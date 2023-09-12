@@ -2,9 +2,12 @@ from django.contrib import admin
 from django.conf.urls import include, url
 from django.conf import settings
 from django.views.static import serve
+from django.urls import path
 
 urlpatterns = [
-    url(r"^admin/", admin.site.urls),
+    path("admin/", admin.site.urls),
+    path("api/", include(("fiveapp.api_urls", "project"), namespace="api")),
+
 ]
 
 if settings.DEBUG:
