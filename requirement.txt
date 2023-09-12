@@ -1,0 +1,12 @@
+Django >= 3.2, < 4
+django-filter==21.1
+djangorestframework==3.13.*
+docutils==0.18.*
+et-xmlfile==1.1.*
+idna~=3.3
+python-dateutil==2.8.*
+requests==2.27.*
+six==1.16.*
+Pillow==9.1.*
+psycopg2==2.9.*
+mysqlclient~=2.1
