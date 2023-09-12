@@ -1,0 +1,25 @@
+import os
+
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+debug = True
+allowed_hosts = [
+    "*",
+    "127.0.0.1",
+]
+secret_key = "6_^s1$ndr$z%_2h3+m^x_yct%87f=19qa93sd$z&1z7v$3eek0"
+email_host_password = ""
+databases = {
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'testproject',
+        'USER': 'testprojectuser',
+        'PASSWORD': 'password',
+        'HOST': 'localhost',
+        'PORT': '',
+    }
+}
+media_root = "your media"
+static_root = ""
+domains = ["localhost", "127.0.0.1:8000"]
+email_host_user = ""
+email_host_password = ""
