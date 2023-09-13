@@ -1,0 +1,185 @@
+{% extends "dashboard/base.html" %}
+{% block content %}
+{% load static %}
+<div class="page_body">
+{% include '../general/header.html' %}
+
+<div class="card-group">
+  <div class="row">
+    <div class="col-12">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-0 bg-white">
+          <li class="breadcrumb-item">
+            <a>Module</a>
+          </li>
+          <li class="breadcrumb-item">
+            <a>
+              <b>Module</b>
+            </a>
+          </li>
+        </ol>
+      </nav>
+    </div>
+  </div>
+  <div class="row">
+    <div class="col-12">
+      <div class="card rounded-t-s">
+        <div class="card-header bg-transparent pt-0">
+          <div class="row align-items-center">
+            <div class="col-md-4">
+              <h5 class="card-title font-bold">Module</h5>
+            </div>
+            <div class="col-md-8 text-md-end">
+              <button class="btn btn-primary m-w-100-px btn-group-icon me-15" type="button" data-bs-toggle="offcanvas" data-bs-target="#modal_add">
+                <i class="fa fa-plus" aria-hidden="true"></i>
+                <span>Add New</span>
+              </button> 
+            </div>
+          </div> 
+        </div>
+        <div class="card-sub-header mt-15">
+          <div class="row">
+            <div class="col-md-8">
+              <div class="search-form d-inline-block me-15">
+                <form>
+                  {% for key,value in request.GET.items %}
+                      {% if key != 'search' %}
+                      <input hidden name="{{key}}" value="{{value}}">
+                      {%endif%}
+                  {%endfor%}
+                  <input class="form-control" type="search" name="search" value="{{search|default_if_none:""}}" placeholder="Search">
+                  <button class="btn" type="submit">
+                      <img src="{% static 'general/images/icons/light-grey-search.png' %}">
+                  </button>
+              </form>
+              </div>
+            </div>
+            <div class="col-md-4 text-md-end">
+              <div class="btn-group btn-group-export">
+                <button class="btn" type="button" onclick="printThis('.print_data')">Print</button>
+          
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="card-body ">
+          <div class="table-default bg-tr-even">
+            <div class="table-responsive print_data">
+              <table class="table text-center">
+                <thead>
+                  <tr>
+                    <th class="xs-tcol">#</th>
+                    <th class="s-tcol">Title</th>
+                    <th class="s-tcol text-start">Description</th>
+                    <th class="btn-tcol">Action</th>
+                  </tr>
+                </thead>
+                <tbody>    
+                  {%for i in page%} 
+                  <tr>
+                      <td>{{forloop.counter}}</td>
+                      
+                      <td>{{i.title|default_if_none:''}}</td>
+                      <td>
+                          <img class="img-default rounded-img" src="{%if i.image%}{{i.image.url}}{%endif%}">
+                      </td>
+                      <td>{{i.sub_title|default_if_none:""}}</td>
+                      <td class="s-tcol text-start">{{i.description|truncatechars:"50"|default_if_none:""|safe}}</td>
+                      <td>{{i.date|default_if_none:""}}</td>
+                      <td class="d-print-none">
+                      <div class="dropdown">
+                          <button class="dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                          <img src="{% static 'general/images/icons/light-grey-ellipsis-h.png' %}">
+                          </button>
+                          <ul class="dropdown-menu">
+                         
+                          <li>
+                              <a class="dropdown-item" data-date="{{i.date|date:"d/m/Y"|default_if_none:""}}" data-image="{%if i.image%}{{i.image.url}}{%endif%}" data-des="{{i.description|default_if_none:""}}" data-sub="{{i.sub_title|default_if_none:""}}" data-title="{{i.title|default_if_none:""}}" data-id="{{i.id}}" onclick="edit_modal(this)">Update</a>
+                          </li>
+                          <li>
+                              <button data-class="{{i.id}}" type="button" class="dropdown-item text-danger swal_btn_delete" >Delete</button>
+                          </li>
+                          </ul>
+                      </div>
+                      </td>
+                  </tr>
+                  {%endfor%}
+                </tbody>
+              </table>
+            </div>
+            <div class="row align-items-center">
+              <div class="col-md-4 col-8">
+                {% include 'dashboard/table-info.html' %}
+              </div>
+              <div class="col-md-4 col-12 order-3-zero-sm">
+                {% include 'dashboard/pagination-buttons.html' %}
+              </div>
+              <div class="col-md-4 col-4 text-end order-2-zero-sm">
+                {% include 'dashboard/table-length.html' %}
+              </div>
+            </div>     
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- modal_add -->
+<div class="offcanvas offcanvas-end" tabindex="-1" id="modal_add">
+  <div class="offcanvas-header">
+    <h5 class="offcanvas-title font-bold">Add</h5>
+    <button type="button" class="btn-icon btn-offcanvas-close" data-bs-dismiss="offcanvas" aria-label="Close">
+      <img src="{% static 'general/images/icons/arrow-right.png' %}">
+    </button>
+  </div>  
+  <div class="offcanvas-body">
+    <form method="post" action="" enctype="multipart/form-data">{% csrf_token %}
+      <div class="offcanvas-inner-body">
+      <div class="form-default">
+        <div class="form-body">
+          <div class="row">
+            <div class="col-12">
+              <label class="form-label">Title</label>
+              <input type="text" class="form-control" name="title" placeholder="Enter Title" required >
+            </div>
+            <div class="col-12">
+              <label class="form-label">Sub Title</label>
+              <input type="text" class="form-control" name="sub_title" placeholder="Enter Sub Title" >
+            </div>
+          
+            <div class="col-12">
+              <label class="form-label">Description</label>
+              <textarea class="form-control DESCRIPTION" name="description" placeholder="Enter Description"></textarea>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Date</label>
+              <input type="text" autocomplete="off" class="form-control date_pick" required  name="date" placeholder="dd/mm/yyyy" />
+            </div>   
+              <div class="col-md-6">
+                <label class="form-label">Image</label>
+                <input type="file" class="form-control" required name="image"  accept="image/*" />
+            </div>   
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="offcanvas-footer text-end">
+      <button type="button" class="btn btn-secondary m-w-100-px me-15" data-bs-dismiss="offcanvas" aria-label="Close">Cancel</button>
+      <button class="btn btn-l-green m-w-100-px" onclick="submitAnyForm(this)">Submit</button>
+    </div>
+   </form>
+  </div>
+</div>
+<!-- /modal_add -->
+
+
+</div><!-- page_body -->
+{% endblock %}
+
+{%block javascript%}
+<script>
+
+
+  </script>
+  {% endblock %}

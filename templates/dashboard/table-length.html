@@ -1,0 +1,17 @@
+
+<div class="table-length">
+  <form action="">
+  {% for key,value in request.GET.items %}
+      {% if key != 'item_per_page' %}
+      <input hidden name="{{key}}" value="{{value}}">
+      {%endif%}
+  {%endfor%}
+
+
+  <select name="item_per_page" onchange="this.form.submit()">
+    <option value="50" {%if request.GET.item_per_page == "50" %}selected{%endif%}>50</option>
+    <option value="100" {%if request.GET.item_per_page == "100" %}selected{%endif%}>100</option>
+    <option value="150" {%if request.GET.item_per_page == "150" %}selected{%endif%}>150</option>
+  </select>
+</form>
+</div>

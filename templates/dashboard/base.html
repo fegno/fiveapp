@@ -1,0 +1,126 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+  <head>
+   <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+   <meta charset="utf-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1">
+   <meta http-equiv="X-UA-Compatible" content="IE=edge">
+   <title>FIVEAPP</title>
+   <link href="{% static 'general/fonts/fontawesome/v4.7/css/font-awesome.min.css' %}" rel="stylesheet" type="text/css">
+   <link href="{% static 'dashboard/modules/sidemenu/side-menu.css' %}?v=26/10/2020" rel="stylesheet" type="text/css">
+   <link href="{% static 'general/modules/print/print.css' %}" rel="stylesheet" type="text/css">
+   <link href="{% static 'general/modules/chosen-select/chosen.css' %}" rel="stylesheet" type="text/css">
+   <link href="{% static 'general/modules/datepicker/jquery-ui.css' %}" rel="stylesheet" type="text/css">
+   <link href="{% static 'general/modules/daterangepicker/daterangepicker.min.css' %}" rel="stylesheet" type="text/css">
+   <link href="{% static 'general/modules/slick-slider/slick.min.css' %}?v=30/03/2021" rel="stylesheet" type="text/css" />
+   <link href="{% static 'general/modules/slick-slider/slick-theme.min.css' %}?v=30/03/2021" rel="stylesheet" type="text/css" />
+   <link href="{% static 'general/modules/sweetalert/sweet-alert.css' %}" rel="stylesheet" type="text/css">
+   <link href="{% static 'general/modules/fancybox/jquery.fancybox.min.css' %}" rel="stylesheet" type="text/css">
+   <link href="{% static 'general/modules/datatables/datatables.min.css' %}" rel="stylesheet" type="text/css">
+   <link href="{% static 'general/modules/datatables/custom.css' %}?v=12/01/2021" rel="stylesheet" type="text/css">
+   <link href="{% static 'general/modules/bootstrap5/css/bootstrap.min.css' %}" rel="stylesheet" type="text/css">
+   <link href="{% static 'general/fonts/webfonts/airbnbcereal/font-airbnbcereal.css' %}" rel="stylesheet" type="text/css">
+   <link href="{% static 'general/css/custom.css' %}?v=14/01/2021" rel="stylesheet" type="text/css">
+   <link href="{% static 'dashboard/css/custom.css' %}?v=18/02/2022" rel="stylesheet" type="text/css">
+   <!-- jquery -->
+   <script src="{% static 'general/modules/jquery/jquery-3.3.1.min.js' %}" type="text/javascript"></script>
+  {% block style %}
+  {% endblock %}
+</head>
+<body class="open-sidebar">
+    <div class="pre_loader pre-loader"></div><!-- pre-loader -->
+
+    <!-- loading -->
+    <div class="loading LOADING d-none">
+      <span>Loading</span>
+    </div>
+
+     {% block content %}
+     {% endblock %}
+
+<!-- modal_show_image -->
+<div class="offcanvas offcanvas-end offcanvas-lg modal_show_image" tabindex="-1" id="modal_show_image">
+  <div class="offcanvas-header">
+    <button type="button" class="btn-icon btn-offcanvas-close" data-bs-dismiss="offcanvas" aria-label="Close">
+      <img src="{% static 'general/images/icons/arrow-right.png' %}">
+    </button>
+  </div>  
+  <div class="offcanvas-body">
+    <div class="offcanvas-inner-body p-0">
+      <div class="row">
+        <div class="col-12">
+          <img class="show_image img-fluid">
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- /modal_show_image -->
+
+<!-- modal_show_file -->
+<div class="offcanvas offcanvas-end offcanvas-lg modal_show_file" data-bs-backdrop="false" tabindex="-1" id="modal_show_file">
+  <div class="offcanvas-header">
+    <button type="button" class="btn-icon btn-offcanvas-close remove_src" data-bs-dismiss="offcanvas" aria-label="Close">
+      <img src="{% static 'general/images/icons/arrow-right.png' %}">
+    </button>
+  </div>  
+  <div class="offcanvas-body">
+    <div class="offcanvas-inner-body p-0">
+      <div class="row">
+        <div class="col-12">
+          <embed id="file_src" class="show_file h-100-vh">  
+          <iframe class="show_file h-100-vh" id="i_file_src" hidden
+          >
+          </iframe>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- /modal_show_file -->
+
+  </div><!-- /main-wrapper -->
+  
+  <script>var csrf_header={'X-CSRFToken': '{{csrf_token}}'};</script>
+  <!-- apexcharts -->
+  <script src="{% static 'dashboard/modules/apexcharts/apexcharts.min.js' %}" type="text/javascript"></script>
+  <!-- sidemenu -->
+  <script src="{% static 'dashboard/modules/sidemenu/side-menu.js' %}?v=26/10/2020" type="text/javascript"></script>
+  <!-- print -->
+  <script src="{% static 'general/modules/print/jquery.PrintArea.js' %}" type="text/javascript"></script>
+  <!-- chosen-select -->
+  <script src="{% static 'general/modules/chosen-select/chosen.jquery.js' %}" type="text/javascript"></script>
+  <!-- datepicker -->
+  <script src="{% static 'general/modules/datepicker/jquery-ui.js' %}" type="text/javascript"></script>
+  <!-- daterangepicker -->
+  <script src="{% static 'general/modules/daterangepicker/moment.min.js' %}" type="text/javascript"></script>
+  <script src="{% static 'general/modules/daterangepicker/daterangepicker.min.js' %}" type="text/javascript"></script>
+  <!-- slick-slider -->
+  <script src="{% static 'general/modules/slick-slider/slick.min.js' %}" type="text/javascript"></script>
+  <script src="{% static 'general/modules/slick-slider/custom.js' %}?v=04/04/2021" type="text/javascript"></script>
+  <!-- sweetalert -->
+  <script src="{% static 'general/modules/sweetalert/sweet-alert.min.js' %}" type="text/javascript"></script>
+  <script src="{% static 'general/modules/sweetalert/custom.js' %}?v=26/10/2020" type="text/javascript"></script>
+  <!-- select-table-filter -->
+  <script src="{% static 'dashboard/modules/select-table-filter/select-table-filter.js' %}" type="text/javascript"></script>
+  <!-- swipe-menu -->
+  <script src="{% static 'dashboard/modules/swipe-menu/swipe-menu.js' %}?v=26/10/2020" type="text/javascript"></script>
+  <!-- datatables -->
+  <script src="{% static 'general/modules/datatables/datatables.min.js' %}" type="text/javascript"></script>
+  <script src="{% static 'general/modules/datatables/dt-buttons/buttons.min.js' %}" type="text/javascript"></script>
+  <script src="{% static 'general/modules/datatables/custom.js' %}" type="text/javascript"></script>
+  <!-- bootstrap5 -->
+  <script src="{% static 'general/modules/bootstrap5/js/popper.min.js' %}" type="text/javascript"></script>
+  <script src="{% static 'general/modules/bootstrap5/js/bootstrap.min.js' %}" type="text/javascript"></script>
+  <!-- custom -->
+  <script type="text/javascript" src="{% static 'ckeditor/ckeditor.js' %}"></script>
+  <script type="text/javascript" src="{% static 'ckeditor/adapters/jquery.js' %}"></script>
+  <script src="{% static 'general/js/custom.js' %}?v=22/10/2020" type="text/javascript"></script>
+  <script src="{% static 'dashboard/js/custom.js' %}?v=27/10/2020" type="text/javascript"></script>
+  {% block javascript %}
+  {% endblock %}   
+  {% include 'general/common_messages.html' %}
+</body>  
+</html>
