@@ -1,0 +1,31 @@
+
+/* slick-offset */
+.slick-offset-20 .slick-list {
+    padding-right: 20%;}
+.slick-offset-5 .slick-list {
+    padding-right: 5%;}
+
+/* slick-item */
+.slick-item .img-primary {
+    width: 100%;
+    max-width: 100%;
+    object-fit: cover;
+    height: auto;}
+
+.slick-next.slick-disabled, 
+.slick-prev.slick-disabled {
+    cursor: default !important;}
+
+/* arrow */
+.slick-btn-arrow .slick-next:before, 
+.slick-btn-arrow .slick-prev:before {
+    content: '';
+    background-repeat: no-repeat;
+    background-size: 35%;
+    width: 100px;
+    height: 100px;
+    display: block;}
+.slick-btn-arrow .slick-next:before {
+    background-image: url(./next.png);}
+.slick-btn-arrow .slick-prev:before {
+    background-image: url(./prev.png);}
