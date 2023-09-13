@@ -21,6 +21,7 @@ import os
 import shlex
 import subprocess
 from background_task import background
+from fiveapp.utils import get_error
 
 from user.models import UserProfile, Token, LoginOTP
 from user.serializers import RegisterSerializer
@@ -141,15 +142,18 @@ class RegisterUser(APIView):
     def post(self, request):
         response_dict = {"status": False}
         data = request.data   
-        data._mutable = True
-        data["username"] = request.data.get("email")
-        data._mutable = False
         serializer = RegisterSerializer(data=data)
+        if UserProfile.objects.filter(
+            email=data.get("email"),
+        ).first():
+            response_dict["reason"] ="User already exists"
+            return Response(response_dict, HTTP_200_OK)
         with transaction.atomic():
             if serializer.is_valid():
                 user = serializer.save(
                     user_type="ADMIN",
                 )
+                user.username = user.email
                 user.set_password(data.get("password"))
                 user.save()
                 response_dict["status"] = True

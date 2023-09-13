@@ -70,8 +70,10 @@
                   <tr>
                     <th class="xs-tcol">#</th>
                     <th class="s-tcol">Title</th>
+                    <th class="s-tcol">Monthly Price</th>
+                    <th class="s-tcol">Weekly Price</th>
+                    <th class="s-tcol">Yearly Price</th>
                     <th class="s-tcol text-start">Description</th>
-                    <th class="btn-tcol">Action</th>
                   </tr>
                 </thead>
                 <tbody>    
@@ -80,28 +82,8 @@
                       <td>{{forloop.counter}}</td>
                       
                       <td>{{i.title|default_if_none:''}}</td>
-                      <td>
-                          <img class="img-default rounded-img" src="{%if i.image%}{{i.image.url}}{%endif%}">
-                      </td>
-                      <td>{{i.sub_title|default_if_none:""}}</td>
-                      <td class="s-tcol text-start">{{i.description|truncatechars:"50"|default_if_none:""|safe}}</td>
-                      <td>{{i.date|default_if_none:""}}</td>
-                      <td class="d-print-none">
-                      <div class="dropdown">
-                          <button class="dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                          <img src="{% static 'general/images/icons/light-grey-ellipsis-h.png' %}">
-                          </button>
-                          <ul class="dropdown-menu">
-                         
-                          <li>
-                              <a class="dropdown-item" data-date="{{i.date|date:"d/m/Y"|default_if_none:""}}" data-image="{%if i.image%}{{i.image.url}}{%endif%}" data-des="{{i.description|default_if_none:""}}" data-sub="{{i.sub_title|default_if_none:""}}" data-title="{{i.title|default_if_none:""}}" data-id="{{i.id}}" onclick="edit_modal(this)">Update</a>
-                          </li>
-                          <li>
-                              <button data-class="{{i.id}}" type="button" class="dropdown-item text-danger swal_btn_delete" >Delete</button>
-                          </li>
-                          </ul>
-                      </div>
-                      </td>
+                      <td>{{i.description|default_if_none:""}}</td>
+                     
                   </tr>
                   {%endfor%}
                 </tbody>
