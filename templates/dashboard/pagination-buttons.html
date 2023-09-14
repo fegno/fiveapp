@@ -1,0 +1,33 @@
+{% if page %}
+<ul class="pagination justify-content-center d-print-none">
+  {% with pagedict=page|page_links %}
+  {% if pagedict.show_first  %}
+  <li class="page-item prev-item">
+    <a class="page-link" href="?page=1" aria-label="Previous">
+      <i class="fa fa-angle-left" aria-hidden="true"></i>
+    </a>
+  </li>
+  {%endif%}
+  {% for i in pagedict.prev_three %}
+  <li class="page-item">
+    <a class="page-link" href="?page={{i}}{% for key,value in request.GET.items %}{% if key != 'page' %}&{{key}}={{value}}{%endif%}{%endfor%}">{{i}}</a>
+  </li>
+  {%endfor%}
+  <li class="page-item"><a class="page-link active" href="?page={{page.number}}{% for key,value in request.GET.items %}{% if key != 'page' %}&{{key}}={{value}}{%endif%}{%endfor%}">{{page.number}}</a> </i>
+  {% for i in pagedict.next_three %}
+  <li class="page-item">
+    <a class="page-link" href="?page={{i}}{% for key,value in request.GET.items %}{% if key != 'page' %}&{{key}}={{value}}{%endif%}{%endfor%}">{{i}}</a>
+  </li>
+  {%endfor%}
+ 
+  {% if pagedict.show_last  %}
+  <li class="page-item next-item">
+    <a class="page-link" href="?page={{ page.num_pages }}{% for key,value in request.GET.items %}{% if key != 'page' %}&{{key}}={{value}}{%endif%}{%endfor%}" aria-label="Next">
+      <i class="fa fa-angle-right" aria-hidden="true"></i>
+    </a>
+  </li>
+  {%endif%}
+
+  {% endwith %}
+</ul>
+{%endif%}

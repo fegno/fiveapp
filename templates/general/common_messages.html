@@ -1,0 +1,54 @@
+{% load static %}
+{% block style %}
+ <link href="{% static 'general/modules/message-wrapper/message-wrapper.css' %}" rel="stylesheet" type="text/css">
+{% endblock %}
+
+{% if messages %}
+	{% for message in messages %}
+	{% if forloop.counter0 == 0 %}
+    <div class="message_wrapper message-wrapper {{ message.tags }}">
+        <div class="message-inner">
+          <div class="message-body">
+            <div class="warning">
+              <div class="icon-wrapper">
+                <div class="icon pulseWarning"> 
+                  <span class="icon-body pulseWarningIns"></span> 
+                  <span class="dot pulseWarningIns"></span> 
+                </div>
+               </div>
+              <h3>Warning</h3>
+            </div>
+            <div class="success">
+              <div class="sa-wrapper">
+                <div class="sa-success">
+                <div class="sa-success-tip"></div>
+                <div class="sa-success-long"></div>
+                <div class="sa-success-placeholder"></div>
+                <div class="sa-success-fix"></div>
+               </div>
+              </div>
+              <h3>Success</h3>
+            </div>
+            <h5>{% autoescape off %}{{ message }}{% endautoescape %}</h5>
+          </div>
+          <div class="message-foot">
+            <button type="button" class="btn-cancel" onclick="close_message();">Cancel</button>
+            <button type="button" class="btn-confirm" onclick="close_message();">Yes, ok</button>
+          </div>
+        </div>
+    </div>
+	{% endif %}
+	{% endfor %}
+    <script>
+	 function close_message()
+        {
+		$('.message_wrapper').hide();
+        }
+	$(window).ready(function(){
+        $('.message_wrapper').addClass('display_class')
+        setTimeout(function(){
+            $('.message_wrapper').not('.persist').fadeOut(1500);
+        },4000);
+	});
+    </script>
+{% endif %}

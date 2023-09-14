@@ -1,0 +1,68 @@
+{% load static %}
+<!-- header -->
+<header class="header">
+
+<div class="row">
+<!-- left -->
+ <div class="col-lg-9 col-6 left">
+   <a class="a-logo" href="{% url 'superadmin:landing-page' %}">
+   </a>
+
+    <!-- sidebar-toggle -->
+     <a data-toggle="body" class="sidebar-toggle sidebar_toggle d-none d-lg-block">
+      <span></span>
+	    <span></span>
+	    <span></span>
+	   </a>
+     <a data-toggle="body" class="sidebar-toggle sidebar_toggle_mob d-lg-none">
+      <span></span>
+	    <span></span>
+	    <span></span>
+	   </a>
+	  <div class="swipe-area-btn"></div>
+ </div>
+         
+ <!-- right -->
+ <div class="col-lg-3 right col-6 text-end">
+ <!-- user-profile-dropdown -->
+   <div class="dropdown user-profile-dropdown">
+    <button class="dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+      <img src="{% static 'general/images/icons/default-user-icon.png' %}">
+      <div>{{request.session.user}}</div>
+    </button>
+    <ul class="dropdown-menu">
+     
+      <li>
+        <a class="dropdown-item" href="">Logout</a>
+      </li>
+    </ul>
+  </div>
+  <!-- /user-profile-dropdown -->
+ </div>
+ 
+ </div>
+</header>
+<!-- /header -->
+
+ 
+  <!-- side-menu -->
+   <aside id="sidebar">
+    <div class="sidebar-menu">
+      <ul>
+        <!-- sidebar-toggle -->
+         <a data-toggle="body" class="sidebar-toggle sidebar_toggle_mob"></a>
+          <li>
+           <a href="{% url 'superadmin:landing-page' %}" title="Blog">
+            <div class="icon">
+             <i class="fa fa-star-o" aria-hidden="true"></i>
+            </div>
+            <span>Module</span>
+           </a>
+         </li>
+       
+      </ul>
+    </div> 
+    </aside>
+    <!-- /side-menu -->
+
+   <div class="main-wrapper">

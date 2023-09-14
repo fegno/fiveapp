@@ -12,5 +12,4 @@ class RegisterSerializer(serializers.ModelSerializer):
             "company_name",
             "industrial_size",
             "employee_position",
-            "username"
         )

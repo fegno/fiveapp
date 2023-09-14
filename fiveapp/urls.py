@@ -7,6 +7,11 @@ from django.urls import path
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/", include(("fiveapp.api_urls", "project"), namespace="api")),
+    path("", include(("common.urls", "common"), namespace="common")),
+    path(
+        "superadmin/",
+        include(("superadmin.urls", "superadmin"), namespace="superadmin"),
+    ),
 
 ]
 
