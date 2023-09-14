@@ -123,6 +123,11 @@ class VerifyOtp(APIView):
         response_dict = {"status": False}
         email = request.data.get("email")
         otp = request.data.get("otp")
+        user = UserProfile.objects.filter(username=email).first()
+        if not user:
+            response_dict["reason"] = "No account found"
+            response_dict["status"] = False
+            return Response(response_dict, HTTP_200_OK)
         created_otp = LoginOTP.objects.filter(
             email=email,
         ).order_by("-id").first()
@@ -170,4 +175,37 @@ class AppLogout(APIView):
     def post(self, request):
         logout(request)
         response_dict = {"status": True}
+        return Response(response_dict, HTTP_200_OK)
+
+class SetUserPassword(APIView):
+    permission_classes = (AllowAny,)
+    authentication_classes = tuple()
+
+    def post(self, request):
+        response_dict = {"status": False}
+        email = request.data.get("email") 
+        new_password = request.data.get("new_password") 
+        confirm_password  = request.data.get("confirm_password") 
+        if new_password != confirm_password:
+            response_dict["reason"] = "Password does not match"
+        user = UserProfile.objects.filter(username=email).first()
+        user.set_password(new_password)
+        user.save()
+        response_dict["status"] = True
+        response_dict["message"] = "Password created"
+        return Response(response_dict, HTTP_200_OK)
+
+
+class ChangePassword(APIView):
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (CustomTokenAuthentication,)
+
+    def post(self, request):
+        response_dict = {"status": False}
+        new_password = request.data.get("new_password") 
+        user = request.user
+        user.set_password(new_password)
+        user.save()
+        response_dict["status"] = True
+        response_dict["message"] = "Password changed"
         return Response(response_dict, HTTP_200_OK)

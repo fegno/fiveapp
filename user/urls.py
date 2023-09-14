@@ -9,4 +9,7 @@ urlpatterns = [
     path("verify-otp/", api.VerifyOtp.as_view(), name="verify-otp"),
     path("register-user/", api.RegisterUser.as_view(), name="register-user"),
     path("logout/", api.AppLogout.as_view(), name="logout"),
+    path("set-password/", api.SetUserPassword.as_view(), name="set-password"),
+    path("change-password/", api.ChangePassword.as_view(), name="change-password"),
+
 ]
