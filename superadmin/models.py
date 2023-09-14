@@ -17,6 +17,7 @@ Type_Choice = (
 
 
 class ModuleDetails(models.Model):
+    department = models.CharField(null=True, blank=True, max_length=100)
     title = models.CharField(null=True, blank=True, max_length=1000, choices=Type_Choice,)
     description = models.TextField(null=True, blank=True)
     bundle_name = models.TextField(null=True, blank=True)

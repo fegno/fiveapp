@@ -15,6 +15,7 @@ class ModuleForm(ModelForm):
             "monthly_price",
             "yearly_price",
             "modules",
-            "is_submodule"
+            "is_submodule",
+            "department"
         ]
 
