@@ -21,17 +21,37 @@ class ModuleDetails(models.Model):
     csv_file = models.FileField(null=True, blank=True)
     position = models.IntegerField(default=0)
     weekly_price = models.DecimalField(
-        max_digits=7, decimal_places=2, null=False, blank=False, default=0
+        max_digits=7, decimal_places=2, null=True, blank=True, default=0
     )
     monthly_price = models.DecimalField(
-        max_digits=7, decimal_places=2, null=False, blank=False, default=0
+        max_digits=7, decimal_places=2, null=True, blank=True, default=0
     )
     yearly_price = models.DecimalField(
-        max_digits=7, decimal_places=2, null=False, blank=False, default=0
+        max_digits=7, decimal_places=2, null=True, blank=True, default=0
+    )
+    modules = models.ForeignKey(
+        'self',
+        blank=True,
+        null=True,
+        on_delete=models.CASCADE,   
+    )
+    is_submodule = models.BooleanField(null=False, blank=True, default=False)
+    is_active = models.BooleanField(null=False, blank=True, default=True)
+    created = models.DateTimeField(auto_now_add=True)
+
+class FeatureDetails(models.Model):
+    feature = models.TextField(null=True, blank=True)
+    benifit = models.TextField(null=True, blank=True)
+    modules = models.ForeignKey(
+        "ModuleDetails",
+        blank=True,
+        null=True,
+        on_delete=models.CASCADE,  
     )
 
     is_active = models.BooleanField(null=False, blank=True, default=True)
     created = models.DateTimeField(auto_now_add=True)
+
 
 class BundleDetails(models.Model):
     title = models.CharField(null=True, blank=True, max_length=1000, choices=Type_Choice,)
