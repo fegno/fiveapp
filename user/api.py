@@ -34,7 +34,7 @@ def process_tasks():
     process_tasks_subprocess = subprocess.Popen(process_tasks_args)
 
 
-def random_otp_generator(size=6, chars="123456789"):
+def random_otp_generator(size=4, chars="123456789"):
     return "".join(random.choice(chars) for _ in range(size))
 
 
