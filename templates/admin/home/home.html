@@ -74,32 +74,30 @@
                     <th class="s-tcol">Weekly Price</th>
                     <th class="s-tcol">Yearly Price</th>
                     <th class="s-tcol text-start">Description</th>
+                    <th class="s-tcol text-start">Bundle</th>
+
                   </tr>
                 </thead>
                 <tbody>    
-                  {%for i in page%} 
+                  {%for i in all_modules%} 
                   <tr>
                       <td>{{forloop.counter}}</td>
                       
                       <td>{{i.title|default_if_none:''}}</td>
+                      <td>{{i.monthly_price|floatformat:""|default_if_none:""}}</td>
+                      <td>{{i.weekly_price|floatformat:""|default_if_none:""}}</td>
+                      <td>{{i.yearly_price|floatformat:""|default_if_none:""}}</td>
                       <td>{{i.description|default_if_none:""}}</td>
-                     
+                      <td>{{i.bundle_name|default_if_none:""}}</td>
+
                   </tr>
+
+                  
                   {%endfor%}
                 </tbody>
               </table>
             </div>
-            <div class="row align-items-center">
-              <div class="col-md-4 col-8">
-                {% include 'dashboard/table-info.html' %}
-              </div>
-              <div class="col-md-4 col-12 order-3-zero-sm">
-                {% include 'dashboard/pagination-buttons.html' %}
-              </div>
-              <div class="col-md-4 col-4 text-end order-2-zero-sm">
-                {% include 'dashboard/table-length.html' %}
-              </div>
-            </div>     
+           
           </div>
         </div>
       </div>
@@ -108,9 +106,9 @@
 </div>
 
 <!-- modal_add -->
-<div class="offcanvas offcanvas-end" tabindex="-1" id="modal_add">
+<div class="offcanvas offcanvas-lg offcanvas-end" tabindex="-1" id="modal_add">
   <div class="offcanvas-header">
-    <h5 class="offcanvas-title font-bold">Add</h5>
+    <h5 class="offcanvas-title font-bold">Add Module</h5>
     <button type="button" class="btn-icon btn-offcanvas-close" data-bs-dismiss="offcanvas" aria-label="Close">
       <img src="{% static 'general/images/icons/arrow-right.png' %}">
     </button>
@@ -121,27 +119,97 @@
       <div class="form-default">
         <div class="form-body">
           <div class="row">
+
+            <div class="col-6">
+              <label class="form-label">Is Sub Module</label>
+              <input type="checkbox" onclick="select_moudle(this)" name="is_submodule" >
+            </div>
+            <div class="col-12 MODULE" style="display:none">
+              <label class="form-label">Module</label>
+              <select class="form-select" name="modules">
+                <option value="">Select</option>
+                {%for i in modules%}
+                <option value="{{i.id}}">{{i.title}}</option>
+                {%endfor%}
+              </select>
+            </div>
+
             <div class="col-12">
               <label class="form-label">Title</label>
-              <input type="text" class="form-control" name="title" placeholder="Enter Title" required >
+              <select class="form-select" required name="title">
+                <option value="">Select</option>
+                <option value="Team Indicator">Team Indicator</option>
+                <option value="Team Workforce Plan Corporate">Team Workforce Plan Corporate</option>
+                <option value="Team Cost">Team Cost</option>
+                <option value="Payroll Analytics">Payroll Analytics</option>
+                <option value="Gender Analytics">Gender Analytics</option>
+                <option value="Utility Meter">Utility Meter</option>
+                <option value="Sale Center">Sale Center</option>
+                <option value="Support">Support</option>
+                <option value="Metrics Meter">Metrics Meter</option>
+                <option value="Warehouse MAP Retail">Warehouse MAP Retail</option>
+                <option value="Logistic Controller">Logistic Controller</option>
+                <option value="Odometers">Odometers</option>
+
+              </select>
             </div>
-            <div class="col-12">
-              <label class="form-label">Sub Title</label>
-              <input type="text" class="form-control" name="sub_title" placeholder="Enter Sub Title" >
-            </div>
-          
             <div class="col-12">
               <label class="form-label">Description</label>
               <textarea class="form-control DESCRIPTION" name="description" placeholder="Enter Description"></textarea>
             </div>
-            <div class="col-md-6">
-              <label class="form-label">Date</label>
-              <input type="text" autocomplete="off" class="form-control date_pick" required  name="date" placeholder="dd/mm/yyyy" />
-            </div>   
-              <div class="col-md-6">
-                <label class="form-label">Image</label>
-                <input type="file" class="form-control" required name="image"  accept="image/*" />
-            </div>   
+            <div class="col-6">
+              <label class="form-label">Yearly Price</label>
+              <input type="text" class="form-control" name="yearly_price" placeholder="Yearly Price" required >
+            </div>
+            <div class="col-6">
+              <label class="form-label">Monthly Price</label>
+              <input type="text" class="form-control" name="monthly_price" placeholder="Monthly Price" required >
+            </div>
+            <div class="col-6">
+              <label class="form-label">Weekly Price</label>
+              <input type="text" class="form-control" name="weekly_price" placeholder="Weekly Price" required >
+            </div>
+           
+            <div class="col-6">
+              <label class="form-label">Position</label>
+              <input type="text" class="form-control" name="position" placeholder="position" required >
+            </div>
+            <div class="col-6">
+              <label class="form-label">CSV sample</label>
+              <input type="file" class="form-control" name="csv_file"  required >
+            </div>
+
+            <div class="multi_field_wrapper">
+              <div class="multi-fields">
+                <div class="multi-field multi-section">
+                  <div class="row">
+                    
+                    <div class="col-6">
+                      <label class="form-label">Feature</label>
+                      <textarea class="form-control" name="feature" placeholder="Enter feature"></textarea>
+                    </div>
+                    <div class="col-6">
+                      <label class="form-label">Benifit</label>
+                      <textarea class="form-control" name="benifit" placeholder="Enter benifit"></textarea>
+                    </div>
+                   
+                    <div class="col-md-4">
+                      <button type="button" class="btn text-danger fs-20 border-0 remove-field-btn remove-icon-btn">
+                        <i class="fa fa-times-circle-o" aria-hidden="true"></i>
+                      </button>
+                    </div>       
+                  </div>
+                </div>
+              </div>
+              <div class="row">
+                <div class="col-12">
+                  <button class="btn btn-primary min-width-100-px btn-group-icon add-field-btn" type="button">
+                    <span>+</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+           
           </div>
         </div>
       </div>
@@ -162,6 +230,29 @@
 {%block javascript%}
 <script>
 
+function select_moudle(src){
+  var chk =  $(src).is(":checked")
+  if(chk == true){
+    $(".MODULE").show()
+  }
+  else{
+    $(".MODULE").hide()
+    $("select[name='modules']").val("")
 
-  </script>
-  {% endblock %}
+  }
+}
+
+// multi_field_wrapper
+$('.multi_field_wrapper').each(function () {
+  var $wrapper = $('.multi-fields', this);
+  $(".add-field-btn", $(this)).click(function (e) {
+    $('.multi-field:first-child', $wrapper).clone(true).attr("id", "").appendTo($wrapper).find('.multi-input').val('').focus();
+  });
+  $('.multi-field .remove-field-btn', $wrapper).click(function () {
+    if ($('.multi-field', $wrapper).length > 1)
+      $(this).parents('.multi-field').remove();
+  });
+});
+
+</script>
+{% endblock %}

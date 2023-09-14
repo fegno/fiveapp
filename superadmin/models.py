@@ -3,14 +3,16 @@ from django.db import models
 Type_Choice = (
     ("Team Indicator", "Team Indicator"),
     ("Team Workforce Plan Corporate", "Team Workforce Plan Corporate"),
-    ("Team Cost HR Costing and Accounting department", "Team Cost HR Costing and Accounting department"),
-    ("Payroll Analytics - Business Services", "Payroll Analytics - Business Services"),
-    ("Gender analytics - Finance and HR department", "Gender analytics - Finance and HR department"),
-    ("UTILITY METER - SUPPLY CHAIN","UTILITY METER - SUPPLY CHAIN"),
-    ("METRICS METER / SALE CENTRE","METRICS METER / SALE CENTRE"),
+    ("Team Cost", "Team Cost"),
+    ("Payroll Analytics", "Payroll Analytics"),
+    ("Gender Analytics", "Gender Analytics"),
+    ("Utility Meter","Utility Meter"),
+    ("Sale Center","Sale Center"),
+    ("Support","Support"),
+    ("Metrics Meter","Metrics Meter"),
     ("Warehouse MAP Retail","Warehouse MAP Retail"),
     ("Logistic Controller","Logistic Controller"),
-    ("ODOMETERS: BACK OFFICE","ODOMETERS: BACK OFFICE")
+    ("Odometers","Odometers")
 )
 
 
@@ -20,14 +22,14 @@ class ModuleDetails(models.Model):
     bundle_name = models.TextField(null=True, blank=True)
     csv_file = models.FileField(null=True, blank=True)
     position = models.IntegerField(default=0)
-    weekly_price = models.DecimalField(
-        max_digits=7, decimal_places=2, null=True, blank=True, default=0
+    weekly_price = models.FloatField(
+        null=True, blank=True, default=0
     )
-    monthly_price = models.DecimalField(
-        max_digits=7, decimal_places=2, null=True, blank=True, default=0
+    monthly_price = models.FloatField(
+       null=True, blank=True, default=0
     )
-    yearly_price = models.DecimalField(
-        max_digits=7, decimal_places=2, null=True, blank=True, default=0
+    yearly_price = models.FloatField(
+        null=True, blank=True, default=0
     )
     modules = models.ForeignKey(
         'self',
@@ -59,14 +61,14 @@ class BundleDetails(models.Model):
         "ModuleDetails",
         blank=True   
     )
-    weekly_price = models.DecimalField(
-        max_digits=7, decimal_places=2, null=False, blank=False, default=0
+    weekly_price = models.FloatField(
+       null=False, blank=False, default=0
     )
-    monthly_price = models.DecimalField(
-        max_digits=7, decimal_places=2, null=False, blank=False, default=0
+    monthly_price = models.FloatField(
+        null=False, blank=False, default=0
     )
-    yearly_price = models.DecimalField(
-        max_digits=7, decimal_places=2, null=False, blank=False, default=0
+    yearly_price = models.FloatField(
+        null=False, blank=False, default=0
     )
 
     is_active = models.BooleanField(null=False, blank=True, default=True)
