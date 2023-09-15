@@ -71,6 +71,7 @@ class BundleDetails(models.Model):
     yearly_price = models.FloatField(
         null=False, blank=False, default=0
     )
+    icon = models.FileField(null=True, blank=True)
 
     is_active = models.BooleanField(null=False, blank=True, default=True)
     created = models.DateTimeField(auto_now_add=True)
