@@ -13,3 +13,9 @@ class RegisterSerializer(serializers.ModelSerializer):
             "industrial_size",
             "employee_position",
         )
+
+class UserSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = UserProfile
+        fields = '__all__'

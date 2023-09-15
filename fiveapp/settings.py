@@ -38,7 +38,8 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'background_task',
     "user",
-    "superadmin"
+    "superadmin",
+    "administrator"
 ]
 
 MIDDLEWARE = [
@@ -125,3 +126,5 @@ EMAIL_USE_TLS = True
 EMAIL_PORT = 587
 EMAIL_HOST_USER = local_settings.email_host_user
 EMAIL_HOST_PASSWORD = local_settings.email_host_password
+
+DISABLE_INTERNAL_REQUEST_CALL_API = False
