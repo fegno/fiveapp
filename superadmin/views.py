@@ -27,8 +27,8 @@ from django.db.models import (
 )
 from django.http import HttpResponse
 import json
-from superadmin.models import ModuleDetails, FeatureDetails
-from superadmin.forms import ModuleForm
+from superadmin.models import ModuleDetails, FeatureDetails,  BundleDetails
+from superadmin.forms import ModuleForm, BundleForm
 
 class LandingPage(IsSuperAdminMixin, TemplateView):
     template_name = "admin/home/home.html"
@@ -74,3 +74,36 @@ class LandingPage(IsSuperAdminMixin, TemplateView):
             response_dict["reason"] = get_error(form)
             messages.error(request, response_dict["reason"])
         return redirect(request.GET.get("return") or "superadmin:landing-page")
+
+
+class ListBundle(IsSuperAdminMixin, TemplateView):
+    template_name = "admin/bundle/bundle.html"
+
+    def get(self, request):
+        context = {}
+        all_modules = ModuleDetails.objects.filter(
+            is_active=True,
+        )
+        bundle = BundleDetails.objects.filter(
+            is_active=True,
+        )
+        context = {
+            "user": request.session["user"],
+            "bundle":bundle,
+            "all_modules":all_modules
+        }
+        return render(request, self.template_name, context)
+
+    def post(self, request):
+        response_dict = {}
+        form = BundleForm(request.POST, request.FILES)
+        if form.is_valid():
+            with transaction.atomic():
+                bundle = form.save()   
+                if request.POST.getlist("modules"):
+                    bundle.modules.add(*request.POST.getlist("modules"))             
+                messages.success(request, "Added successfully")
+        else:
+            response_dict["reason"] = get_error(form)
+            messages.error(request, response_dict["reason"])
+        return redirect(request.GET.get("return") or "superadmin:list-bundle")

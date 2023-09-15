@@ -1,0 +1,221 @@
+{% extends "dashboard/base.html" %}
+{% block content %}
+{% load static %}
+<div class="page_body">
+{% include '../general/header.html' %}
+
+<div class="card-group">
+  <div class="row">
+    <div class="col-12">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-0 bg-white">
+          <li class="breadcrumb-item">
+            <a>Bundle</a>
+          </li>
+          <li class="breadcrumb-item">
+            <a>
+              <b>Bundle</b>
+            </a>
+          </li>
+        </ol>
+      </nav>
+    </div>
+  </div>
+  <div class="row">
+    <div class="col-12">
+      <div class="card rounded-t-s">
+        <div class="card-header bg-transparent pt-0">
+          <div class="row align-items-center">
+            <div class="col-md-4">
+              <h5 class="card-title font-bold">Bundle</h5>
+            </div>
+            <div class="col-md-8 text-md-end">
+              <button class="btn btn-primary m-w-100-px btn-group-icon me-15" type="button" data-bs-toggle="offcanvas" data-bs-target="#modal_add">
+                <i class="fa fa-plus" aria-hidden="true"></i>
+                <span>Add New</span>
+              </button> 
+            </div>
+          </div> 
+        </div>
+        <div class="card-sub-header mt-15">
+          <div class="row">
+            <div class="col-md-8">
+              <div class="search-form d-inline-block me-15">
+                <form>
+                  {% for key,value in request.GET.items %}
+                      {% if key != 'search' %}
+                      <input hidden name="{{key}}" value="{{value}}">
+                      {%endif%}
+                  {%endfor%}
+                  <input class="form-control" type="search" name="search" value="{{search|default_if_none:""}}" placeholder="Search">
+                  <button class="btn" type="submit">
+                      <img src="{% static 'general/images/icons/light-grey-search.png' %}">
+                  </button>
+              </form>
+              </div>
+            </div>
+            <div class="col-md-4 text-md-end">
+              <div class="btn-group btn-group-export">
+                <button class="btn" type="button" onclick="printThis('.print_data')">Print</button>
+          
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="card-body ">
+          <div class="table-default bg-tr-even">
+            <div class="table-responsive print_data">
+              <table class="table text-center">
+                <thead>
+                  <tr>
+                    <th class="xs-tcol">#</th>
+                    <th class="s-tcol">Title</th>
+                    <th class="s-tcol">Monthly Price</th>
+                    <th class="s-tcol">Weekly Price</th>
+                    <th class="s-tcol">Yearly Price</th>
+                    <th class="s-tcol">Available Modules</th>
+
+                  </tr>
+                </thead>
+                <tbody>    
+                  {%for i in bundle%} 
+                  <tr>
+                      <td>{{forloop.counter}}</td>
+                      
+                      <td>{{i.title|default_if_none:''}}</td>
+                      <td>{{i.monthly_price|floatformat:""|default_if_none:""}}</td>
+                      <td>{{i.weekly_price|floatformat:""|default_if_none:""}}</td>
+                      <td>{{i.yearly_price|floatformat:""|default_if_none:""}}</td>
+                      <td>
+                          {%for j in i.modules.all%}
+                          {{j.title}}<br>
+                          {%endfor%}
+                      </td>
+
+                  </tr>
+
+                  
+                  {%endfor%}
+                </tbody>
+              </table>
+            </div>
+           
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- modal_add -->
+<div class="offcanvas offcanvas-lg offcanvas-end" tabindex="-1" id="modal_add">
+  <div class="offcanvas-header">
+    <h5 class="offcanvas-title font-bold">Add Bundle</h5>
+    <button type="button" class="btn-icon btn-offcanvas-close" data-bs-dismiss="offcanvas" aria-label="Close">
+      <img src="{% static 'general/images/icons/arrow-right.png' %}">
+    </button>
+  </div>  
+  <div class="offcanvas-body">
+    <form method="post" action="" enctype="multipart/form-data">{% csrf_token %}
+      <div class="offcanvas-inner-body">
+      <div class="form-default">
+        <div class="form-body">
+          <div class="row">
+
+            <div class="col-12">
+              <label class="form-label">Module</label>
+                <select multiple required class="chosen-select" name="modules">
+                    <option value="">Select</option>
+                    {%for i in all_modules%}
+                    <option value="{{i.id}}">{{i.title}}</option>
+                    {%endfor%}
+                </select>
+            </div>
+
+            <div class="col-12">
+              <label class="form-label">Title</label>
+              <select class="form-select" required name="title">
+                <option value="">Select</option>
+                <option value="Team Indicator">Team Indicator</option>
+                <option value="Team Workforce Plan Corporate">Team Workforce Plan Corporate</option>
+                <option value="Team Cost">Team Cost</option>
+                <option value="Payroll Analytics">Payroll Analytics</option>
+                <option value="Gender Analytics">Gender Analytics</option>
+                <option value="Utility Meter">Utility Meter</option>
+                <option value="Sale Center">Sale Center</option>
+                <option value="Support">Support</option>
+                <option value="Metrics Meter">Metrics Meter</option>
+                <option value="Warehouse MAP Retail">Warehouse MAP Retail</option>
+                <option value="Logistic Controller">Logistic Controller</option>
+                <option value="Odometers">Odometers</option>
+
+              </select>
+            </div>
+           
+            <div class="col-6">
+              <label class="form-label">Yearly Price</label>
+              <input type="number" step="0.01" class="form-control" name="yearly_price" placeholder="Yearly Price" required >
+            </div>
+            <div class="col-6">
+              <label class="form-label">Monthly Price</label>
+              <input type="number" step="0.01" class="form-control" name="monthly_price" placeholder="Monthly Price" required >
+            </div>
+            <div class="col-6">
+              <label class="form-label">Weekly Price</label>
+              <input type="number" step="0.01" class="form-control" name="weekly_price" placeholder="Weekly Price" required >
+            </div>
+           
+       
+            <div class="col-6">
+              <label class="form-label">Icon</label>
+              <input type="file" class="form-control" name="icon"  required >
+            </div>
+
+            
+           
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="offcanvas-footer text-end">
+      <button type="button" class="btn btn-secondary m-w-100-px me-15" data-bs-dismiss="offcanvas" aria-label="Close">Cancel</button>
+      <button class="btn btn-l-green m-w-100-px" onclick="submitAnyForm(this)">Submit</button>
+    </div>
+   </form>
+  </div>
+</div>
+<!-- /modal_add -->
+
+
+</div><!-- page_body -->
+{% endblock %}
+
+{%block javascript%}
+<script>
+
+function select_moudle(src){
+  var chk =  $(src).is(":checked")
+  if(chk == true){
+    $(".MODULE").show()
+  }
+  else{
+    $(".MODULE").hide()
+    $("select[name='modules']").val("")
+
+  }
+}
+
+// multi_field_wrapper
+$('.multi_field_wrapper').each(function () {
+  var $wrapper = $('.multi-fields', this);
+  $(".add-field-btn", $(this)).click(function (e) {
+    $('.multi-field:first-child', $wrapper).clone(true).attr("id", "").appendTo($wrapper).find('.multi-input').val('').focus();
+  });
+  $('.multi-field .remove-field-btn', $wrapper).click(function () {
+    if ($('.multi-field', $wrapper).length > 1)
+      $(this).parents('.multi-field').remove();
+  });
+});
+
+</script>
+{% endblock %}

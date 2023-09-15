@@ -52,13 +52,21 @@
         <!-- sidebar-toggle -->
          <a data-toggle="body" class="sidebar-toggle sidebar_toggle_mob"></a>
           <li>
-           <a href="{% url 'superadmin:landing-page' %}" title="Blog">
+           <a href="{% url 'superadmin:landing-page' %}" title="Module">
             <div class="icon">
              <i class="fa fa-star-o" aria-hidden="true"></i>
             </div>
             <span>Module</span>
            </a>
          </li>
+         <li>
+          <a href="{% url 'superadmin:list-bundle' %}" title="Bundle">
+           <div class="icon">
+            <i class="fa fa-star-o" aria-hidden="true"></i>
+           </div>
+           <span>Bundle</span>
+          </a>
+        </li>
        
       </ul>
     </div> 

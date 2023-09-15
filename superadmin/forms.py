@@ -19,3 +19,15 @@ class ModuleForm(ModelForm):
             "department"
         ]
 
+
+class BundleForm(ModelForm):
+    class Meta:
+        model = BundleDetails
+        fields = [
+            "title",
+            "weekly_price",
+            "monthly_price",
+            "yearly_price",
+            "icon",
+        ]
+
