@@ -31,6 +31,11 @@ class CustomUserAdmin(UserAdmin):
                 "fields": (
                     "email",
                     "first_name",
+                    "free_subscription_start_date",
+                    "free_subscription_end_date",
+                    "available_free_users",
+                    "take_free_subscription",
+                    "free_subscribed"
                 )
             },
         ),

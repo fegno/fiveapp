@@ -5,5 +5,5 @@ from django.urls import path
 
 
 urlpatterns = [
-    path('module-list/', api.ModuleDetailsList.as_view(), name='module-details-list'),
+    path('home-page/', api.Homepage.as_view(), name='home-page'),
 ]

@@ -11,9 +11,6 @@ urlpatterns = [
     path(
         "superadmin/",
         include(("superadmin.urls", "superadmin"), namespace="superadmin"),
-    ),
-    path(
-        "administrator/", include(("administrator.urls", "administrator"), namespace="administrator")
     )
 
 ]

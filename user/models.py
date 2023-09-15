@@ -27,11 +27,18 @@ class UserProfile(AbstractUser):
     industrial_size = models.CharField(max_length=100, blank=True, null=True)
     employee_position = models.CharField(max_length=100, blank=True, null=True)
 
-    free_subscription_start_date = models.DateTimeField(null=True, blank=True)
-    free_subscription_end_date = models.DateTimeField(null=True, blank=True)
+    available_free_users = models.IntegerField(default=5)
+    free_subscription_start_date = models.DateField(null=True, blank=True)
+    free_subscription_end_date = models.DateField(null=True, blank=True)
     free_subscribed = models.BooleanField(null=True, blank=True, default=False)
     take_free_subscription = models.BooleanField(null=True, blank=True, default=False)
 
+    created_admin =  models.ForeignKey(
+        "self",
+        blank=True,
+        null=True,
+        on_delete=models.CASCADE,  
+    )
     is_active = models.BooleanField(null=False, blank=True, default=True)
     created = models.DateTimeField(auto_now_add=True)
     updated = models.DateTimeField(auto_now=True)
@@ -42,7 +49,7 @@ class UserProfile(AbstractUser):
     
     def start_free_trial(self):
 
-        self.free_subscription_start_date = datetime.now()
+        self.free_subscription_start_date = datetime.now().date()
         self.free_subscription_end_date = self.free_subscription_start_date + timedelta(days=15)  
         self.take_free_subscription = True
         self.free_subscribed = True

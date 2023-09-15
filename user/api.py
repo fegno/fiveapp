@@ -93,7 +93,7 @@ class VerifyEmail(APIView):
             response_dict["message"] = "Verified"
             response_dict["status"] = True
         else:
-            response_dict["reason"] = "Email already added"
+            response_dict["error"] = "Email already added"
             response_dict["status"] = False
         return Response(response_dict, HTTP_200_OK)
 
@@ -127,7 +127,7 @@ class VerifyOtp(APIView):
         otp = request.data.get("otp")
         user = UserProfile.objects.filter(username=email).first()
         if not user:
-            response_dict["reason"] = "No account found"
+            response_dict["error"] = "No account found"
             response_dict["status"] = False
             return Response(response_dict, HTTP_200_OK)
         created_otp = LoginOTP.objects.filter(
@@ -137,7 +137,7 @@ class VerifyOtp(APIView):
             response_dict["message"] = "Success"
             response_dict["status"] = True
         else:
-            response_dict["reason"] = "OTP incorrect"
+            response_dict["error"] = "OTP incorrect"
             response_dict["status"] = False
         return Response(response_dict, HTTP_200_OK)
 
@@ -153,7 +153,7 @@ class RegisterUser(APIView):
         if UserProfile.objects.filter(
             email=data.get("email"),
         ).first():
-            response_dict["reason"] ="User already exists"
+            response_dict["error"] ="User already exists"
             return Response(response_dict, HTTP_200_OK)
         with transaction.atomic():
             if serializer.is_valid():
@@ -166,7 +166,7 @@ class RegisterUser(APIView):
                 response_dict["status"] = True
                 response_dict["message"] = "Registered successfully"
             else:
-                response_dict["reason"] = get_error(serializer)
+                response_dict["error"] = get_error(serializer)
         return Response(response_dict, HTTP_200_OK)
 
 
@@ -189,7 +189,7 @@ class SetUserPassword(APIView):
         new_password = request.data.get("new_password") 
         confirm_password  = request.data.get("confirm_password") 
         if new_password != confirm_password:
-            response_dict["reason"] = "Password does not match"
+            response_dict["error"] = "Password does not match"
         user = UserProfile.objects.filter(username=email).first()
         user.set_password(new_password)
         user.save()

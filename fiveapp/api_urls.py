@@ -3,4 +3,7 @@ from django.urls import path
 
 urlpatterns = [
     path("user/", include("user.urls")),
+    path(
+        "administrator/", include(("administrator.urls", "administrator"), namespace="administrator")
+    )
 ]

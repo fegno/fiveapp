@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from user.models import UserProfile
+from django.utils import timezone
 
 class RegisterSerializer(serializers.ModelSerializer):
     class Meta:
@@ -26,5 +27,19 @@ class UserSerializer(serializers.ModelSerializer):
             "company_name",
             "industrial_size",
             "employee_position",
-            "created"
+            "created",
+            "user_type",
+            "free_subscription_start_date",
+            "free_subscription_end_date",
+            "free_subscribed",
+            "take_free_subscription",
+            "available_free_users"
         )
+    def to_representation(self, obj, *args, **kwargs):
+        cd = super(UserSerializer, self).to_representation(
+            obj, *args, **kwargs
+        )
+        if obj.free_subscription_end_date and obj.free_subscription_end_date > timezone.now().date():
+            days = obj.free_subscription_end_date - obj.free_subscription_start_date
+            cd["free_expire_in"] = days.days
+        return cd
