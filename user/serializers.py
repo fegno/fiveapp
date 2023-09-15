@@ -18,4 +18,13 @@ class UserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = UserProfile
-        fields = '__all__'
+        fields = (
+            "first_name",
+            "last_name",
+            "mobile_no",
+            "email",
+            "company_name",
+            "industrial_size",
+            "employee_position",
+            "created"
+        )

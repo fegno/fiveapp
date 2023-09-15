@@ -2,6 +2,7 @@ from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
 from datetime import date
 import random, string
+from datetime import datetime, timedelta
 
 
 USER_TYPE_CHOICES = (
@@ -26,12 +27,26 @@ class UserProfile(AbstractUser):
     industrial_size = models.CharField(max_length=100, blank=True, null=True)
     employee_position = models.CharField(max_length=100, blank=True, null=True)
 
+    free_subscription_start_date = models.DateTimeField(null=True, blank=True)
+    free_subscription_end_date = models.DateTimeField(null=True, blank=True)
+    free_subscribed = models.BooleanField(null=True, blank=True, default=False)
+    take_free_subscription = models.BooleanField(null=True, blank=True, default=False)
+
     is_active = models.BooleanField(null=False, blank=True, default=True)
     created = models.DateTimeField(auto_now_add=True)
     updated = models.DateTimeField(auto_now=True)
 
+
     def __str__(self):
         return self.username
+    
+    def start_free_trial(self):
+
+        self.free_subscription_start_date = datetime.now()
+        self.free_subscription_end_date = self.free_subscription_start_date + timedelta(days=15)  
+        self.take_free_subscription = True
+        self.free_subscribed = True
+        self.save()
 
 
 class Token(models.Model):
