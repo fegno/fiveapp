@@ -73,7 +73,9 @@ class Applogin(APIView):
                 "username": user.username,
                 "email": user.email,
                 "id": user.id,
-                'user_type':user.user_type
+                'user_type':user.user_type,
+                "free_subscribed":True if user.take_free_subscription else False,
+                "subscribed":True if user.is_subscribed else False
             }
             response_dict["token"] = token.key
             response_dict["status"] = True
