@@ -12,4 +12,7 @@ urlpatterns = [
     path("set-password/", api.SetUserPassword.as_view(), name="set-password"),
     path("change-password/", api.ChangePassword.as_view(), name="change-password"),
 
+    
+    path('user-details/', api.UserDetail.as_view(), name='user')
+
 ]

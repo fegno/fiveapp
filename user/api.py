@@ -24,8 +24,10 @@ from background_task import background
 from fiveapp.utils import get_error
 
 from user.models import UserProfile, Token, LoginOTP
-from user.serializers import RegisterSerializer
+from user.serializers import RegisterSerializer, UserSerializer
 from user.task import send_mail
+from rest_framework import status
+
 
 
 def process_tasks():
@@ -209,3 +211,12 @@ class ChangePassword(APIView):
         response_dict["status"] = True
         response_dict["message"] = "Password changed"
         return Response(response_dict, HTTP_200_OK)
+    
+
+class UserDetail(APIView):
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (CustomTokenAuthentication,)
+
+    def get(self, request):
+        user_serializer = UserSerializer(request.user)
+        return Response(user_serializer.data, status=status.HTTP_200_OK)
