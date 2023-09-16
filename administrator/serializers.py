@@ -38,7 +38,8 @@ class BundleDetailsSerializer(serializers.ModelSerializer):
             "monthly_price",
             "yearly_price",
             "title",
-            "icon"
+            "icon",
+            "modules"
         )
     def to_representation(self, obj, *args, **kwargs):
         cd = super(BundleDetailsSerializer, self).to_representation(
