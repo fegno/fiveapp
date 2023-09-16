@@ -28,6 +28,8 @@ class UserProfile(AbstractUser):
     employee_position = models.CharField(max_length=100, blank=True, null=True)
 
     available_free_users = models.IntegerField(default=5)
+    available_paid_users = models.IntegerField(default=0)
+    total_users = models.IntegerField(default=5)
     is_free_user = models.BooleanField(null=True, blank=True, default=False)
     is_subscribed = models.BooleanField(null=True, blank=True, default=False)
 

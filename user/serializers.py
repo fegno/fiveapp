@@ -36,6 +36,8 @@ class UserSerializer(serializers.ModelSerializer):
             "available_free_users",
             "is_subscribed",
             "is_free_user",
+            "available_paid_users",
+            "total_users",
         )
     def to_representation(self, obj, *args, **kwargs):
         cd = super(UserSerializer, self).to_representation(
