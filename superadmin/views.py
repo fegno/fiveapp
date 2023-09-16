@@ -83,6 +83,7 @@ class ListBundle(IsSuperAdminMixin, TemplateView):
         context = {}
         all_modules = ModuleDetails.objects.filter(
             is_active=True,
+            is_submodule=False
         )
         bundle = BundleDetails.objects.filter(
             is_active=True,
