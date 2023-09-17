@@ -179,6 +179,7 @@ class AppLogout(APIView):
     def post(self, request):
         logout(request)
         response_dict = {"status": True}
+        response_dict["message"] = "Logout successfully"
         return Response(response_dict, HTTP_200_OK)
 
 class SetUserPassword(APIView):

@@ -26,6 +26,8 @@ class ModuleDetailsSerializer(serializers.ModelSerializer):
             is_active=True, modules=obj
         ).values("id","benifit","feature"))
         cd["feature_benifit"] = feature_benifit
+        if self.context.get("from_module"):
+            cd["users_count"] = 0
         return cd
 
 
@@ -62,7 +64,7 @@ class ModuleLiteSerializer(serializers.ModelSerializer):
             "yearly_price",
         )
     def to_representation(self, obj, *args, **kwargs):
-        cd = super(ModuleDetailsSerializer, self).to_representation(
+        cd = super(ModuleLiteSerializer, self).to_representation(
             obj, *args, **kwargs
         )
         feature_benifit = tuple(FeatureDetails.objects.filter(
@@ -90,5 +92,5 @@ class BundleDetailsLiteSerializer(serializers.ModelSerializer):
             obj, *args, **kwargs
         )
         cd["modules"] = ModuleLiteSerializer(
-            obj.modules.filter(is_submodule=False),many=True).data
+            obj.modules.all().filter(is_submodule=False),many=True).data
         return cd

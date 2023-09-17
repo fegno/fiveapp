@@ -19,7 +19,11 @@ class SubscriptionDetails(models.Model):
     is_active = models.BooleanField(null=False, blank=True, default=True)
     created = models.DateTimeField(auto_now_add=True)
     updated = models.DateTimeField(auto_now=True)
-    
+
+STATUS_CHOICES=(   
+	('Pending','Pending'),
+	('Placed','Placed'),
+)
 class PurchaseDetails(models.Model):
     user = models.ForeignKey(
         UserProfile,
@@ -36,7 +40,19 @@ class PurchaseDetails(models.Model):
     total_price = models.FloatField(
         null=False, blank=False, default=0
     )
+    status =	models.CharField(max_length=50,blank=True,null=False,db_index=True,choices=STATUS_CHOICES)
+    is_active = models.BooleanField(null=False, blank=True, default=True)
+    created = models.DateTimeField(auto_now_add=True)
+    updated = models.DateTimeField(auto_now=True)
 
+class UserAssignedModules(models.Model):
+    user = models.ForeignKey(
+        UserProfile,
+        blank=True,
+        null=True,
+        on_delete=models.CASCADE,   
+    )
+    module = models.ManyToManyField(ModuleDetails, blank=True)   
     is_active = models.BooleanField(null=False, blank=True, default=True)
     created = models.DateTimeField(auto_now_add=True)
     updated = models.DateTimeField(auto_now=True)

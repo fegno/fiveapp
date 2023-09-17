@@ -11,7 +11,8 @@ from django.utils import timezone
 from administrator.models import SubscriptionDetails
 from administrator.serializers import (
     ModuleDetailsSerializer, 
-    BundleDetailsSerializer
+    BundleDetailsSerializer,
+    BundleDetailsLiteSerializer
 )
 
 class Homepage(APIView):
@@ -104,8 +105,34 @@ class ViewBundle(APIView):
         response_dict = {"status": False}
         current_date = timezone.now().date()
         bundles = BundleDetails.objects.filter(
-            is_active=True, id=pk)
+            is_active=True, id=pk).last()
         response_dict["bundles"] = BundleDetailsLiteSerializer(
             bundles,context={"request": request}).data
+        response_dict["status"] = True
+        return Response(response_dict, status=status.HTTP_200_OK)
+
+class ListModules(APIView):
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (CustomTokenAuthentication, IsAdmin)
+
+    def get(self, request):
+        response_dict = {"status": False}
+        current_date = timezone.now().date()
+        modules = ModuleDetails.objects.filter(is_active=True)
+        subscription = SubscriptionDetails.objects.filter(
+            user=request.user, 
+            is_subscribed=True,
+            subscription_end_date__gte=current_date
+        )
+        subscribed_modules = []
+        if subscription:
+            subscribed_modules = modules.exclude(
+                id__in=subscription.modules.all().values_list("id", flat=True)
+            )
+            modules = modules.exclude(id__in=subscription.modules.all().values_list("id", flat=True))
+            
+        response_dict["unsubscribed_modules"] = ModuleDetailsSerializer(modules,context={"request": request}, many=True,).data
+        response_dict["subscribed_modules"] = ModuleDetailsSerializer(
+            subscribed_modules,context={"request": request, "from_module":True}, many=True,).data
         response_dict["status"] = True
         return Response(response_dict, status=status.HTTP_200_OK)

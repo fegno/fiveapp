@@ -39,7 +39,8 @@ INSTALLED_APPS = [
     'background_task',
     "user",
     "superadmin",
-    "administrator"
+    "administrator",
+    "payment"
 ]
 
 MIDDLEWARE = [
