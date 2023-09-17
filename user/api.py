@@ -207,8 +207,16 @@ class ChangePassword(APIView):
 
     def post(self, request):
         response_dict = {"status": False}
-        new_password = request.data.get("new_password") 
         user = request.user
+        old_password = request.data.get("old_password") 
+        new_password = request.data.get("new_password") 
+        confirm_password  = request.data.get("confirm_password") 
+        if new_password != confirm_password:
+            response_dict["error"] = "Password does not match"
+            return Response(response_dict, HTTP_200_OK)
+        if not user.check_password(old_password):
+            response_dict["error"] = "Old Password is incorrect"
+            return Response(response_dict, HTTP_200_OK)
         user.set_password(new_password)
         user.save()
         response_dict["status"] = True
