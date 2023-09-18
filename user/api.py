@@ -224,6 +224,11 @@ class ChangePassword(APIView):
         return Response(response_dict, HTTP_200_OK)
     
 
+class ChangeName(APIView):
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (CustomTokenAuthentication,)
+
+
 class UserDetail(APIView):
     permission_classes = (IsAuthenticated,)
     authentication_classes = (CustomTokenAuthentication,)
