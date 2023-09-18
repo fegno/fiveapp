@@ -9,6 +9,7 @@ Type_Choice = (
     ("Utility Meter","Utility Meter"),
     ("Sale Center","Sale Center"),
     ("Support","Support"),
+    ("Impression","Impression"),
     ("Metrics Meter","Metrics Meter"),
     ("Warehouse MAP Retail","Warehouse MAP Retail"),
     ("Logistic Controller","Logistic Controller"),
@@ -57,7 +58,7 @@ class FeatureDetails(models.Model):
 
 
 class BundleDetails(models.Model):
-    title = models.CharField(null=True, blank=True, max_length=1000, choices=Type_Choice,)
+    title = models.CharField(null=True, blank=True, max_length=1000)
     modules = models.ManyToManyField(
         "ModuleDetails",
         blank=True   
