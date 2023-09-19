@@ -57,7 +57,7 @@ class InitiatePayment(APIView):
 		with transaction.atomic():
 			stripe.api_key=settings.STRIPE_API_KEY
 			intent = stripe.PaymentIntent.create(amount=round(order.total_price*100),currency='aed')
-			payment_attempt=PaymentAttempt.objects.create(parchase=order,user=request.user,currency='aed',amount=order.total_price,
+			payment_attempt=PaymentAttempt.objects.create(parchase_user_type="Subscription",parchase=order,user=request.user,currency='aed',amount=order.total_price,
 				status='Initiated',client_secret=intent['client_secret'],payment_intent_id=intent['id'],last_attempt_date=timezone.now())
 		
 			response_dict['client_secret']=payment_attempt.client_secret
