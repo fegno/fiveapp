@@ -229,5 +229,34 @@ class UserDetail(APIView):
     authentication_classes = (CustomTokenAuthentication,)
 
     def get(self, request):
+        response_dict = {"status": False}
         user_serializer = UserSerializer(request.user)
-        return Response(user_serializer.data, status=status.HTTP_200_OK)
+        response_dict["details"] = user_serializer.data
+        response_dict["status"] = True
+        return Response(response_dict, status=status.HTTP_200_OK)
+
+class CheckLoginMethod(APIView):
+    permission_classes = (AllowAny,)
+    authentication_classes = tuple()
+
+    def get(self, request):
+        response_dict = {"status": False}
+        data = request.data
+        email = request.data.get("email")
+        user = UserProfile.objects.filter(
+            email=data.get("email"),
+        ).first()
+        if user and user.user_type == "ADMIN":
+            response_dict["user_type"] = "ADMIN"
+        elif user:
+            if user.password:
+                response_dict["password_set"] = True
+                response_dict["user_type"] = "USER"
+            else:
+                response_dict["password_set"] = False
+                response_dict["user_type"] = "USER"
+        elif not user:
+            response_dict["user_type"] = "Not Registered"
+
+        response_dict["status"] = True
+        return Response(response_dict, status=status.HTTP_200_OK)

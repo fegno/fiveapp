@@ -11,6 +11,7 @@ urlpatterns = [
     path("logout/", api.AppLogout.as_view(), name="logout"),
     path("set-password/", api.SetUserPassword.as_view(), name="set-password"),
     path("change-password/", api.ChangePassword.as_view(), name="change-password"),
+    path("login-method-check/", api.CheckLoginMethod.as_view(), name="login"),
 
     
     path('user-details/', api.UserDetail.as_view(), name='user')
