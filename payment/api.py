@@ -10,7 +10,8 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from user.api_permissions import CustomTokenAuthentication, IsAdmin
 from rest_framework.views import APIView
 from rest_framework import status
-from datetime import datetime
+from datetime import timedelta, date, datetime
+
 from superadmin.models import ModuleDetails, FeatureDetails,  BundleDetails
 from payment.models import PaymentAttempt
 from administrator.models import PurchaseDetails
@@ -38,6 +39,21 @@ class InitiatePayment(APIView):
             subscription_type=subscription_type,
             total_price=total_price
         )
+        order.module.add(*request.POST.getlist("modules_ids"))      
+        order.bundle.add(*request.POST.getlist("bundle_ids"))    
+        if subscription_type == "WEEK":
+            order.subscription_start_date =  timezone.now().date()
+            end_date = timezone.now().date()  + timedelta(days=7)
+            order.subscription_end_date =  end_date
+        elif  subscription_type == "MONTH":
+            order.subscription_start_date =  timezone.now().date()
+            end_date = timezone.now().date()  + timedelta(days=30)
+            order.subscription_end_date =  end_date
+        elif subscription_type == "YEAR":
+            order.subscription_start_date =  timezone.now().date()   
+            end_date = timezone.now().date()  + timedelta(days=365)
+            order.subscription_end_date =  end_date
+        order.save()
 		with transaction.atomic():
 			stripe.api_key=settings.STRIPE_API_KEY
 			intent = stripe.PaymentIntent.create(amount=round(order.total_price*100),currency='aed')
