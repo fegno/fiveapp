@@ -145,6 +145,9 @@ class SelectFreeSubscription(APIView):
     def post(self, request):
         response_dict = {"status": False}
         user = request.user
+        print(
+            user , "ppp"
+        )
         if user.take_free_subscription:
             response_dict["error"] = "Already subscribed"
             return Response(response_dict, status.HTTP_200_OK)
