@@ -1,4 +1,5 @@
 from django.db import models
+from user.models import UserProfile
 
 Type_Choice = (
     ("Team Indicator", "Team Indicator"),
@@ -82,3 +83,15 @@ class ModuleReports(models.Model):
 
     is_active = models.BooleanField(null=False, blank=True, default=True)
     created = models.DateTimeField(auto_now_add=True)
+
+class UserAssignedModules(models.Model):
+    user = models.ForeignKey(
+        UserProfile,
+        blank=True,
+        null=True,
+        on_delete=models.CASCADE,   
+    )
+    module = models.ManyToManyField(ModuleDetails, blank=True)   
+    is_active = models.BooleanField(null=False, blank=True, default=True)
+    created = models.DateTimeField(auto_now_add=True)
+    updated = models.DateTimeField(auto_now=True)
