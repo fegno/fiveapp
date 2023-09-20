@@ -14,6 +14,9 @@ urlpatterns = [
     path("login-method-check/", api.CheckLoginMethod.as_view(), name="login"),
 
     
-    path('user-details/', api.UserDetail.as_view(), name='user')
+    path('user-details/', api.UserDetail.as_view(), name='user'),
+    path("change-name/", api.ChangeName.as_view(), name="change-name"),
+    path("change-company-name/", api.ChangeComapnyName.as_view(), name="change-company-name"),
+    path("change-email/", api.ChangeEmail.as_view(), name="change-email"),
 
 ]

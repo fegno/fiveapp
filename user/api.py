@@ -100,6 +100,7 @@ class VerifyEmail(APIView):
         return Response(response_dict, HTTP_200_OK)
 
 
+
 class SendOtp(APIView):
     permission_classes = (AllowAny,)
     authentication_classes = tuple()
@@ -128,14 +129,13 @@ class VerifyOtp(APIView):
         response_dict = {"status": False}
         email = request.data.get("email")
         otp = request.data.get("otp")
+        print(email)
+        print(otp)
         user = UserProfile.objects.filter(username=email).first()
-        if not user:
-            response_dict["error"] = "No account found"
-            response_dict["status"] = False
-            return Response(response_dict, HTTP_200_OK)
         created_otp = LoginOTP.objects.filter(
             email=email,
         ).order_by("-id").first()
+        print(created_otp)
         if created_otp and str(created_otp.otp) == str(otp):
             created_otp.is_verified = True
             created_otp.save()
@@ -233,6 +233,52 @@ class ChangePassword(APIView):
 class ChangeName(APIView):
     permission_classes = (IsAuthenticated,)
     authentication_classes = (CustomTokenAuthentication,)
+
+    def post(self, request):
+        response_dict ={"status":False}
+        user = request.user
+        first_name =  request.data.get("first_name")
+        last_name = request.data.get("last_name")
+        user_profile = UserProfile.objects.filter(id=user.id).update(first_name=first_name, last_name=last_name)
+        response_dict["status"] = True
+        response_dict["message"] = "successfully Update the name"
+        return Response(response_dict, HTTP_200_OK)
+    
+
+class ChangeComapnyName(APIView):
+
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (CustomTokenAuthentication,)
+
+    def post(self, request):
+        response_dict = {}
+        user = request.user
+        company_name = request.data.get('company_name')
+        company = UserProfile.objects.filter(id=user.id).update(company_name=company_name)
+        response_dict["message"] = "successfully update the Company name"
+        return Response(response_dict, HTTP_200_OK)
+    
+
+class ChangeEmail(APIView):
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (CustomTokenAuthentication,)
+
+    def post(self, request):
+        response_dict = {}
+        email = request.data.get('email')
+        user = request.user
+        email_exist = UserProfile.objects.filter(email=email).exists()
+        if email_exist:
+            response_dict["error"] = "The email already in use"
+            return Response(response_dict, HTTP_200_OK)
+        elif user.username == email:
+            response_dict["error"] = "The email already used as username"
+            return Response(response_dict, HTTP_200_OK)
+        user.email = email
+        user.username = email
+        user.save()
+        response_dict["message"] = "The email was successfully updated"
+        return Response(response_dict, HTTP_200_OK)
 
 
 class UserDetail(APIView):
