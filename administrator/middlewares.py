@@ -2,6 +2,7 @@ from django.shortcuts import get_object_or_404
 from datetime import date, datetime, timedelta
 from user.models import UserProfile
 from django.utils import timezone
+from administrator.models import PurchaseDetails, SubscriptionDetails
 
 class SubscriptionMiddleware(object):
     def __init__(self, get_response):
@@ -16,4 +17,14 @@ class SubscriptionMiddleware(object):
                     if user.free_subscription_end_date < timezone.now().date():
                         user.free_subscribed = False
                         user.save()
+                subscription = SubscriptionDetails.objects.filter(
+                    user=user, 
+                    is_subscribed=True
+                ).last()
+                if subscription and subscription.subscription_end_date < timezone.now().date():
+                    subscription.is_subscribed = False
+                    user.is_subscribed = False
+                    user.save()
+                    subscription.save()
+                
         return response

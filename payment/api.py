@@ -101,6 +101,9 @@ class StripePaymentWebhook(APIView):
 			order.received_amounts=intent['amount_received']/100
 			order.payment_dates=timezone.now()
 			order.save()
+			user = order.user
+			user.is_subscribed = True
+            user.save()
 			if SubscriptionDetails.objects.filter(user=order.user):
 				subscription = SubscriptionDetails.objects.filter(user=order.user).last()
 				if subscription.subscription_end_date < timezone.now().date():
