@@ -9,8 +9,9 @@ https://docs.djangoproject.com/en/4.2/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/4.2/ref/settings/
 """
-from fiveapp import local_settings
 import os
+from dotenv import load_dotenv
+load_dotenv()
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -24,9 +25,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-ox$#5$#@^7)=shgyvbuq^3z=ee0_=%3^(*o#7j^28bi&nau!$i'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = local_settings.debug
+DEBUG = True
 
-ALLOWED_HOSTS = local_settings.allowed_hosts
+ALLOWED_HOSTS = ["*"]
 # Application definition
 
 INSTALLED_APPS = [
@@ -80,8 +81,17 @@ WSGI_APPLICATION = 'fiveapp.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
-DATABASES = local_settings.databases
-
+DATABASES ={
+    "default":{
+        'ENGINE':os.environ.get("DB_ENGINE"),
+        'NAME': os.environ.get("DB_NAME"),
+        'USER': os.environ.get("DB_USER"),
+        'PASSWORD': os.environ.get("DB_PASSWORD"),
+        'HOST':os.environ.get("DB_HOST"),
+        'PORT':os.environ.get("DB_PORT"),
+    }
+    
+}
 
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
@@ -117,15 +127,15 @@ STATICFILES_DIRS = [
 ]
 STATIC_URL = "/static/"
 MEDIA_URL = "/media/"
-STATIC_ROOT = local_settings.static_root
-MEDIA_ROOT = local_settings.media_root
+STATIC_ROOT = os.environ.get("STATIC_ROOT")
+MEDIA_ROOT = os.environ.get("MEDIA_ROOT")
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 EMAIL_HOST = "smtp.gmail.com"
 EMAIL_USE_TLS = True
 EMAIL_PORT = 587
-EMAIL_HOST_USER = local_settings.email_host_user
-EMAIL_HOST_PASSWORD = local_settings.email_host_password
+EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER")
+EMAIL_HOST_PASSWORD =  os.environ.get("EMAIL_HOST_PASSWORD")
 
 DISABLE_INTERNAL_REQUEST_CALL_API = False

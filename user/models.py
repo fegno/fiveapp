@@ -138,6 +138,10 @@ class Token(models.Model):
 class LoginOTP(models.Model):
     email = models.EmailField(max_length=100, null=True, blank=True)
     otp = models.IntegerField()
-
+    is_verified = models.BooleanField(null=False, blank=True, default=False)
+    user_type = models.CharField(
+        max_length=50, null=False, blank=True, choices=USER_TYPE_CHOICES
+    )
+    
     def __str__(self):
         return self.email

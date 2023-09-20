@@ -111,7 +111,8 @@ class SendOtp(APIView):
         otp = random_otp_generator()
         LoginOTP.objects.create(
             email=request.data.get("email"),
-            otp=otp
+            otp=otp,
+            user_type="ADMIN"
         )
         process_tasks()
         send_mail(otp, request.data.get("email"))
@@ -136,6 +137,8 @@ class VerifyOtp(APIView):
             email=email,
         ).order_by("-id").first()
         if created_otp and str(created_otp.otp) == str(otp):
+            created_otp.is_verified = True
+            created_otp.save()
             response_dict["message"] = "Success"
             response_dict["status"] = True
         else:
@@ -151,6 +154,9 @@ class RegisterUser(APIView):
     def post(self, request):
         response_dict = {"status": False}
         data = request.data   
+        if not LoginOTP.objects.filter(email=data.get("email"), is_verified=True).last():
+            response_dict["error"] = "OTP not verified"
+            return Response(response_dict, HTTP_200_OK)
         serializer = RegisterSerializer(data=data)
         if UserProfile.objects.filter(
             email=data.get("email"),
@@ -234,5 +240,40 @@ class UserDetail(APIView):
     authentication_classes = (CustomTokenAuthentication,)
 
     def get(self, request):
+        response_dict = {"status": False}
         user_serializer = UserSerializer(request.user)
-        return Response(user_serializer.data, status=status.HTTP_200_OK)
+        response_dict["details"] = user_serializer.data
+        response_dict["status"] = True
+        return Response(response_dict, status=status.HTTP_200_OK)
+
+class CheckLoginMethod(APIView):
+    permission_classes = (AllowAny,)
+    authentication_classes = tuple()
+
+    def get(self, request):
+        response_dict = {"status": False}
+        data = request.data
+        email = request.data.get("email")
+        user = UserProfile.objects.filter(
+            email=data.get("email"),
+        ).first()
+        if user and user.user_type == "ADMIN":
+            response_dict["user_type"] = "ADMIN"
+            response_dict["password_set"] = True
+        elif user:
+            if user.password:
+                response_dict["password_set"] = True
+                response_dict["user_type"] = "USER"
+            else:
+                response_dict["password_set"] = False
+                response_dict["user_type"] = "USER"
+        elif not user:
+            if LoginOTP.objects.filter(email=email):
+                otp_user = LoginOTP.objects.filter(email=email)
+                response_dict["password_set"] = False
+                response_dict["user_type"] = otp_user.user_type
+            else:
+                response_dict["user_type"] = "Not Registered"
+
+        response_dict["status"] = True
+        return Response(response_dict, status=status.HTTP_200_OK)

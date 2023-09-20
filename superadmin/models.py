@@ -76,3 +76,9 @@ class BundleDetails(models.Model):
 
     is_active = models.BooleanField(null=False, blank=True, default=True)
     created = models.DateTimeField(auto_now_add=True)
+
+class ModuleReports(models.Model):
+    report = models.TextField(null=True, blank=True)
+
+    is_active = models.BooleanField(null=False, blank=True, default=True)
+    created = models.DateTimeField(auto_now_add=True)

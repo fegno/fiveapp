@@ -34,3 +34,4 @@ class PaymentAttempt(models.Model):
 	is_active				=	models.BooleanField(null=False,blank=True,default=True)
 	created					=	models.DateTimeField(auto_now_add=True)
 	updated					=	models.DateTimeField(auto_now=True)
+	parchase_user_type		=	models.CharField(null=True,blank=True,max_length=255)
