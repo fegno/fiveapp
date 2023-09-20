@@ -41,7 +41,8 @@ INSTALLED_APPS = [
     "user",
     "superadmin",
     "administrator",
-    "payment"
+    "payment",
+    "rest_framework"
 ]
 
 MIDDLEWARE = [

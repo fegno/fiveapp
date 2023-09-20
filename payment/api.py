@@ -27,33 +27,33 @@ class InitiatePayment(APIView):
 
 	def post(self,request):
 		response_dict={'status':False}
-        bundle_ids = request.data.getlist("bundle_ids")
-        modules_ids = request.data.getlist("modules_ids")
-        total_price = request.data.get("total_price")
-        modules_ids = request.data.getlist("modules_ids")
-        subscription_type = request.data.get("subscription_type")
+		bundle_ids = request.data.getlist("bundle_ids")
+		modules_ids = request.data.getlist("modules_ids")
+		total_price = request.data.get("total_price")
+		modules_ids = request.data.getlist("modules_ids")
+		subscription_type = request.data.get("subscription_type")
 
-        order = PurchaseDetails.objects.create(
-            user=request.user,
-            status="Pending",
-            subscription_type=subscription_type,
-            total_price=total_price
-        )
-        order.module.add(*request.POST.getlist("modules_ids"))      
-        order.bundle.add(*request.POST.getlist("bundle_ids"))    
-        if subscription_type == "WEEK":
-            order.subscription_start_date =  timezone.now().date()
-            end_date = timezone.now().date()  + timedelta(days=7)
-            order.subscription_end_date =  end_date
-        elif  subscription_type == "MONTH":
-            order.subscription_start_date =  timezone.now().date()
-            end_date = timezone.now().date()  + timedelta(days=30)
-            order.subscription_end_date =  end_date
-        elif subscription_type == "YEAR":
-            order.subscription_start_date =  timezone.now().date()   
-            end_date = timezone.now().date()  + timedelta(days=365)
-            order.subscription_end_date =  end_date
-        order.save()
+		order = PurchaseDetails.objects.create(
+			user=request.user,
+			status="Pending",
+			subscription_type=subscription_type,
+			total_price=total_price
+		)
+		order.module.add(*request.POST.getlist("modules_ids"))      
+		order.bundle.add(*request.POST.getlist("bundle_ids"))    
+		if subscription_type == "WEEK":
+			order.subscription_start_date =  timezone.now().date()
+			end_date = timezone.now().date()  + timedelta(days=7)
+			order.subscription_end_date =  end_date
+		elif  subscription_type == "MONTH":
+			order.subscription_start_date =  timezone.now().date()
+			end_date = timezone.now().date()  + timedelta(days=30)
+			order.subscription_end_date =  end_date
+		elif subscription_type == "YEAR":
+			order.subscription_start_date =  timezone.now().date()   
+			end_date = timezone.now().date()  + timedelta(days=365)
+			order.subscription_end_date =  end_date
+		order.save()
 		with transaction.atomic():
 			stripe.api_key=settings.STRIPE_API_KEY
 			intent = stripe.PaymentIntent.create(amount=round(order.total_price*100),currency='aed')

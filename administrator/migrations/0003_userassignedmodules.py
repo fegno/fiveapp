@@ -8,8 +8,6 @@ import django.db.models.deletion
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('superadmin', '0009_modulereports'),
-        migrations.swappable_dependency(settings.AUTH_USER_MODEL),
         ('administrator', '0002_purchasedetails_status'),
     ]
 

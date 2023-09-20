@@ -1,3 +1,5 @@
 from django.contrib import admin
+from administrator.models import UserAssignedModules
 
-# Register your models here.
+
+admin.site.register(UserAssignedModules)

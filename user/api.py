@@ -128,11 +128,6 @@ class VerifyOtp(APIView):
         response_dict = {"status": False}
         email = request.data.get("email")
         otp = request.data.get("otp")
-        user = UserProfile.objects.filter(username=email).first()
-        if not user:
-            response_dict["error"] = "No account found"
-            response_dict["status"] = False
-            return Response(response_dict, HTTP_200_OK)
         created_otp = LoginOTP.objects.filter(
             email=email,
         ).order_by("-id").first()
