@@ -85,8 +85,8 @@ class StripePaymentWebhook(APIView):
 			order=payment_attempt.parchase
 			payment_attempt.save()
 			order.status='Placed'
-			order.received_amount=intent['amount_received']/100
-			order.payment_date=timezone.now()
+			order.received_amounts=intent['amount_received']/100
+			order.payment_dates=timezone.now()
 			order.save()
 		elif event.type == 'payment_intent.cancelled':
 			intent = event.data.object # contains a stripe.PaymentIntent

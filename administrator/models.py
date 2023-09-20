@@ -40,22 +40,10 @@ class PurchaseDetails(models.Model):
     total_price = models.FloatField(
         null=False, blank=False, default=0
     )
-    received_amount			=	models.FloatField(null=True,blank=True)
-    payment_date			=	models.DateTimeField(null=True,blank=True)
+    received_amounts			=	models.FloatField(null=True,blank=True)
+    payment_dates			=	models.DateTimeField(null=True,blank=True)
     
     status =	models.CharField(max_length=50,blank=True,null=False,db_index=True,choices=STATUS_CHOICES)
-    is_active = models.BooleanField(null=False, blank=True, default=True)
-    created = models.DateTimeField(auto_now_add=True)
-    updated = models.DateTimeField(auto_now=True)
-
-class UserAssignedModules(models.Model):
-    user = models.ForeignKey(
-        UserProfile,
-        blank=True,
-        null=True,
-        on_delete=models.CASCADE,   
-    )
-    module = models.ManyToManyField(ModuleDetails, blank=True)   
     is_active = models.BooleanField(null=False, blank=True, default=True)
     created = models.DateTimeField(auto_now_add=True)
     updated = models.DateTimeField(auto_now=True)
