@@ -137,3 +137,22 @@ class ListModules(APIView):
             subscribed_modules,context={"request": request, "from_module":True}, many=True,).data
         response_dict["status"] = True
         return Response(response_dict, status=status.HTTP_200_OK)
+
+class SelectFreeSubscription(APIView):
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (CustomTokenAuthentication, IsAdmin)
+
+    def post(self, request):
+        response_dict = {"status": False}
+        user = request.user
+        if user.take_free_subscription:
+            response_dict["error"] = "Already subscribed"
+            return Response(response_dict, status.HTTP_200_OK)
+        user.take_free_subscription = True
+        user.free_subscribed = True
+        user.free_subscription_start_date = timezone.now().date()
+        user.free_subscription_end_date = timezone.now().date()  + timedelta(days=15)
+        user.save()
+        response_dict["message"] = "The email was successfully updated"
+        response_dict["status"] = True
+        return Response(response_dict, status.HTTP_200_OK)

@@ -7,5 +7,6 @@ urlpatterns = [
     re_path(r'^list-subscription-plans/', api.ListSubscriptionPlans.as_view(), name='list-subscription-plans'),
     re_path(r'^view-bundle-details/(?P<pk>\d+)/$', api.ViewBundle.as_view()),
     re_path(r'^list-modules/', api.ListModules.as_view(), name='list-modules'),
+    re_path(r'^select-free-subscription/', api.SelectFreeSubscription.as_view(), name='select-free-subscription'),
 
 ]

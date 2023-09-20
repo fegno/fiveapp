@@ -247,11 +247,12 @@ class ChangeComapnyName(APIView):
     authentication_classes = (CustomTokenAuthentication,)
 
     def post(self, request):
-        response_dict = {}
+        response_dict ={"status":False}
         user = request.user
         company_name = request.data.get('company_name')
         company = UserProfile.objects.filter(id=user.id).update(company_name=company_name)
         response_dict["message"] = "successfully update the Company name"
+        response_dict["status"] = True
         return Response(response_dict, HTTP_200_OK)
     
 
@@ -260,7 +261,7 @@ class ChangeEmail(APIView):
     authentication_classes = (CustomTokenAuthentication,)
 
     def post(self, request):
-        response_dict = {}
+        response_dict ={"status":False}
         email = request.data.get('email')
         user = request.user
         email_exist = UserProfile.objects.filter(email=email).exists()
@@ -274,6 +275,7 @@ class ChangeEmail(APIView):
         user.username = email
         user.save()
         response_dict["message"] = "The email was successfully updated"
+        response_dict["status"] = True
         return Response(response_dict, HTTP_200_OK)
 
 
