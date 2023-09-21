@@ -27,7 +27,8 @@ from user.models import UserProfile, Token, LoginOTP
 from user.serializers import RegisterSerializer, UserSerializer
 from user.task import send_mail
 from rest_framework import status
-
+from django.core.mail import send_mail, EmailMessage
+from django.template.loader import render_to_string
 
 
 def process_tasks():
@@ -115,8 +116,14 @@ class SendOtp(APIView):
             otp=otp,
             user_type="ADMIN"
         )
-        process_tasks()
-        send_mail(otp, request.data.get("email"))
+        
+        html_message = render_to_string(
+            'register.html', {"otp":otp}
+        )
+        email = EmailMessage("OTP for Registration", html_message, to=[email])
+        email.content_subtype = "html"
+        email.send()   
+
         response_dict["message"] = "OTP send to email"
         response_dict["status"] = True
         return Response(response_dict, HTTP_200_OK)
