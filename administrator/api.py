@@ -1,4 +1,5 @@
 from django.shortcuts import render
+from django.shortcuts import get_object_or_404
 from rest_framework.response import Response
 from superadmin.models import ModuleDetails, BundleDetails
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -15,6 +16,7 @@ from administrator.serializers import (
     BundleDetailsSerializer,
     BundleDetailsLiteSerializer
 )
+from user.models import UserProfile
 
 class Homepage(APIView):
     permission_classes = (IsAuthenticated,)
@@ -159,3 +161,8 @@ class SelectFreeSubscription(APIView):
         response_dict["message"] = "success"
         response_dict["status"] = True
         return Response(response_dict, status.HTTP_200_OK)
+
+
+class UserInModule(APIView):
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (CustomTokenAuthentication,)

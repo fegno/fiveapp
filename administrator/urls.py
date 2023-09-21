@@ -9,4 +9,6 @@ urlpatterns = [
     re_path(r'^list-modules/', api.ListModules.as_view(), name='list-modules'),
     re_path(r'^select-free-subscription/', api.SelectFreeSubscription.as_view(), name='select-free-subscription'),
 
+    re_path(r'^module/<int:pk>/users/', api.UserInModule.as_view(), name='users-under-the-module')
+
 ]

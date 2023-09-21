@@ -95,3 +95,8 @@ class UserAssignedModules(models.Model):
     is_active = models.BooleanField(null=False, blank=True, default=True)
     created = models.DateTimeField(auto_now_add=True)
     updated = models.DateTimeField(auto_now=True)
+
+
+class DeleteUserLog(models.Model):
+    user = models.ForeignKey(UserProfile, on_delete=models.CASCADE, null=True, blank=True)
+    module = models.ForeignKey(ModuleDetails, on_delete=models.CASCADE, null=True, blank=True)
