@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from user.models import UserProfile
 from django.utils import timezone
+from administrator.models import PurchaseDetails, SubscriptionDetails
 
 class RegisterSerializer(serializers.ModelSerializer):
     class Meta:
@@ -44,6 +45,16 @@ class UserSerializer(serializers.ModelSerializer):
             obj, *args, **kwargs
         )
         if obj.free_subscription_end_date and obj.free_subscription_end_date > timezone.now().date():
-            days = obj.free_subscription_end_date - obj.free_subscription_start_date
+            days = obj.free_subscription_end_date -timezone.now().date() 
             cd["free_expire_in"] = days.days
+        subscription = SubscriptionDetails.objects.filter(
+			user=obj, 
+		).last()
+        if subscription:
+            cd["subscription_start_date"] = subscription.subscription_start_date
+            cd["subscription_end_date"] = subscription.subscription_end_date
+            if subscription.is_subscribed:
+                days = subscription.subscription_end_date  - timezone.now().date()
+                cd["subscription_expire_in"] = days.days
+
         return cd
