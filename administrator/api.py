@@ -1,6 +1,5 @@
 from django.shortcuts import render
 from rest_framework.response import Response
-from superadmin.models import ModuleDetails, BundleDetails
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from user.api_permissions import CustomTokenAuthentication, IsAdmin
 from rest_framework.views import APIView
@@ -15,6 +14,8 @@ from administrator.serializers import (
     BundleDetailsSerializer,
     BundleDetailsLiteSerializer
 )
+from superadmin.models import ModuleDetails, BundleDetails, UserAssignedModules
+
 
 class Homepage(APIView):
     permission_classes = (IsAuthenticated,)
@@ -69,6 +70,52 @@ class Homepage(APIView):
             else:
                 response_dict["error"] = "Not started your any subscription"
                 return Response(response_dict, status=status.HTTP_403_FORBIDDEN)
+        elif user.user_type == "USER":
+            user_assigned_modules = UserAssignedModules.objects.filter(
+                user=request.user
+            ).last()
+            modules_list = []
+            if user_assigned_modules:
+                modules_list = user_assigned_modules.module.all().values_list("id", flat=True)
+            admin = user.created_admin
+
+            expired_subscription = None
+            subscription = SubscriptionDetails.objects.filter(
+                user=admin, 
+                is_subscribed=True,
+                subscription_end_date__gte=current_date
+            ).order_by("-id").first()
+            if not subscription:
+                expired_subscription = SubscriptionDetails.objects.filter(
+                    user=admin
+                ).order_by("-id").first()
+            if subscription:
+                modules = ModuleDetails.objects.filter(is_active=True, id__in=modules_list).filter(
+                    id__in=subscription.module.all().values_list("id", flat=True)
+                )
+                response_dict["modules"] = ModuleDetailsSerializer(modules,context={"request": request}, many=True,).data
+                response_dict["status"] = True
+                response_dict["take_subscription"] = True
+                return Response(response_dict, status=status.HTTP_200_OK)
+            elif expired_subscription:
+                response_dict["message"] = "Subscription Expired"
+                response_dict["status"] = True
+                response_dict["take_subscription"] = True
+                return Response(response_dict, status=status.HTTP_200_OK)
+            elif admin.take_free_subscription:
+                response_dict["free_subscription"] = True
+                if admin.free_subscription_end_date and admin.free_subscription_end_date > current_date:
+                    modules = ModuleDetails.objects.filter(is_active=True, id__in=modules_list)
+                    response_dict["modules"] = ModuleDetailsSerializer(modules,context={"request": request}, many=True,).data
+                else:
+                    response_dict["message"] = "Free Subscription Expired"
+                response_dict["take_subscription"] = True
+                response_dict["status"] = True
+                return Response(response_dict, status=status.HTTP_200_OK)
+            else:
+                response_dict["error"] = "Not started your any subscription"
+                return Response(response_dict, status=status.HTTP_403_FORBIDDEN)
+
         else:
             response_dict["error"] = "Access denied, Only Admin can access the module list"
             return Response(response_dict, status=status.HTTP_403_FORBIDDEN)
