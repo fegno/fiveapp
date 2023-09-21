@@ -156,6 +156,6 @@ class SelectFreeSubscription(APIView):
         user.free_subscription_start_date = timezone.now().date()
         user.free_subscription_end_date = timezone.now().date()  + timedelta(days=15)
         user.save()
-        response_dict["message"] = "The email was successfully updated"
+        response_dict["message"] = "success"
         response_dict["status"] = True
         return Response(response_dict, status.HTTP_200_OK)
