@@ -29,6 +29,7 @@ class PaymentAttempt(models.Model):
 	client_secret			=	models.CharField(null=True,blank=True,max_length=255)
 	description				=	models.TextField(null=True)
 	last_payment_error_json	=	models.TextField(null=True)
+	last_payment_json	=	models.TextField(null=True)
 	status					=	models.CharField(max_length=50,blank=True,null=False,db_index=True,choices=PAYMENT_ATTEMPT_STATUS_CHOICES)
 	last_attempt_date		=	models.DateTimeField(null=True,blank=True)
 	is_active				=	models.BooleanField(null=False,blank=True,default=True)

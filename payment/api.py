@@ -87,11 +87,16 @@ class StripePaymentWebhook(APIView):
 			event = stripe.Event.construct_from(request.data,stripe.api_key)
 		except ValueError as e:
 			return HttpResponse(status=400)
+		
 		if event.type == 'payment_intent.succeeded':
 			intent = event.data.object # contains a stripe.PaymentIntent
 			payment_attempt=PaymentAttempt.objects.filter(payment_intent_id=intent['id'],is_active=True).first()
 			if not payment_attempt:
 				return HttpResponse(status=404)
+
+			PaymentAttempt.objects.filter(payment_intent_id=intent['id']).update(
+				last_payment_json=json.dumps(event)
+			)
 			payment_attempt.status='succeeded'
 			payment_attempt.charges_json=json.dumps(intent['charges'])
 			payment_attempt.total_charge=sum(i['amount'] for i in intent['charges']['data'])
@@ -132,6 +137,9 @@ class StripePaymentWebhook(APIView):
 			payment_attempt=PaymentAttempt.objects.filter(payment_intent_id=intent['id'],is_active=True).first()
 			if not payment_attempt:
 				return HttpResponse(status=404)
+			PaymentAttempt.objects.filter(payment_intent_id=intent['id']).update(
+				last_payment_json=json.dumps(event)
+			)
 			with transaction.atomic():
 				payment_attempt.status='Cancelled'
 				payment_attempt.save()
