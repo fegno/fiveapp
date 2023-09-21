@@ -47,3 +47,46 @@ class PurchaseDetails(models.Model):
     is_active = models.BooleanField(null=False, blank=True, default=True)
     created = models.DateTimeField(auto_now_add=True)
     updated = models.DateTimeField(auto_now=True)
+
+
+class UploadedCsvFiles(models.Model):
+    uploaded_by = models.ForeignKey(
+        UserProfile,
+        blank=True,
+        null=True,
+        on_delete=models.CASCADE,   
+    )
+    modules = models.ForeignKey(
+        ModuleDetails,
+        blank=True,
+        null=True,
+        on_delete=models.CASCADE,  
+    )
+    csv_file = models.FileField(null=True, blank=True)
+    standard_working_hour = models.FloatField(null=True, blank=True, default=0)
+    is_report_generated = models.BooleanField(null=False, blank=True, default=True)
+
+    is_active = models.BooleanField(null=False, blank=True, default=True)
+    created = models.DateTimeField(auto_now_add=True)
+    updated = models.DateTimeField(auto_now=True)
+
+
+class CsvLogDetails(models.Model):
+    uploaded_file = models.ForeignKey(
+        UploadedCsvFiles,
+        blank=True,
+        null=True,
+        on_delete=models.CASCADE,   
+    )
+    sl_no = models.CharField(null=True, blank=True, max_length=1000)
+    working_type = models.CharField(null=True, blank=True, max_length=1000)
+    employee_id = models.CharField(null=True, blank=True, max_length=1000)
+    employee_name = models.CharField(null=True, blank=True, max_length=1000)
+    department = models.CharField(null=True, blank=True, max_length=1000)
+    team = models.CharField(null=True, blank=True, max_length=1000)
+    designation = models.CharField(null=True, blank=True, max_length=1000)
+    working_hour = models.FloatField(null=True, blank=True, default=0)
+
+    is_active = models.BooleanField(null=False, blank=True, default=True)
+    created = models.DateTimeField(auto_now_add=True)
+    updated = models.DateTimeField(auto_now=True)
