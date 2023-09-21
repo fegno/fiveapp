@@ -167,8 +167,21 @@ class RegisterUser(APIView):
                 user.username = user.email
                 user.set_password(data.get("password"))
                 user.save()
+                authenticated = authenticate(username=user.email, password=data.get("password"))
+                Token.objects.filter(user=user).delete()
+                token, c = Token.objects.get_or_create(user=user)
+                response_dict["session_data"] = {
+                    "token": token.key,
+                    "name": user.first_name,
+                    "username": user.username,
+                    "email": user.email,
+                    "id": user.id,
+                    'user_type':user.user_type,
+                    "free_subscribed":True if user.take_free_subscription else False,
+                    "subscribed":True if user.is_subscribed else False
+                }
+                response_dict["token"] = token.key
                 response_dict["status"] = True
-                response_dict["message"] = "Registered successfully"
             else:
                 response_dict["error"] = get_error(serializer)
         return Response(response_dict, HTTP_200_OK)
@@ -312,7 +325,7 @@ class CheckLoginMethod(APIView):
                 response_dict["password_set"] = False
                 response_dict["user_type"] = "USER"
         elif not user:
-            if LoginOTP.objects.filter(email=email):
+            if LoginOTP.objects.filter(email=email, is_verified=True):
                 otp_user = LoginOTP.objects.filter(email=email)
                 response_dict["password_set"] = False
                 response_dict["user_type"] = otp_user.user_type
