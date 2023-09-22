@@ -46,6 +46,7 @@ class CustomUserAdmin(UserAdmin):
                     "user_type",
                     "is_active",
                     "is_superuser",
+                    "created_admin",
                 )
             },
         ),
