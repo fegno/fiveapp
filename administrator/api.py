@@ -11,11 +11,13 @@ from datetime import timedelta, date, datetime
 
 from administrator.models import SubscriptionDetails
 from administrator.serializers import (
+    DeletedUserLogSerializers,
     ModuleDetailsSerializer, 
     BundleDetailsSerializer,
-    BundleDetailsLiteSerializer
+    BundleDetailsLiteSerializer,
+    UserAssignedModuleSerializers
 )
-from superadmin.models import ModuleDetails, BundleDetails, UserAssignedModules
+from superadmin.models import DeleteUsersLog, ModuleDetails, BundleDetails, UserAssignedModules
 
 
 class Homepage(APIView):
@@ -212,3 +214,60 @@ class SelectFreeSubscription(APIView):
 class UserInModule(APIView):
     permission_classes = (IsAuthenticated,)
     authentication_classes = (CustomTokenAuthentication,)
+
+    def get(self, request, pk):
+        response_dict = {"status": False}
+        # Get the ModuleDetails instance
+        try:
+            module = ModuleDetails.objects.get(pk=pk)
+        except ModuleDetails.DoesNotExist:
+            return Response(
+                {"message": "Module not found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Filter users assigned to the module
+        user_assigned = UserAssignedModules.objects.filter(
+            module=module, user__created_admin=request.user
+        )
+        deleted_user = DeleteUsersLog.objects.filter(module=module,deleted_by=request.user)
+        response_dict["users"] = UserAssignedModuleSerializers(user_assigned, context={"request": request}, many=True).data
+        response_dict["deleted-users"] = DeletedUserLogSerializers(deleted_user, context={"request":request}, many=True).data
+        response_dict["status"] = True
+        return Response(response_dict, status=status.HTTP_200_OK)
+    
+
+class DeleteUserFromModule(APIView):
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (CustomTokenAuthentication,)
+
+    def post(self, request, module_id, pk):
+        response_dict = {"status": False}
+
+        user_to_delete = UserAssignedModules.objects.get(user__id=pk)
+        module_to_delete = ModuleDetails.objects.get(id=module_id)
+        print(user_to_delete)
+        print(module_to_delete)
+        
+        if not user_to_delete.module.filter(id=module_id).exists():
+            print('message')
+            response_dict["message"] = "User is not associated with the specified module"
+            return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
+        print("message_out")
+        
+        user_to_delete.module.remove(module_to_delete)
+        
+        # import pdb; pdb.set_trace()
+        DeleteUsersLog.objects.create(
+            deleted_by=request.user,
+            user=user_to_delete.user,
+            module=module_to_delete,
+            user_id = pk
+        )
+
+        
+
+        response_dict["message"] = "Successfully deleted the user from the module"
+        response_dict["status"] = True
+
+        return Response(response_dict, status=status.HTTP_200_OK)

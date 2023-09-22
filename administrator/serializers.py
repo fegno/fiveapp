@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from superadmin.models import DeleteUserLog, ModuleDetails, FeatureDetails, BundleDetails, UserAssignedModules
+from superadmin.models import DeleteUsersLog, ModuleDetails, FeatureDetails, BundleDetails, UserAssignedModules
 
 
 class ModuleDetailsSerializer(serializers.ModelSerializer):
@@ -106,3 +106,7 @@ class UserAssignedModuleSerializers(serializers.ModelSerializer):
         fields = ('user', 'module', 'created')
 
     
+class DeletedUserLogSerializers(serializers.ModelSerializer):
+    class Meta:
+        model = DeleteUsersLog
+        fields = ('user', 'module', 'delteed_by')
