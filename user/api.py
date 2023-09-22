@@ -316,8 +316,8 @@ class CheckLoginMethod(APIView):
 
     def get(self, request):
         response_dict = {"status": False}
-        data = request.data
-        email = request.data.get("email")
+        data = request.GET
+        email = request.GET.get("email")
         user = UserProfile.objects.filter(
             email=data.get("email"),
         ).first()
