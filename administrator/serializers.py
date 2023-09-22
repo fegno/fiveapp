@@ -1,12 +1,13 @@
 from rest_framework import serializers
 
-from superadmin.models import ModuleDetails, FeatureDetails, BundleDetails
+from superadmin.models import DeleteUserLog, ModuleDetails, FeatureDetails, BundleDetails, UserAssignedModules
 
 
 class ModuleDetailsSerializer(serializers.ModelSerializer):
     class Meta:
         model= ModuleDetails
         fields = (
+            "id",
             "department",
             "title",
             "description",
@@ -36,6 +37,7 @@ class BundleDetailsSerializer(serializers.ModelSerializer):
     class Meta:
         model= BundleDetails
         fields = (
+            "id",
             "weekly_price",
             "monthly_price",
             "yearly_price",
@@ -53,6 +55,7 @@ class ModuleLiteSerializer(serializers.ModelSerializer):
     class Meta:
         model= ModuleDetails
         fields = (
+            "id",
             "department",
             "title",
             "description",
@@ -80,6 +83,7 @@ class BundleDetailsLiteSerializer(serializers.ModelSerializer):
     class Meta:
         model= BundleDetails
         fields = (
+            "id",
             "weekly_price",
             "monthly_price",
             "yearly_price",
@@ -94,3 +98,11 @@ class BundleDetailsLiteSerializer(serializers.ModelSerializer):
         cd["modules"] = ModuleLiteSerializer(
             obj.modules.all().filter(is_submodule=False),many=True).data
         return cd
+    
+
+class UserAssignedModuleSerializers(serializers.ModelSerializer):
+    class Meta:
+        model = UserAssignedModules
+        fields = ('user', 'module', 'created')
+
+    
