@@ -64,7 +64,8 @@ class UploadedCsvFiles(models.Model):
     )
     csv_file = models.FileField(null=True, blank=True)
     standard_working_hour = models.FloatField(null=True, blank=True, default=0)
-    is_report_generated = models.BooleanField(null=False, blank=True, default=True)
+    is_report_generated = models.BooleanField(null=False, blank=True, default=False)
+    working_type = models.CharField(null=True, blank=True, max_length=1000)
 
     is_active = models.BooleanField(null=False, blank=True, default=True)
     created = models.DateTimeField(auto_now_add=True)
@@ -79,7 +80,6 @@ class CsvLogDetails(models.Model):
         on_delete=models.CASCADE,   
     )
     sl_no = models.CharField(null=True, blank=True, max_length=1000)
-    working_type = models.CharField(null=True, blank=True, max_length=1000)
     employee_id = models.CharField(null=True, blank=True, max_length=1000)
     employee_name = models.CharField(null=True, blank=True, max_length=1000)
     department = models.CharField(null=True, blank=True, max_length=1000)

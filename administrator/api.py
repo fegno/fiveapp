@@ -9,7 +9,7 @@ from datetime import datetime
 from django.utils import timezone
 from datetime import timedelta, date, datetime
 
-from administrator.models import SubscriptionDetails
+from administrator.models import SubscriptionDetails,  CsvLogDetails, UploadedCsvFiles
 from administrator.serializers import (
     DeletedUserLogSerializers,
     ModuleDetailsSerializer, 
@@ -17,8 +17,14 @@ from administrator.serializers import (
     BundleDetailsLiteSerializer,
     UserAssignedModuleSerializers
 )
-from superadmin.models import DeleteUsersLog, ModuleDetails, BundleDetails, UserAssignedModules
-
+from superadmin.models import (
+    DeleteUsersLog,
+    ModuleDetails, 
+    BundleDetails, 
+    UserAssignedModules,
+  
+)
+import csv
 
 class Homepage(APIView):
     permission_classes = (IsAuthenticated,)
@@ -195,9 +201,6 @@ class SelectFreeSubscription(APIView):
     def post(self, request):
         response_dict = {"status": False}
         user = request.user
-        print(
-            user , "ppp"
-        )
         if user.take_free_subscription:
             response_dict["error"] = "Already subscribed"
             return Response(response_dict, status.HTTP_200_OK)
@@ -222,7 +225,7 @@ class UserInModule(APIView):
             module = ModuleDetails.objects.get(pk=pk)
         except ModuleDetails.DoesNotExist:
             return Response(
-                {"message": "Module not found."},
+                {"error": "Module not found."},
                 status=status.HTTP_404_NOT_FOUND
             )
 
@@ -246,28 +249,61 @@ class DeleteUserFromModule(APIView):
 
         user_to_delete = UserAssignedModules.objects.get(user__id=pk)
         module_to_delete = ModuleDetails.objects.get(id=module_id)
-        print(user_to_delete)
-        print(module_to_delete)
         
         if not user_to_delete.module.filter(id=module_id).exists():
-            print('message')
-            response_dict["message"] = "User is not associated with the specified module"
+            response_dict["error"] = "User is not associated with the specified module"
             return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
-        print("message_out")
-        
         user_to_delete.module.remove(module_to_delete)
         
-        # import pdb; pdb.set_trace()
         DeleteUsersLog.objects.create(
             deleted_by=request.user,
             user=user_to_delete.user,
             module=module_to_delete,
             user_id = pk
         )
-
-        
-
         response_dict["message"] = "Successfully deleted the user from the module"
         response_dict["status"] = True
+        return Response(response_dict, status=status.HTTP_200_OK)
 
+
+class UploadCsv(APIView):
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (CustomTokenAuthentication,)
+
+    def post(self, request, pk):
+        response_dict = {"status": False}
+        csv_file = request.FILES.get("file")
+        working_type = request.FILES.get("working_type")
+
+        module = ModuleDetails.objects.filter(id=pk).last()
+        if not module:
+            response_dict["error"] = "Module Not Found"
+            return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
+        if not csv_file:
+            response_dict["error"] = "Module Not Found"
+            return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
+        to_save = []
+        decoded_file = csv_file.read().decode('utf-8').splitlines()
+        reader = csv.DictReader(decoded_file)
+
+        upload_log = UploadedCsvFiles.objects.create(
+            uploaded_by=request.user,
+            modules=module,
+            csv_file=csv_file,
+            working_type=working_type
+        )
+        for row in reader:
+            to_save.append(
+                CsvLogDetails(
+                    uploaded_file=upload_log,
+                    sl_no=row.get("S.NO"),
+                    employee_id=row.get("EMPLOYEE ID"),
+                    employee_name=row.get("EMPLOYEE NAME"),
+                    team=row.get("TEAM"),
+                    working_hour=row.get("WORKING HOURS/WEEK/ MONTHLY")
+                )
+            )
+        CsvLogDetails.objects.bulk_create(to_save)
+        response_dict["message"] = "Successfully uplaoded"
+        response_dict["status"] = True
         return Response(response_dict, status=status.HTTP_200_OK)
