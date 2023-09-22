@@ -27,7 +27,7 @@ from django.db.models import (
 )
 from django.http import HttpResponse
 import json
-from superadmin.models import ModuleDetails, FeatureDetails,  BundleDetails
+from superadmin.models import ModuleDetails, FeatureDetails,  BundleDetails, ModuleReports
 from superadmin.forms import ModuleForm, BundleForm
 
 class LandingPage(IsSuperAdminMixin, TemplateView):
@@ -69,6 +69,12 @@ class LandingPage(IsSuperAdminMixin, TemplateView):
                             )
                         )
                     FeatureDetails.objects.bulk_create(to_save)
+                if request.POST.getlist("report_type"):
+                    for i in request.POST.getlist("report_type"):
+                        ModuleReports.objects.create(
+                            module=module,
+                            report=i
+                        )
                 messages.success(request, "Added successfully")
         else:
             response_dict["reason"] = get_error(form)

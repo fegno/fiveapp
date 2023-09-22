@@ -79,6 +79,12 @@ class BundleDetails(models.Model):
     created = models.DateTimeField(auto_now_add=True)
 
 class ModuleReports(models.Model):
+    module = models.ForeignKey(
+        ModuleDetails,
+        blank=True,
+        null=True,
+        on_delete=models.CASCADE,   
+    )
     report = models.TextField(null=True, blank=True)
 
     is_active = models.BooleanField(null=False, blank=True, default=True)
