@@ -8,6 +8,7 @@ class SubscriptionDetails(models.Model):
         blank=True,
         null=True,
         on_delete=models.CASCADE,   
+        related_name="admin_subscriptions"
     )
     module = models.ManyToManyField(ModuleDetails, blank=True)
     bundle = models.ManyToManyField(BundleDetails, blank=True)
