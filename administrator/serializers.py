@@ -1,7 +1,14 @@
 from rest_framework import serializers
 
-from superadmin.models import DeleteUsersLog, ModuleDetails, FeatureDetails, BundleDetails, UserAssignedModules
-
+from superadmin.models import (
+    DeleteUsersLog, 
+    ModuleDetails, 
+    FeatureDetails, 
+    BundleDetails, 
+    UserAssignedModules,
+  
+)
+from administrator.models import  CsvLogDetails,UploadedCsvFiles
 
 class ModuleDetailsSerializer(serializers.ModelSerializer):
     class Meta:
@@ -110,3 +117,21 @@ class DeletedUserLogSerializers(serializers.ModelSerializer):
     class Meta:
         model = DeleteUsersLog
         fields = ('user', 'module', 'delteed_by')
+
+class UploadedCsvFilesSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UploadedCsvFiles
+        fields = "__all__"
+
+class CsvSerializers(serializers.ModelSerializer):
+    class Meta:
+        model = CsvLogDetails
+        fields = "__all__"
+
+    def to_representation(self, obj, *args, **kwargs):
+        cd = super(CsvSerializers, self).to_representation(
+            obj, *args, **kwargs
+        )
+        cd["uploaded_Details"] =UploadedCsvFilesSerializer(
+            obj.uploaded_file, context={'request':self.context.get("context")}).data
+        return cd

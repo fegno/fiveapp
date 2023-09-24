@@ -14,5 +14,6 @@ urlpatterns = [
     # path('user-delete/<int:pk>/<int:module_id>/', api.DeleteUserFromModule.as_view(), name='delte-user')
 
     re_path(r'^upload-csv/(?P<pk>\d+)/$', api.UploadCsv.as_view(), name='upload-csv'),
+    re_path(r'^list-csv/(?P<pk>\d+)/$', api.ListCsv.as_view(), name='list-csv'),
 
 ]

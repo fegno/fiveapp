@@ -8,6 +8,23 @@ from rest_framework import status
 from datetime import datetime
 from django.utils import timezone
 from datetime import timedelta, date, datetime
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from django.db.models import (
+    Q,
+    Sum,
+    Count,
+    Max,
+    Prefetch,
+    Case,
+    When,
+    Value,
+    CharField,
+    BooleanField,
+    IntegerField,
+    F,
+    IntegerField,
+)
+from fiveapp.utils import PageSerializer
 
 from administrator.models import SubscriptionDetails,  CsvLogDetails, UploadedCsvFiles
 from administrator.serializers import (
@@ -15,7 +32,9 @@ from administrator.serializers import (
     ModuleDetailsSerializer, 
     BundleDetailsSerializer,
     BundleDetailsLiteSerializer,
-    UserAssignedModuleSerializers
+    UserAssignedModuleSerializers,
+    CsvSerializers,
+    UploadedCsvFilesSerializer
 )
 from superadmin.models import (
     DeleteUsersLog,
@@ -305,5 +324,36 @@ class UploadCsv(APIView):
             )
         CsvLogDetails.objects.bulk_create(to_save)
         response_dict["message"] = "Successfully uplaoded"
+        response_dict["status"] = True
+        return Response(response_dict, status=status.HTTP_200_OK)
+
+class ListCsv(APIView):
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (CustomTokenAuthentication,)
+
+    def get(self, request, pk):
+        response_dict = {"status": False}
+        module = ModuleDetails.objects.filter(id=pk).last()
+        if not module:
+            response_dict["error"] = "Module Not Found"
+            return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
+        csv_log = UploadedCsvFiles.objects.filter(
+            modules=module
+        ).filter(
+            Q(uploaded_by=request.user)|
+            Q(uploaded_by__created_admin=request.user)
+        )
+        items_per_page = 100
+        paginator = Paginator(csv_log, items_per_page)
+        page = request.GET.get("page")
+        try:
+            items = paginator.page(page)
+        except PageNotAnInteger:
+            items = paginator.page(1)
+        except EmptyPage:
+            items = paginator.page(paginator.num_pages)
+        serialized = UploadedCsvFilesSerializer(items, many=True, context={"request":self.request}).data
+        items.object_list = serialized
+        response_dict["page"] = PageSerializer(items, serialize=False).data
         response_dict["status"] = True
         return Response(response_dict, status=status.HTTP_200_OK)
