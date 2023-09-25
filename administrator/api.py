@@ -348,7 +348,7 @@ class ListCsv(APIView):
         ).filter(
             Q(uploaded_by=request.user)|
             Q(uploaded_by__created_admin=request.user)
-        )
+        ).order_by("-id")
         items_per_page = 100
         paginator = Paginator(csv_log, items_per_page)
         page = request.GET.get("page")
@@ -358,12 +358,51 @@ class ListCsv(APIView):
             items = paginator.page(1)
         except EmptyPage:
             items = paginator.page(paginator.num_pages)
-        serialized = UploadedCsvFilesSerializer(items, many=True, context={"request":self.request}).data
+        serialized = UploadedCsvFilesSerializer(items, many=True, localize=True, context={"request":self.request}).data
         items.object_list = serialized
         response_dict["page"] = PageSerializer(items, serialize=False).data
         response_dict["status"] = True
         return Response(response_dict, status=status.HTTP_200_OK)
 
+
+class ViewCsv(APIView):
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (CustomTokenAuthentication,)
+
+    def get(self, request, pk):
+        response_dict = {"status": False}
+
+        csv_file = UploadedCsvFiles.objects.filter(
+            id=pk
+        ).first()
+        response_dict["module"] = {
+            "id":csv_file.modules.id,
+            "name":csv_file.modules.title,
+            "department":csv_file.modules.department
+        }
+        csvlog = CsvLogDetails.objects.filter(
+            uploaded_file__id=pk
+        ).filter(
+            Q(uploaded_file__uploaded_by=request.user)|
+            Q(uploaded_file__uploaded_by__created_admin=request.user)
+        ).order_by("id")
+        if not csvlog:
+            response_dict["error"] = "Log Not Found"
+            return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
+        items_per_page = 100
+        paginator = Paginator(csvlog, items_per_page)
+        page = request.GET.get("page")
+        try:
+            items = paginator.page(page)
+        except PageNotAnInteger:
+            items = paginator.page(1)
+        except EmptyPage:
+            items = paginator.page(paginator.num_pages)
+        serialized = CsvSerializers(items, many=True, context={"request":self.request}).data
+        items.object_list = serialized
+        response_dict["page"] = PageSerializer(items, serialize=False).data
+        response_dict["status"] = True
+        return Response(response_dict, status=status.HTTP_200_OK)
 
 class UserInviteModule(APIView):
     permission_classes = (IsAuthenticated,)

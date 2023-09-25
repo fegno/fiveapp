@@ -9,6 +9,7 @@ from superadmin.models import (
   
 )
 from administrator.models import  CsvLogDetails, SubscriptionDetails,UploadedCsvFiles
+from fiveapp.custom_serializer import CustomSerializer
 
 class ModuleDetailsSerializer(serializers.ModelSerializer):
     class Meta:
@@ -118,22 +119,35 @@ class DeletedUserLogSerializers(serializers.ModelSerializer):
         model = DeleteUsersLog
         fields = ('user', 'module', 'deleted_by')
 
-class UploadedCsvFilesSerializer(serializers.ModelSerializer):
+class UploadedCsvFilesSerializer(CustomSerializer):
     class Meta:
         model = UploadedCsvFiles
         fields = "__all__"
+        extra_kwargs = {
+            "created": {"format": "%d/%m/%Y %H:%M"},
+            "updated": {"format": "%d/%m/%Y %H:%M"},
+        }
+    def to_representation(self, obj, *args, **kwargs):
+        cd = super(UploadedCsvFilesSerializer, self).to_representation(
+            obj, *args, **kwargs
+        )
+        cd["uploaded_by_name"] = obj.uploaded_by.first_name
+        return cd
 
 class CsvSerializers(serializers.ModelSerializer):
     class Meta:
         model = CsvLogDetails
         fields = "__all__"
-
+        extra_kwargs = {
+            "created": {"format": "%d/%m/%Y %H:%M"},
+            "updated": {"format": "%d/%m/%Y %H:%M"},
+        }
     def to_representation(self, obj, *args, **kwargs):
         cd = super(CsvSerializers, self).to_representation(
             obj, *args, **kwargs
         )
         cd["uploaded_Details"] =UploadedCsvFilesSerializer(
-            obj.uploaded_file, context={'request':self.context.get("context")}).data
+            obj.uploaded_file, context={'request':self.context.get("request")}).data
         return cd
     
 
