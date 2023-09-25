@@ -8,7 +8,7 @@ from superadmin.models import (
     UserAssignedModules,
   
 )
-from administrator.models import  CsvLogDetails,UploadedCsvFiles
+from administrator.models import  CsvLogDetails, SubscriptionDetails,UploadedCsvFiles
 
 class ModuleDetailsSerializer(serializers.ModelSerializer):
     class Meta:
@@ -116,7 +116,7 @@ class UserAssignedModuleSerializers(serializers.ModelSerializer):
 class DeletedUserLogSerializers(serializers.ModelSerializer):
     class Meta:
         model = DeleteUsersLog
-        fields = ('user', 'module', 'delteed_by')
+        fields = ('user', 'module', 'deleted_by')
 
 class UploadedCsvFilesSerializer(serializers.ModelSerializer):
     class Meta:
@@ -135,3 +135,14 @@ class CsvSerializers(serializers.ModelSerializer):
         cd["uploaded_Details"] =UploadedCsvFilesSerializer(
             obj.uploaded_file, context={'request':self.context.get("context")}).data
         return cd
+    
+
+class UserInviteSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    first_name = serializers.CharField()
+    selected_modules = serializers.ListField(child=serializers.IntegerField(), required=False)
+
+
+class SubscriptionModuleSerilzer(serializers.Serializer):
+    model = SubscriptionDetails
+    fields = ("user", "module", "bundle")

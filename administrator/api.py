@@ -32,9 +32,11 @@ from administrator.serializers import (
     ModuleDetailsSerializer, 
     BundleDetailsSerializer,
     BundleDetailsLiteSerializer,
+    SubscriptionModuleSerilzer,
     UserAssignedModuleSerializers,
     CsvSerializers,
-    UploadedCsvFilesSerializer
+    UploadedCsvFilesSerializer,
+    UserInviteSerializer
 )
 from superadmin.models import (
     DeleteUsersLog,
@@ -44,6 +46,11 @@ from superadmin.models import (
   
 )
 import csv
+
+from user.models import UserProfile
+from django.db import transaction
+from fiveapp.utils import get_error
+from user.serializers import UserSerializer
 
 class Homepage(APIView):
     permission_classes = (IsAuthenticated,)
@@ -278,7 +285,6 @@ class DeleteUserFromModule(APIView):
             deleted_by=request.user,
             user=user_to_delete.user,
             module=module_to_delete,
-            user_id = pk
         )
         response_dict["message"] = "Successfully deleted the user from the module"
         response_dict["status"] = True
@@ -357,3 +363,192 @@ class ListCsv(APIView):
         response_dict["page"] = PageSerializer(items, serialize=False).data
         response_dict["status"] = True
         return Response(response_dict, status=status.HTTP_200_OK)
+
+
+class UserInviteModule(APIView):
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (CustomTokenAuthentication,)
+
+    def post(self, request):
+        response_dict = {"status": False}
+        data = request.data
+
+        serializer = UserInviteSerializer(data=data)
+        
+        if UserProfile.objects.filter(email=data.get("email")).exists():
+            response_dict["error"] = "User already exists"
+            return Response(response_dict, status=status.HTTP_200_OK)
+
+        admin_user = request.user 
+        # available user count
+        availble_free_user = admin_user.available_free_users
+        available_paid_user = admin_user.available_paid_users
+
+
+        if availble_free_user>0:
+
+            # Create a new UserProfile instance for the invited user
+            user = UserProfile.objects.create(
+                user_type="USER",
+                username=data.get("email"),
+                email=data.get("email"),
+                first_name=data.get("first_name"),
+                created_admin=admin_user, 
+            )
+            user.save()
+
+            # Assign the user to selected modules
+            selected_modules = data.get("selected_modules")
+            assigned_module_names = []
+            if selected_modules:
+                for module_id in selected_modules:
+                    try:
+                        module = ModuleDetails.objects.get(id=module_id)
+                    except ModuleDetails.DoesNotExist:
+                        response_dict["error"] =  f"module with ID {module_id} doesn't exists"
+                        return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
+                    
+                    if UserAssignedModules.objects.filter(user=user, module=module).exists():
+                        response_dict["error"] = f"User with the module ID {module_id} already exists"
+                    
+                    assign_user = UserAssignedModules.objects.create(user=user)
+                    assign_user.module.add(module)
+                    assigned_module_names.append(module.title)
+
+            admin_user.available_free_users -= 1
+            admin_user.save()
+
+            response_dict["session_data"] = {
+                "name": user.first_name,
+                "username": user.username,
+                "email": user.email,
+                "id": user.id,
+                "user_type": user.user_type,
+                "created_admin": user.created_admin.id,
+                "assigned_module_names":assigned_module_names
+            }
+            response_dict["status"] = True
+            response_dict["message"] = "User invitation and module assignment successful"
+        else:
+            if available_paid_user>0:
+                # Create a new UserProfile instance for the invited user
+                user = UserProfile.objects.create(
+                    user_type="USER",
+                    username=data.get("email"),
+                    email=data.get("email"),
+                    first_name=data.get("first_name"),
+                    created_admin=admin_user, 
+                )
+                user.save()
+
+                # Assign the user to selected modules
+                selected_modules = data.get("selected_modules")
+                print(selected_modules)
+                assigned_module_names = []
+                if selected_modules:
+                    for module_id in selected_modules:
+                        try:
+                            module = ModuleDetails.objects.get(id=module_id)
+                        except ModuleDetails.DoesNotExist:
+                            response_dict["error"] =  f"module with ID {module_id} doesn't exists"
+                            return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
+                        
+                        if UserAssignedModules.objects.filter(user=user, module=module).exists():
+                            response_dict["error"] = f"User with the module ID {module_id} already exists"
+                        
+                        assign_user = UserAssignedModules.objects.create(user=user)
+                        assign_user.module.add(module)
+                        assigned_module_names.append(module.title)
+
+                admin_user.available_paid_users -= 1
+                admin_user.save()
+
+                response_dict["session_data"] = {
+                    "name": user.first_name,
+                    "username": user.username,
+                    "email": user.email,
+                    "id": user.id,
+                    "user_type": user.user_type,
+                    "created_admin": user.created_admin.id,
+                    "assigned_module_names":assigned_module_names
+                }
+                response_dict["status"] = True
+                response_dict["message"] = "User invitation and module assignment successful"
+            else:
+                response_dict["message"] = "No paid or free users are available"    
+        return Response(response_dict, status=status.HTTP_200_OK)
+
+
+class UnAssignUserlist(APIView):
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (CustomTokenAuthentication,) 
+
+    def get(self, request,pk):
+        response_dict = {"status":True}
+        user = request.user
+        module = ModuleDetails.objects.get(id=pk)
+        un_assigned_user = UserProfile.objects.filter(created_admin=user).exclude(userassignedmodules__module=module)  
+        # unassigned_user = un_assigned_user.filter(created_admin=user)
+        response_dict["un_assigned_users"] = UserSerializer(un_assigned_user, context={"request":request}, many=True).data
+        return Response(response_dict, status=status.HTTP_200_OK)
+
+
+class AssignUser(APIView):
+    permission_classes =(IsAuthenticated,)
+    authentication_classes = (CustomTokenAuthentication,) 
+
+    def post(self, request, pk):
+        response_dict = {"status":True}
+        user = request.user
+        try:
+            module = ModuleDetails.objects.get(id=pk)
+        except ModuleDetails.DoesNotExist:
+            response_dict["error"] = f"Module with ID {pk} does not exists"
+            return Response(response_dict, status=status.HTTP_200_OK)
+        
+
+        users_to_assign = request.data.get("user_ids", [])
+        for user_id in users_to_assign:
+            try:
+                users = UserProfile.objects.get(id=user_id)
+            except UserProfile.DoesNotExist:
+                response_dict["error"] = f"User with the ID {user_id} does not exsts"
+
+            if UserAssignedModules.objects.filter(user=user, module=module).exists():
+                continue  
+
+            assign_user = UserAssignedModules.objects.create(user=user)
+            assign_user.module.add(module)
+        return Response(response_dict, status=status.HTTP_200_OK)
+    
+
+    # def post(self, request, module_id):
+    #     try:
+    #         module = ModuleDetails.objects.get(id=module_id)
+    #     except ModuleDetails.DoesNotExist:
+    #         return Response({"error": f"Module with ID {module_id} does not exist."}, status=status.HTTP_404_NOT_FOUND)
+
+    #     # Get the list of user IDs to assign to the module from the request data
+    #     user_ids_to_assign = request.data.get("user_ids", [])
+        
+    #     # Loop through user IDs and assign users to the module
+    #     for user_id in user_ids_to_assign:
+    #         try:
+    #             user = UserProfile.objects.get(id=user_id)
+    #         except UserProfile.DoesNotExist:
+    #             return Response({"error": f"User with ID {user_id} does not exist."}, status=status.HTTP_404_NOT_FOUND)
+
+    #         # Check if the user is already assigned to the module
+    #         if UserAssignedModules.objects.filter(user=user, module=module).exists():
+    #             continue  # Skip already assigned users
+
+    #         # Create a UserAssignedModules instance to assign the user to the module
+    #         assign_user = UserAssignedModules.objects.create(user=user)
+    #         assign_user.module.add(module)
+
+    #     return Response({"message": "Users assigned to the module successfully."}, status=status.HTTP_200_OK)
+
+
+
+
+        
