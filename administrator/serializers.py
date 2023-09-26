@@ -10,6 +10,7 @@ from superadmin.models import (
 )
 from administrator.models import  CsvLogDetails, SubscriptionDetails,UploadedCsvFiles
 from fiveapp.custom_serializer import CustomSerializer
+from user.serializers import UserSerializer
 
 class ModuleDetailsSerializer(serializers.ModelSerializer):
     class Meta:
@@ -112,6 +113,7 @@ class BundleDetailsLiteSerializer(serializers.ModelSerializer):
 
 class UserAssignedModuleSerializers(serializers.ModelSerializer):
     module = ModuleDetailsSerializer(many=True)
+    user = UserSerializer()
     class Meta:
         model = UserAssignedModules
         fields = ('user', 'module', 'created')
@@ -119,6 +121,7 @@ class UserAssignedModuleSerializers(serializers.ModelSerializer):
     def get_module_names(self, obj):
         # Extract and return the names of modules assigned to the user
         return [module.title for module in obj.module.all()]
+    
 
     
 class DeletedUserLogSerializers(serializers.ModelSerializer):

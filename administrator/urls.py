@@ -18,7 +18,7 @@ urlpatterns = [
 
     re_path(r'^user-module-list/(?P<pk>\d+)/$', api.UserModuleList.as_view(), name='user-module-list'),
     re_path(r'^remove-module/(?P<user_id>\d+)/(?P<module_id>\d+)/$', api.DeleteModule.as_view(), name='remove-module'),
-    # re_path(r'^unassign-module/(?P<pk>\d+)/$', api.UnassignedModule.as_view(), name= 'unassigned-module'),
+    re_path(r'^unassign-module/(?P<pk>\d+)/$', api.UnassignedModule.as_view(), name= 'unassigned-module'),
 
     re_path(r'^upload-csv/(?P<pk>\d+)/$', api.UploadCsv.as_view(), name='upload-csv'),
     re_path(r'^list-csv/(?P<pk>\d+)/$', api.ListCsv.as_view(), name='list-csv'),
