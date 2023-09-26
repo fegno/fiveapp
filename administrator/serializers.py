@@ -125,6 +125,7 @@ class UserAssignedModuleSerializers(serializers.ModelSerializer):
 
     
 class DeletedUserLogSerializers(serializers.ModelSerializer):
+    user = UserSerializer()
     class Meta:
         model = DeleteUsersLog
         fields = ('user', 'module', 'deleted_by')

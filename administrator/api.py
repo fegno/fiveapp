@@ -667,9 +667,15 @@ class UnAssignUserlist(APIView):
         response_dict = {"status":True}
         user = request.user
         module = ModuleDetails.objects.get(id=pk)
-        un_assigned_user = UserProfile.objects.filter(created_admin=user).exclude(userassignedmodules__module=module)  
-        # unassigned_user = un_assigned_user.filter(created_admin=user)
-        response_dict["un_assigned_users"] = UserSerializer(un_assigned_user, context={"request":request}, many=True).data
+
+        subscribed_modules = SubscriptionDetails.objects.filter(user=request.user, module=pk)
+        print(subscribed_modules)
+        if subscribed_modules:
+            un_assigned_user = UserProfile.objects.filter(created_admin=user).exclude(userassignedmodules__module=module)  
+            # unassigned_user = un_assigned_user.filter(created_admin=user)
+            response_dict["un_assigned_users"] = UserSerializer(un_assigned_user, context={"request":request}, many=True).data
+        else:
+            response_dict["error"] = "User is not subscribed the module"
         return Response(response_dict, status=status.HTTP_200_OK)
 
 
@@ -699,18 +705,22 @@ class AssignUser(APIView):
             except UserProfile.DoesNotExist:
                 response_dict["error"] = f"User with the ID {user_id} does not exsts"
 
-            if UserAssignedModules.objects.filter(user=user_id).exists():
-                if UserAssignedModules.objects.filter(user=user_id, module=module).exists():
-                    response_dict["message"] = f"User {user_profile.id} is already assigned to module {module.id}"
-                else:
-                    user_assign_object = UserAssignedModules.objects.filter(user=user_id).first()
-                    user_assign_object.module.add(module)
-                    response_dict["message"] = "User is assigned to the module"
-                    continue
+            subscribed_module = SubscriptionDetails.objects.filter(user=request.user, module=pk)
+            if subscribed_module:
+                if UserAssignedModules.objects.filter(user=user_id).exists():
+                    if UserAssignedModules.objects.filter(user=user_id, module=module).exists():
+                        response_dict["message"] = f"User {user_profile.id} is already assigned to module {module.id}"
+                    else:
+                        user_assign_object = UserAssignedModules.objects.filter(user=user_id).first()
+                        user_assign_object.module.add(module)
+                        response_dict["message"] = "User is assigned to the module"
+                        continue
 
-            assign_user = UserAssignedModules.objects.create(user=user)
-            assign_user.module.add(module)
-            response_dict["message"] = f"User with ID {user_profile.id} added to the module id{module.id}"
+                assign_user = UserAssignedModules.objects.create(user=user)
+                assign_user.module.add(module)
+                response_dict["message"] = f"User with ID {user_profile.id} added to the module id{module.id}"
+            else:
+                response_dict["error"] = "Not subscribed the module"
         return Response(response_dict, status=status.HTTP_200_OK)
     
     
