@@ -363,17 +363,32 @@ class UploadCsv(APIView):
             csv_file=csv_file,
             working_type=working_type
         )
-        for row in reader:
-            to_save.append(
-                CsvLogDetails(
-                    uploaded_file=upload_log,
-                    sl_no=row.get("S.NO"),
-                    employee_id=row.get("EMPLOYEE ID"),
-                    employee_name=row.get("EMPLOYEE NAME"),
-                    team=row.get("TEAM"),
-                    working_hour=row.get("WORKING HOURS/WEEK/ MONTHLY")
+        if module.title == "Team Indicator":
+            for row in reader:
+                to_save.append(
+                    CsvLogDetails(
+                        uploaded_file=upload_log,
+                        sl_no=row.get("S.NO"),
+                        employee_id=row.get("EMPLOYEE ID"),
+                        employee_name=row.get("EMPLOYEE NAME"),
+                        team=row.get("TEAM"),
+                        working_hour=row.get("WORKING HOURS/WEEK/ MONTHLY")
+                    )
                 )
-            )
+        elif module.title == "Team Workforce Plan Corporate":
+            for row in reader:
+                to_save.append(
+                    CsvLogDetails(
+                        uploaded_file=upload_log,
+                        sl_no=row.get("S.NO"),
+                        employee_id=row.get("EMPLOYEE ID"),
+                        employee_name=row.get("EMPLOYEE NAME"),
+                        team=row.get("TEAM"),
+                        designation=row.get("DESIGNATION"),
+                        department=row.get("DEPARTMENTS"),
+                        working_hour=row.get("WORKING HOUR")
+                    )
+                )
         CsvLogDetails.objects.bulk_create(to_save)
         response_dict["message"] = "Successfully uplaoded"
         response_dict["status"] = True
@@ -450,6 +465,66 @@ class ViewCsv(APIView):
         response_dict["status"] = True
         return Response(response_dict, status=status.HTTP_200_OK)
 
+
+class GenerateReport(APIView):
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (CustomTokenAuthentication,)
+
+    def post(self, request, pk):
+        response_dict = {"status": False}
+        week_working_hour = request.data.get("week_working_hour", 0)
+        csv_file = UploadedCsvFiles.objects.filter(
+            id=pk
+        ).first()
+        response_dict["module"] = {
+            "id":csv_file.modules.id,
+            "name":csv_file.modules.title,
+            "department":csv_file.modules.department
+        }
+        log  = CsvLogDetails.objects.filter(
+            uploaded_file__id=pk
+        ).filter(
+            Q(uploaded_file__uploaded_by=request.user)|
+            Q(uploaded_file__uploaded_by__created_admin=request.user)
+        ).order_by("id")
+
+        if csv_file.is_report_generated:
+            response_dict["error"] = "Report Already generated"
+            return Response(response_dict, status=status.HTTP_200_OK)
+        
+        try:
+            if csv_file.working_type == "WEEK":
+                for i in log:
+                    working_hr = float(i.working_hour)
+                    if float(i.working_hour) > float(week_working_hour):
+                        extra_hr = float(i.working_hour) - float(week_working_hour)
+                        i.extra_hour = extra_hr
+                        i.save()
+                        
+            elif csv_file.working_type == "MONTH":
+                week_working_hour =float(week_working_hour) *30
+                for i in log:
+                    working_hr = float(i.working_hour)
+                    if float(i.working_hour) > float(week_working_hour):
+                        extra_hr = float(i.working_hour) - float(week_working_hour)
+                        i.extra_hour = extra_hr
+                        i.save()
+
+            elif csv_file.working_type == "YEAR":
+                week_working_hour =float(week_working_hour) *365
+                for i in log:
+                    working_hr = float(i.working_hour)
+                    if float(i.working_hour) > float(week_working_hour):
+                        extra_hr = float(i.working_hour) - float(week_working_hour)
+                        i.extra_hour = extra_hr
+                        i.save()
+            csv_file.is_report_generated = True
+            csv_file.save()
+            response_dict["status"] = True
+            response_dict["message"] = "Generated"
+        except Exception as e:
+            response_dict["error"] = str(e)
+        return Response(response_dict, status=status.HTTP_200_OK)
 
 class UserInviteModule(APIView):
     permission_classes = (IsAuthenticated,)
