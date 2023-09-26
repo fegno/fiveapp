@@ -496,36 +496,34 @@ class GenerateReport(APIView):
             if csv_file.working_type == "WEEK":
                 for i in log:
                     working_hr = float(i.working_hour)
+
                     if float(i.working_hour) > float(week_working_hour):
                         extra_hr = float(i.working_hour) - float(week_working_hour)
                         i.extra_hour = extra_hr
+                        i.save()
+                    elif float(i.working_hour) < float(week_working_hour):
+                        per_day = float(week_working_hour) / 5
+                        abn = float(i.working_hour) / float(per_day)
+                        absent = float(5.0) - float(abn)
+                        i.absent_days = absent
                         i.save()
                         
             elif csv_file.working_type == "MONTH":
-                week_working_hour =float(week_working_hour) *30
+                week_working_hour =float(week_working_hour) *4
                 for i in log:
                     working_hr = float(i.working_hour)
                     if float(i.working_hour) > float(week_working_hour):
                         extra_hr = float(i.working_hour) - float(week_working_hour)
                         i.extra_hour = extra_hr
+                        i.save()
+                    
+                    elif float(i.working_hour) < float(week_working_hour):
+                        per_day = float(week_working_hour) / 20
+                        abn = float(i.working_hour) / float(per_day)
+                        absent = float(20.0) - float(abn)
+                        i.absent_days = absent
                         i.save()
 
-            elif csv_file.working_type == "YEAR":
-                week_working_hour =float(week_working_hour) *365
-                for i in log:
-                    working_hr = float(i.working_hour)
-                    if float(i.working_hour) > float(week_working_hour):
-                        extra_hr = float(i.working_hour) - float(week_working_hour)
-                        i.extra_hour = extra_hr
-                        i.save()
-
-            elif csv_file.working_type == "HOURS":
-                for i in log:
-                    working_hr = float(i.working_hour)
-                    if float(i.working_hour) > float(week_working_hour):
-                        extra_hr = float(i.working_hour) - float(week_working_hour)
-                        i.extra_hour = extra_hr
-                        i.save()
             csv_file.is_report_generated = True
             csv_file.save()
             response_dict["status"] = True

@@ -88,6 +88,7 @@ class CsvLogDetails(models.Model):
     designation = models.CharField(null=True, blank=True, max_length=1000)
     working_hour = models.FloatField(null=True, blank=True, default=0)
     extra_hour = models.FloatField(null=True, blank=True, default=0)
+    absent_days = models.FloatField(null=True, blank=True, default=0)
 
     is_active = models.BooleanField(null=False, blank=True, default=True)
     created = models.DateTimeField(auto_now_add=True)
