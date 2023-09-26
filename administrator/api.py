@@ -266,7 +266,7 @@ class ListModules(APIView):
         return Response(response_dict, status=status.HTTP_200_OK)
 
 class SelectFreeSubscription(APIView):
-    
+
     permission_classes = (IsAuthenticated,)
     authentication_classes = (CustomTokenAuthentication, IsAdmin)
 
@@ -506,6 +506,7 @@ class UserInviteModule(APIView):
                         assigned_module_names.append(module.title)
 
             admin_user.available_free_users -= 1
+            admin_user.is_free_user = True
             admin_user.save()
 
             response_dict["session_data"] = {
