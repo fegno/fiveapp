@@ -480,6 +480,7 @@ class UserInviteModule(APIView):
                 first_name=data.get("first_name"),
                 created_admin=admin_user, 
             )
+            user.is_free_user = True
             user.save()
 
             # Assign the user to selected modules
@@ -506,7 +507,6 @@ class UserInviteModule(APIView):
                         assigned_module_names.append(module.title)
 
             admin_user.available_free_users -= 1
-            admin_user.is_free_user = True
             admin_user.save()
 
             response_dict["session_data"] = {
