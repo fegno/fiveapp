@@ -221,6 +221,7 @@ class ListModules(APIView):
         return Response(response_dict, status=status.HTTP_200_OK)
 
 class SelectFreeSubscription(APIView):
+    
     permission_classes = (IsAuthenticated,)
     authentication_classes = (CustomTokenAuthentication, IsAdmin)
 
@@ -404,6 +405,7 @@ class ViewCsv(APIView):
         response_dict["status"] = True
         return Response(response_dict, status=status.HTTP_200_OK)
 
+
 class UserInviteModule(APIView):
     permission_classes = (IsAuthenticated,)
     authentication_classes = (CustomTokenAuthentication,)
@@ -419,14 +421,13 @@ class UserInviteModule(APIView):
             return Response(response_dict, status=status.HTTP_200_OK)
 
         admin_user = request.user 
-        # available user count
+        
         availble_free_user = admin_user.available_free_users
         available_paid_user = admin_user.available_paid_users
 
 
         if availble_free_user>0:
 
-            # Create a new UserProfile instance for the invited user
             user = UserProfile.objects.create(
                 user_type="USER",
                 username=data.get("email"),
@@ -440,24 +441,30 @@ class UserInviteModule(APIView):
             selected_modules = data.get("selected_modules")
             assigned_module_names = []
             if selected_modules:
-                for module_id in selected_modules:
-                    try:
-                        module = ModuleDetails.objects.get(id=module_id)
-                    except ModuleDetails.DoesNotExist:
-                        response_dict["error"] =  f"module with ID {module_id} doesn't exists"
-                        return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
                     
-                    if UserAssignedModules.objects.filter(user=user, module=module).exists():
-                        response_dict["error"] = f"User with the module ID {module_id} already exists"
-                    
-                    assign_user = UserAssignedModules.objects.create(user=user)
-                    assign_user.module.add(module)
-                    assigned_module_names.append(module.title)
+                    existing_assign_user = UserAssignedModules.objects.filter(user=user).first()
+
+                    if existing_assign_user:
+                        
+                        existing_assign_user.module.clear()
+                    else:  
+                        existing_assign_user = UserAssignedModules.objects.create(user=user)
+
+                    for module_id in selected_modules:
+                        try:
+                            module = ModuleDetails.objects.get(id=module_id)
+                        except ModuleDetails.DoesNotExist:
+                            response_dict["error"] = f"Module with ID {module_id} doesn't exist"
+                            return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
+
+                        existing_assign_user.module.add(module)
+                        assigned_module_names.append(module.title)
 
             admin_user.available_free_users -= 1
             admin_user.save()
 
             response_dict["session_data"] = {
+                "id": user.id,
                 "name": user.first_name,
                 "username": user.username,
                 "email": user.email,
@@ -480,23 +487,29 @@ class UserInviteModule(APIView):
                 )
                 user.save()
 
-                # Assign the user to selected modules
+                
                 selected_modules = data.get("selected_modules")
-                print(selected_modules)
                 assigned_module_names = []
+
                 if selected_modules:
+                    
+                    existing_assign_user = UserAssignedModules.objects.filter(user=user).first()
+
+                    if existing_assign_user:
+                        
+                        existing_assign_user.module.clear() 
+                    else:
+                        
+                        existing_assign_user = UserAssignedModules.objects.create(user=user)
+
                     for module_id in selected_modules:
                         try:
                             module = ModuleDetails.objects.get(id=module_id)
                         except ModuleDetails.DoesNotExist:
-                            response_dict["error"] =  f"module with ID {module_id} doesn't exists"
+                            response_dict["error"] = f"Module with ID {module_id} doesn't exist"
                             return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
-                        
-                        if UserAssignedModules.objects.filter(user=user, module=module).exists():
-                            response_dict["error"] = f"User with the module ID {module_id} already exists"
-                        
-                        assign_user = UserAssignedModules.objects.create(user=user)
-                        assign_user.module.add(module)
+
+                        existing_assign_user.module.add(module)
                         assigned_module_names.append(module.title)
 
                 admin_user.available_paid_users -= 1
@@ -518,6 +531,7 @@ class UserInviteModule(APIView):
         return Response(response_dict, status=status.HTTP_200_OK)
 
 
+
 class UnAssignUserlist(APIView):
     permission_classes = (IsAuthenticated,)
     authentication_classes = (CustomTokenAuthentication,) 
@@ -532,6 +546,8 @@ class UnAssignUserlist(APIView):
         return Response(response_dict, status=status.HTTP_200_OK)
 
 
+
+    
 class AssignUser(APIView):
     permission_classes =(IsAuthenticated,)
     authentication_classes = (CustomTokenAuthentication,) 
@@ -539,6 +555,7 @@ class AssignUser(APIView):
     def post(self, request, pk):
         response_dict = {"status":True}
         user = request.user
+        print(user)
         try:
             module = ModuleDetails.objects.get(id=pk)
         except ModuleDetails.DoesNotExist:
@@ -547,45 +564,29 @@ class AssignUser(APIView):
         
 
         users_to_assign = request.data.get("user_ids", [])
+        
         for user_id in users_to_assign:
             try:
-                users = UserProfile.objects.get(id=user_id)
+                user_profile = UserProfile.objects.get(id=user_id)
+
             except UserProfile.DoesNotExist:
                 response_dict["error"] = f"User with the ID {user_id} does not exsts"
 
-            if UserAssignedModules.objects.filter(user=user, module=module).exists():
-                continue  
+            if UserAssignedModules.objects.filter(user=user_id).exists():
+                if UserAssignedModules.objects.filter(user=user_id, module=module).exists():
+                    response_dict["message"] = f"User {user_profile.id} is already assigned to module {module.id}"
+                else:
+                    user_assign_object = UserAssignedModules.objects.filter(user=user_id).first()
+                    user_assign_object.module.add(module)
+                    response_dict["message"] = "User is assigned to the module"
+                    continue
 
             assign_user = UserAssignedModules.objects.create(user=user)
             assign_user.module.add(module)
+            response_dict["message"] = f"User with ID {user_profile.id} added to the module id{module.id}"
         return Response(response_dict, status=status.HTTP_200_OK)
     
-
-    # def post(self, request, module_id):
-    #     try:
-    #         module = ModuleDetails.objects.get(id=module_id)
-    #     except ModuleDetails.DoesNotExist:
-    #         return Response({"error": f"Module with ID {module_id} does not exist."}, status=status.HTTP_404_NOT_FOUND)
-
-    #     # Get the list of user IDs to assign to the module from the request data
-    #     user_ids_to_assign = request.data.get("user_ids", [])
-        
-    #     # Loop through user IDs and assign users to the module
-    #     for user_id in user_ids_to_assign:
-    #         try:
-    #             user = UserProfile.objects.get(id=user_id)
-    #         except UserProfile.DoesNotExist:
-    #             return Response({"error": f"User with ID {user_id} does not exist."}, status=status.HTTP_404_NOT_FOUND)
-
-    #         # Check if the user is already assigned to the module
-    #         if UserAssignedModules.objects.filter(user=user, module=module).exists():
-    #             continue  # Skip already assigned users
-
-    #         # Create a UserAssignedModules instance to assign the user to the module
-    #         assign_user = UserAssignedModules.objects.create(user=user)
-    #         assign_user.module.add(module)
-
-    #     return Response({"message": "Users assigned to the module successfully."}, status=status.HTTP_200_OK)
+    
 
 
 
