@@ -586,9 +586,15 @@ class UnAssignUserlist(APIView):
         response_dict = {"status":True}
         user = request.user
         module = ModuleDetails.objects.get(id=pk)
-        un_assigned_user = UserProfile.objects.filter(created_admin=user).exclude(userassignedmodules__module=module)  
-        # unassigned_user = un_assigned_user.filter(created_admin=user)
-        response_dict["un_assigned_users"] = UserSerializer(un_assigned_user, context={"request":request}, many=True).data
+
+        subscribed_modules = SubscriptionDetails.objects.filter(user=request.user, module=pk)
+        print(subscribed_modules)
+        if subscribed_modules:
+            un_assigned_user = UserProfile.objects.filter(created_admin=user).exclude(userassignedmodules__module=module)  
+            # unassigned_user = un_assigned_user.filter(created_admin=user)
+            response_dict["un_assigned_users"] = UserSerializer(un_assigned_user, context={"request":request}, many=True).data
+        else:
+            response_dict["error"] = "User is not subscribed the module"
         return Response(response_dict, status=status.HTTP_200_OK)
 
 
