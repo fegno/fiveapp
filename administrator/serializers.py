@@ -111,9 +111,14 @@ class BundleDetailsLiteSerializer(serializers.ModelSerializer):
     
 
 class UserAssignedModuleSerializers(serializers.ModelSerializer):
+    module = ModuleDetailsSerializer(many=True)
     class Meta:
         model = UserAssignedModules
         fields = ('user', 'module', 'created')
+
+    def get_module_names(self, obj):
+        # Extract and return the names of modules assigned to the user
+        return [module.title for module in obj.module.all()]
 
     
 class DeletedUserLogSerializers(serializers.ModelSerializer):
