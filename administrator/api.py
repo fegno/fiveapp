@@ -518,6 +518,14 @@ class GenerateReport(APIView):
                         extra_hr = float(i.working_hour) - float(week_working_hour)
                         i.extra_hour = extra_hr
                         i.save()
+
+            elif csv_file.working_type == "HOURS":
+                for i in log:
+                    working_hr = float(i.working_hour)
+                    if float(i.working_hour) > float(week_working_hour):
+                        extra_hr = float(i.working_hour) - float(week_working_hour)
+                        i.extra_hour = extra_hr
+                        i.save()
             csv_file.is_report_generated = True
             csv_file.save()
             response_dict["status"] = True
