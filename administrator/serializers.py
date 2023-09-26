@@ -25,7 +25,7 @@ class ModuleDetailsSerializer(serializers.ModelSerializer):
             "weekly_price",
             "monthly_price",
             "yearly_price",
-            "is_submodule"
+            "is_submodule",
         )
     def to_representation(self, obj, *args, **kwargs):
         cd = super(ModuleDetailsSerializer, self).to_representation(
@@ -36,7 +36,9 @@ class ModuleDetailsSerializer(serializers.ModelSerializer):
         ).values("id","benifit","feature"))
         cd["feature_benifit"] = feature_benifit
         if self.context.get("from_module"):
-            cd["users_count"] = 0
+            cd["users_count"] = UserAssignedModules.objects.filter(
+                is_active=True, module=obj
+            ).count()
         return cd
 
 
@@ -109,9 +111,14 @@ class BundleDetailsLiteSerializer(serializers.ModelSerializer):
     
 
 class UserAssignedModuleSerializers(serializers.ModelSerializer):
+    module = ModuleDetailsSerializer(many=True)
     class Meta:
         model = UserAssignedModules
         fields = ('user', 'module', 'created')
+
+    def get_module_names(self, obj):
+        # Extract and return the names of modules assigned to the user
+        return [module.title for module in obj.module.all()]
 
     
 class DeletedUserLogSerializers(serializers.ModelSerializer):
