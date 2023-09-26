@@ -9,6 +9,14 @@ urlpatterns = [
     re_path(r'^list-modules/', api.ListModules.as_view(), name='list-modules'),
     re_path(r'^select-free-subscription/', api.SelectFreeSubscription.as_view(), name='select-free-subscription'),
 
-    re_path(r'^module/<int:pk>/users/', api.UserInModule.as_view(), name='users-under-the-module')
+    re_path(r'^module-users/(?P<pk>\d+)/$', api.UserInModule.as_view(), name='users-under-the-module'),
+    re_path(r'^user-delete/(?P<pk>\d+)/(?P<module_id>\d+)/$', api.DeleteUserFromModule.as_view(), name='delete-user'),
+    re_path(r'^user-un-assign/(?P<pk>\d+)/$', api.UnAssignUserlist.as_view(), name='user-unassign'),
+    re_path(r'^user-assign/(?P<pk>\d+)/$', api.AssignUser.as_view(), name='user-assign'),
+    re_path(r'^user-invite/', api.UserInviteModule.as_view(), name='users-invite-to-module'),
+
+    re_path(r'^upload-csv/(?P<pk>\d+)/$', api.UploadCsv.as_view(), name='upload-csv'),
+    re_path(r'^list-csv/(?P<pk>\d+)/$', api.ListCsv.as_view(), name='list-csv'),
+    re_path(r'^view-csv/(?P<pk>\d+)/$', api.ViewCsv.as_view(), name='view-csv'),
 
 ]

@@ -215,6 +215,7 @@ class SetUserPassword(APIView):
         confirm_password  = request.data.get("confirm_password") 
         if new_password != confirm_password:
             response_dict["error"] = "Password does not match"
+            return Response(response_dict, HTTP_200_OK)
         user = UserProfile.objects.filter(username=email).first()
         user.set_password(new_password)
         user.save()
@@ -255,7 +256,9 @@ class ChangeName(APIView):
         user = request.user
         first_name =  request.data.get("first_name")
         last_name = request.data.get("last_name")
-        user_profile = UserProfile.objects.filter(id=user.id).update(first_name=first_name, last_name=last_name)
+        user.first_name = first_name
+        user.last_name = last_name
+        user.save()
         response_dict["status"] = True
         response_dict["message"] = "successfully Update the name"
         return Response(response_dict, HTTP_200_OK)
@@ -270,7 +273,8 @@ class ChangeComapnyName(APIView):
         response_dict ={"status":False}
         user = request.user
         company_name = request.data.get('company_name')
-        company = UserProfile.objects.filter(id=user.id).update(company_name=company_name)
+        user.company_name = company_name
+        user.save()
         response_dict["message"] = "successfully update the Company name"
         response_dict["status"] = True
         return Response(response_dict, HTTP_200_OK)

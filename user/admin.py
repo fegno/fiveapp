@@ -34,6 +34,7 @@ class CustomUserAdmin(UserAdmin):
                     "free_subscription_start_date",
                     "free_subscription_end_date",
                     "available_free_users",
+                    "available_paid_users",
                     "take_free_subscription",
                     "free_subscribed"
                 )
@@ -59,7 +60,7 @@ class CustomUserAdmin(UserAdmin):
     )
     form = CustomUserChangeForm
     add_form = CustomUserCreationForm
-    list_display = ("username", "first_name", "user_type")
+    list_display = ("id", "username", "first_name", "user_type")
     search_fields = ("username", "first_name")
     ordering = ("username",)
 

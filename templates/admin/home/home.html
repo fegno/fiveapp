@@ -76,6 +76,7 @@
                     <th class="s-tcol text-start">Description</th>
                     <th class="s-tcol text-start">Bundle</th>
                     <th class="s-tcol text-start">Department</th>
+                    <th class="s-tcol text-start">Action</th>
 
                   </tr>
                 </thead>
@@ -91,7 +92,11 @@
                       <td>{{i.description|default_if_none:""}}</td>
                       <td>{{i.bundle_name|default_if_none:""}}</td>
                       <td>{{i.department|default_if_none:""}}</td>
-
+                      <td>
+                        <button class="btn" type="button" data-url="{% url 'superadmin:edit-module' i.id %}" onclick="load_popup_async(this,'modal_update');">
+                          <i class="fa fa-pencil" aria-hidden="true"></i>
+                        </button>
+                      </td>   
                   </tr>
 
                   
@@ -241,6 +246,18 @@
 <!-- /modal_add -->
 
 
+<div class="offcanvas offcanvas-lg offcanvas-end" tabindex="-1" id="modal_update">
+  <div class="offcanvas-header">
+    <h5 class="offcanvas-title font-bold">Update Module</h5>
+    <button type="button" class="btn-icon btn-offcanvas-close" data-bs-dismiss="offcanvas" aria-label="Close">
+      <img src="{% static 'general/images/icons/arrow-right.png' %}">
+    </button>
+  </div>  
+  <div class="offcanvas-body">
+
+  </div>
+</div>
+
 </div><!-- page_body -->
 {% endblock %}
 
@@ -258,6 +275,28 @@ function select_moudle(src){
 
   }
 }
+
+function load_popup_async(source, modal_id) {
+  $(".pre-loader").fadeIn("fast");
+  const after_show_fn = eval($(source).data('after-show'));
+  const fetch_params_fn = eval($(source).data('fetch-params'));
+  let params = {};
+  if (fetch_params_fn)
+      params = fetch_params_fn(source);
+  $.ajax({
+      url: $(source).data('url'), type: 'get', data: params,
+      success: (data) => {
+     
+          $('#' + modal_id + ' .offcanvas-body').html(data);
+          const modal = $('#' + modal_id).first();
+          modal.offcanvas('show');
+          if (after_show_fn) after_show_fn(source, modal);
+      },
+      error: function () { alert('connection problem'); },
+      complete: function () { $(".pre-loader").fadeOut("fast"); }
+  });
+}
+
 
 // multi_field_wrapper
 $('.multi_field_wrapper').each(function () {

@@ -1,0 +1,158 @@
+{%load static%}
+<form method="post" action="{% url 'superadmin:edit-module' module.id %}" enctype="multipart/form-data">{% csrf_token %}
+    <div class="offcanvas-inner-body">
+    <div class="form-default">
+      <div class="form-body">
+        <div class="row">
+
+          <div class="col-6">
+            <label class="form-label">Is Sub Module</label>
+            <input {%if module.is_submodule%}checked{%endif%} type="checkbox" onclick="edit_select_moudle(this)" name="is_submodule" >
+          </div>
+          <div class="col-12 MODULE" {%if not module.is_submodule%}style="display:none"{%endif%}>
+            <label class="form-label">Module</label>
+            <select class="form-select" name="modules">
+              <option value="">Select</option>
+              {%for i in modules%}
+              <option value="{{i.id}}" {%if module.modules.id == i.id%}selected{%endif%}>{{i.title}}</option>
+              {%endfor%}
+            </select>
+          </div>
+
+          <div class="col-12">
+            <label class="form-label">Title</label>
+            <select class="form-select" required name="title">
+              <option value="">Select</option>
+              <option value="Team Indicator" {%if module.title == "Team Indicator"%}selected{%endif%}>Team Indicator</option>
+              <option value="Team Workforce Plan Corporate" {%if module.title == "Team Workforce Plan Corporate"%}selected{%endif%}>Team Workforce Plan Corporate</option>
+              <option value="Team Cost" {%if module.title == "Team Cost"%}selected{%endif%}>Team Cost</option>
+              <option value="Payroll Analytics" {%if module.title == "Payroll Analytics"%}selected{%endif%}>Payroll Analytics</option>
+              <option value="Gender Analytics" {%if module.title == "Gender Analytics"%}selected{%endif%}>Gender Analytics</option>
+              <option value="Utility Meter" {%if module.title == "Utility Meter"%}selected{%endif%}>Utility Meter</option>
+              <option value="Sale Center" {%if module.title == "Sale Center"%}selected{%endif%}>Sale Center</option>
+              <option value="Support" {%if module.title == "Support"%}selected{%endif%}>Support</option>
+              <option value="Impression" {%if module.title == "Impression"%}selected{%endif%}>Impression</option>
+              <option value="Metrics Meter" {%if module.title == "Metrics Meter"%}selected{%endif%}>Metrics Meter</option>
+              <option value="Warehouse MAP Retail" {%if module.title == "Warehouse MAP Retail"%}selected{%endif%}>Warehouse MAP Retail</option>
+              <option value="Logistic Controller" {%if module.title == "Logistic Controller"%}selected{%endif%}>Logistic Controller</option>
+              <option value="Odometers" {%if module.title == "Odometers"%}selected{%endif%}>Odometers</option>
+
+            </select>
+          </div>
+          <div class="col-6">
+            <label class="form-label">Department</label>
+            <input type="text" value="{{module.department|default_if_none:""}}" class="form-control" name="department" placeholder="Department" >
+          </div>
+          <div class="col-12">
+            <label class="form-label">Description</label>
+            <textarea class="form-control DESCRIPTION" name="description" placeholder="Enter Description">{{module.description|default_if_none:""}}</textarea>
+          </div>
+          <div class="col-6">
+            <label class="form-label">Yearly Price</label>
+            <input type="number" value="{{module.yearly_price|default_if_none:""}}" step="0.01" class="form-control" name="yearly_price" placeholder="Yearly Price" required >
+          </div>
+          <div class="col-6">
+            <label class="form-label">Monthly Price</label>
+            <input type="number" step="0.01" value="{{module.monthly_price|default_if_none:""}}" class="form-control" name="monthly_price" placeholder="Monthly Price" required >
+          </div>
+          <div class="col-6">
+            <label class="form-label">Weekly Price</label>
+            <input type="number" step="0.01" value="{{module.weekly_price|default_if_none:""}}" class="form-control" name="weekly_price" placeholder="Weekly Price" required >
+          </div>
+         
+          <div class="col-6">
+            <label class="form-label">Position</label>
+            <input type="number" value="{{module.position|default_if_none:""}}" class="form-control" name="position" placeholder="position" required >
+          </div>
+          <div class="col-6">
+            <label class="form-label">Report</label>
+            <select multiple class="chosen-select" name="report_type">
+              <option value="">Select</option>
+              <option value="Working Hours & Absent Status Analytics"  {%if "Working Hours & Absent Status Analytics" in  reports%}selected{%endif%}> Working Hours & Absent Status Analytics</option>
+              <option value="Working Hours & Resources Status Analytics"  {%if "Working Hours & Resources Status Analytics" in  reports %}selected{%endif%}>Working Hours & Resources Status Analytics</option>
+
+            </select>
+          </div>
+
+          <div class="col-6">
+            <label class="form-label">CSV sample</label>
+            <input type="file" class="form-control" name="csv_file" >
+          </div>
+
+          <div class="edit_multi_field_wrapper">
+            <div class="multi-fields">
+                
+                {%for i in features%}
+                <div class="multi-field multi-section">
+                    <div class="row">
+                    
+                    <div class="col-6">
+                        <label class="form-label">Feature</label>
+                        <textarea class="form-control" value="{{i.feature}}" name="feature" placeholder="Enter feature">{{i.feature}}</textarea>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label">Benifit</label>
+                        <textarea class="form-control" value="{{i.benifit}}" name="benifit" placeholder="Enter benifit">{{i.benifit}}</textarea>
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <button type="button" class="btn text-danger fs-20 border-0 remove-field-btn remove-icon-btn">
+                        <i class="fa fa-times-circle-o" aria-hidden="true"></i>
+                        </button>
+                    </div>       
+                    </div>
+                </div>
+                {%endfor%}
+            </div>
+            <div class="row">
+              <div class="col-12">
+                <button class="btn btn-primary min-width-100-px btn-group-icon add-field-btn" type="button">
+                  <span>+</span>
+                </button>
+              </div>
+            </div>
+          </div>
+         
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="offcanvas-footer text-end">
+    <button type="button" class="btn btn-secondary m-w-100-px me-15" data-bs-dismiss="offcanvas" aria-label="Close">Cancel</button>
+    <button class="btn btn-l-green m-w-100-px" onclick="submitAnyForm(this)">Submit</button>
+  </div>
+ </form>
+
+ {%block javascript%}
+<script>
+$(".chosen-select").chosen()
+
+function edit_select_moudle(src){
+  var chk =  $(src).is(":checked")
+  if(chk == true){
+    $(".MODULE").show()
+  }
+  else{
+    $(".MODULE").hide()
+    $("select[name='modules']").val("")
+
+  }
+}
+
+
+
+
+// multi_field_wrapper
+$('.edit_multi_field_wrapper').each(function () {
+  var $wrapper = $('.multi-fields', this);
+  $(".add-field-btn", $(this)).click(function (e) {
+    $('.multi-field:first-child', $wrapper).clone(true).attr("id", "").appendTo($wrapper).find('.multi-input').val('').focus();
+  });
+  $('.multi-field .remove-field-btn', $wrapper).click(function () {
+    if ($('.multi-field', $wrapper).length > 1)
+      $(this).parents('.multi-field').remove();
+  });
+});
+
+</script>
+{% endblock %}
