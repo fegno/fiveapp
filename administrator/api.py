@@ -194,6 +194,51 @@ class ViewBundle(APIView):
         response_dict["status"] = True
         return Response(response_dict, status=status.HTTP_200_OK)
 
+
+
+class ListBundleModules(APIView):
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (CustomTokenAuthentication, IsAdmin)
+
+    def get(self, request, pk):
+        response_dict = {"status": False}
+        response_dict["modules"] = []
+        current_date = timezone.now().date()
+        modules = ModuleDetails.objects.filter(is_active=True)
+        subscribed_modules = []
+        
+        if request.user.user_type == "ADMIN":
+            subscription = SubscriptionDetails.objects.filter(
+                user=request.user, 
+                is_subscribed=True,
+                subscription_end_date__gte=current_date
+            ).last()
+            if subscription:
+                subscribed_modules = modules.filter(
+                    id__in=subscription.module.all().values_list("id", flat=True)
+                )            
+                response_dict["modules"] = ModuleDetailsSerializer(
+                    subscribed_modules,context={"request": request, "from_module":True}, many=True,).data
+        else:
+            user_assigned_modules = UserAssignedModules.objects.filter(
+                user=request.user
+            ).last()
+            subscription = SubscriptionDetails.objects.filter(
+                user=request.user.created_admin, 
+                is_subscribed=True,
+                subscription_end_date__gte=current_date
+            ).last()
+            if user_assigned_modules and subscription:
+                subscribed_modules = modules.filter(
+                    id__in=subscription.module.all().values_list("id", flat=True)
+                ).filter(id__in=user_assigned_modules.module.all().values_list("id", flat=True))            
+                response_dict["modules"] = ModuleDetailsSerializer(
+                    subscribed_modules,context={"request": request, "from_module":True}, many=True,).data
+        
+        
+        response_dict["status"] = True
+        return Response(response_dict, status=status.HTTP_200_OK)
+
 class ListModules(APIView):
     permission_classes = (IsAuthenticated,)
     authentication_classes = (CustomTokenAuthentication, IsAdmin)
@@ -206,13 +251,13 @@ class ListModules(APIView):
             user=request.user, 
             is_subscribed=True,
             subscription_end_date__gte=current_date
-        )
+        ).last()
         subscribed_modules = []
         if subscription:
-            subscribed_modules = modules.exclude(
-                id__in=subscription.modules.all().values_list("id", flat=True)
+            subscribed_modules = modules.filter(
+                id__in=subscription.module.all().values_list("id", flat=True)
             )
-            modules = modules.exclude(id__in=subscription.modules.all().values_list("id", flat=True))
+            modules = modules.exclude(id__in=subscription.module.all().values_list("id", flat=True))
             
         response_dict["unsubscribed_modules"] = ModuleDetailsSerializer(modules,context={"request": request}, many=True,).data
         response_dict["subscribed_modules"] = ModuleDetailsSerializer(
