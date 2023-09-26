@@ -634,6 +634,67 @@ class AssignUser(APIView):
     
     
 
+class UserModuleList(APIView):
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (CustomTokenAuthentication,)
+
+    def get(self, request, pk):
+        response_dict = {"satatus": False}
+        user_obj = UserAssignedModules.objects.filter(user_id=pk).first()
+
+        if user_obj:
+            serializer = UserAssignedModuleSerializers(user_obj)
+            response_dict["satatus"] = True
+            response_dict["modules"] = serializer.data
+        else:
+            response_dict["message"] = f"User with ID {pk} has no assigned modules"
+        return Response(response_dict, status=status.HTTP_200_OK)
+    
+
+
+class DeleteModule(APIView):
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (CustomTokenAuthentication, )
+
+    def post(self, request,user_id, module_id,):
+        response_dict = {"status": False}
+
+        try :
+            user_to_delete = UserAssignedModules.objects.get(user__id=user_id)
+            module_to_delete = ModuleDetails.objects.get(id=module_id)
+        except UserAssignedModules.DoesNotExist:
+            response_dict["message"] = f"User with the id  does not exists"
+            return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
+        except ModuleDetails.DoesNotExist:
+            response_dict["message"] = f"Module with the id  does not exists"
+            return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
+        
+        if not user_to_delete.module.filter(id=module_id).exists():
+            response_dict["error"] = "User is not associated with the specified module"
+            return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
+        
+        user_to_delete.module.remove(module_to_delete)
+
+        response_dict["message"] = "Successfully deleted the Module from the User"
+        response_dict["status"] = True
+        return Response(response_dict, status=status.HTTP_200_OK)
+
+
+
+# class UnassignedModule(APIView):
+#     permission_classes = (IsAuthenticated,)
+#     authentication_classes = (CustomTokenAuthentication,)
+
+#     def get(self, request, pk):
+#         response_dict = {"status":True}
+#         user = request.user
+#         user_obj = UserProfile.objects.get(id=pk)
+#         unassigned_modules = UserAssignedModules.objects.filter(user=user_obj).exclude(user=user_obj)
+#         # module = ModuleDetails.objects.get(id=pk)
+#         # un_assigned_user = UserProfile.objects.filter(created_admin=user).exclude(userassignedmodules__module=module)  
+#         # # unassigned_user = un_assigned_user.filter(created_admin=user)
+#         response_dict["unassigned module"] = ModuleDetailsSerializer(unassigned_modules, context={"request":request}, many=True).data
+#         return Response(response_dict, status=status.HTTP_200_OK)
 
 
 
