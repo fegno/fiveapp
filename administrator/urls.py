@@ -10,6 +10,7 @@ urlpatterns = [
 
     re_path(r'^list-bundle-modules/(?P<pk>\d+)/', api.ListBundleModules.as_view(), name='list-bundle-modules'),
     re_path(r'^list-modules/', api.ListModules.as_view(), name='list-modules'),
+    
     re_path(r'^module-users/(?P<pk>\d+)/$', api.UserInModule.as_view(), name='users-under-the-module'),
     re_path(r'^user-delete/(?P<module_id>\d+)/(?P<pk>\d+)/$', api.DeleteUserFromModule.as_view(), name='delete-user'),
     re_path(r'^user-un-assign/(?P<pk>\d+)/$', api.UnAssignUserlist.as_view(), name='user-unassign'),
