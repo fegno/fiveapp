@@ -169,5 +169,15 @@ class UserInviteSerializer(serializers.Serializer):
 
 
 class SubscriptionModuleSerilzer(serializers.Serializer):
-    model = SubscriptionDetails
-    fields = ("user", "module", "bundle")
+    user = UserSerializer()
+    module = ModuleDetailsSerializer(many=True)
+    class Meta:
+        model = SubscriptionDetails
+        fields = ("user","module", "bundle")
+
+
+
+class ModuleSToUserserializer(serializers.Serializer):
+    # user_id = serializers.IntegerField()
+    module_ids = serializers.ListField(child=serializers.IntegerField(), default=[])
+
