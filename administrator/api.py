@@ -338,20 +338,21 @@ class DeleteUserFromModule(APIView):
             if not user_to_delete.module.filter(id=module_id).exists():
                 response_dict["error"] = "User is not associated with the specified module"
                 return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
-            user_to_delete.module.remove(module_to_delete)
-            
-            if DeleteUsersLog.objects.filter(user=user_to_delete.user, module=module_to_delete).exists():
-                response_dict["error"] = "Already In deleted mode"
-                return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
-
             else:
-                deleted_user = DeleteUsersLog.objects.create(
-                deleted_by=request.user,
-                user=user_to_delete.user,
-                module=module_to_delete,
-                )
-                response_dict["message"] = "Successfully deleted the user from the module"
-                response_dict["status"] = True
+                user_to_delete.module.remove(module_to_delete)
+            
+            # if DeleteUsersLog.objects.filter(user=user_to_delete.user, module=module_to_delete).exists():
+            #     response_dict["error"] = "Already In deleted mode"
+            #     return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
+
+            # else:
+            deleted_user = DeleteUsersLog.objects.create(
+            deleted_by=request.user,
+            user=user_to_delete.user,
+            module=module_to_delete,
+            )
+            response_dict["message"] = "Successfully deleted the user from the module"
+            response_dict["status"] = True
 
             user_assigned = UserAssignedModules.objects.filter(
                 module=module_to_delete, user__created_admin=request.user
