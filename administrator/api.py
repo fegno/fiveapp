@@ -1,3 +1,4 @@
+import random
 from django.shortcuts import render
 from django.shortcuts import get_object_or_404
 from rest_framework.response import Response
@@ -32,6 +33,7 @@ from administrator.serializers import (
     ModuleDetailsSerializer, 
     BundleDetailsSerializer,
     BundleDetailsLiteSerializer,
+    ModuleSToUserserializer,
     SubscriptionModuleSerilzer,
     UserAssignedModuleSerializers,
     CsvSerializers,
@@ -47,10 +49,19 @@ from superadmin.models import (
 )
 import csv
 
-from user.models import UserProfile
+from user.models import LoginOTP, UserProfile
 from django.db import transaction
 from fiveapp.utils import get_error
 from user.serializers import UserSerializer
+from django.core.mail import send_mail, EmailMessage
+from django.template.loader import render_to_string
+from django.contrib.auth import get_user_model
+
+
+
+def random_otp_generator(size=4, chars="123456789"):
+    return "".join(random.choice(chars) for _ in range(size))
+
 
 class Homepage(APIView):
     permission_classes = (IsAuthenticated,)
@@ -316,25 +327,45 @@ class DeleteUserFromModule(APIView):
     permission_classes = (IsAuthenticated,)
     authentication_classes = (CustomTokenAuthentication,)
 
+
     def post(self, request, module_id, pk):
         response_dict = {"status": False}
 
-        user_to_delete = UserAssignedModules.objects.get(user__id=pk)
-        module_to_delete = ModuleDetails.objects.get(id=module_id)
-        
-        if not user_to_delete.module.filter(id=module_id).exists():
-            response_dict["error"] = "User is not associated with the specified module"
-            return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
-        user_to_delete.module.remove(module_to_delete)
-        
-        DeleteUsersLog.objects.create(
+        try:
+            user_to_delete = UserAssignedModules.objects.get(user__id=pk, user__created_admin=request.user)
+            module_to_delete = ModuleDetails.objects.get(id=module_id)
+            
+            if not user_to_delete.module.filter(id=module_id).exists():
+                response_dict["error"] = "User is not associated with the specified module"
+                return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
+            else:
+                user_to_delete.module.remove(module_to_delete)
+            
+            # if DeleteUsersLog.objects.filter(user=user_to_delete.user, module=module_to_delete).exists():
+            #     response_dict["error"] = "Already In deleted mode"
+            #     return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
+
+            # else:
+            deleted_user = DeleteUsersLog.objects.create(
             deleted_by=request.user,
             user=user_to_delete.user,
             module=module_to_delete,
-        )
-        response_dict["message"] = "Successfully deleted the user from the module"
-        response_dict["status"] = True
-        return Response(response_dict, status=status.HTTP_200_OK)
+            )
+            response_dict["message"] = "Successfully deleted the user from the module"
+            response_dict["status"] = True
+
+            user_assigned = UserAssignedModules.objects.filter(
+                module=module_to_delete, user__created_admin=request.user
+            )
+            deleted_users = DeleteUsersLog.objects.filter(module=module_to_delete, deleted_by=request.user)
+            response_dict["users"] = UserAssignedModuleSerializers(user_assigned, context={"request": request}, many=True).data
+            response_dict["deleted-users"] = DeletedUserLogSerializers(deleted_users, context={"request":request}, many=True).data
+        
+            return Response(response_dict, status=status.HTTP_200_OK)
+        except UserAssignedModules.DoesNotExist:
+            response_dict["error"] = "User not assigned with the ADMIN"
+            return Response(response_dict, status=status.HTTP_404_NOT_FOUND)
+    
 
 
 class UploadCsv(APIView):
@@ -531,6 +562,53 @@ class GenerateReport(APIView):
         except Exception as e:
             response_dict["error"] = str(e)
         return Response(response_dict, status=status.HTTP_200_OK)
+    
+
+
+class AdminModules(APIView):
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (CustomTokenAuthentication,)
+    def get(self, request):
+        response_dict={"status":False}
+        logined_user =  request.user
+
+        if logined_user.user_type == 'ADMIN':
+            if logined_user.free_subscribed == True:
+                free_modules = ModuleDetails.objects.all()
+                response_dict["modules"] = ModuleDetailsSerializer(free_modules, context={'request':request}, many=True).data
+                response_dict["additional_users"] = self.get_users_with_password()
+                response_dict["invited_users"] = self.get_users_without_password()
+                return Response(response_dict, status=status.HTTP_200_OK)
+            else:
+                Subscribed_modules = SubscriptionDetails.objects.filter(user=request.user)
+                response_dict["modules"] = SubscriptionModuleSerilzer(Subscribed_modules, context={"request":request,}, many=True).data
+                response_dict["additional_users"] = self.get_users_with_password()
+                response_dict["invited_users"] = self.get_users_without_password()
+                return Response(response_dict, status=status.HTTP_200_OK)
+        else:
+            response_dict["error"] = "Access denied, Only Admin can access the module list"
+            return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
+    
+
+    def get_users_with_password(self):
+        users_with_password = UserProfile.objects.filter(user_type="USER", is_active=True).exclude(password="")
+        admin_id = self.request.user.id
+        users_with_password = users_with_password.filter(created_admin=admin_id)
+        serializer = UserSerializer(users_with_password, many=True)
+        return serializer.data
+
+    def get_users_without_password(self):
+        users_without_password = UserProfile.objects.filter(user_type="USER", is_active=True, password="")
+        admin_id = self.request.user.id
+        users_without_password = users_without_password.filter(created_admin=admin_id)
+        serializer = UserSerializer(users_without_password, many=True)
+        return serializer.data
+        
+    
+            
+
+
+
 
 class UserInviteModule(APIView):
     permission_classes = (IsAuthenticated,)
@@ -538,73 +616,24 @@ class UserInviteModule(APIView):
 
     def post(self, request):
         response_dict = {"status": False}
-        data = request.data
+        user_login =  request.user
 
-        serializer = UserInviteSerializer(data=data)
-        
-        if UserProfile.objects.filter(email=data.get("email")).exists():
-            response_dict["error"] = "User already exists"
-            return Response(response_dict, status=status.HTTP_200_OK)
+        if user_login.user_type == 'ADMIN':
+            data = request.data
+            serializer = UserInviteSerializer(data=data)
+            
+            if UserProfile.objects.filter(email=data.get("email")).exists():
+                response_dict["error"] = "User already exists"
+                return Response(response_dict, status=status.HTTP_200_OK)
 
-        admin_user = request.user 
-        
-        availble_free_user = admin_user.available_free_users
-        available_paid_user = admin_user.available_paid_users
+            admin_user = request.user 
+            
+            availble_free_user = admin_user.available_free_users
+            available_paid_user = admin_user.available_paid_users
 
 
-        if availble_free_user>0:
+            if availble_free_user>0:
 
-            user = UserProfile.objects.create(
-                user_type="USER",
-                username=data.get("email"),
-                email=data.get("email"),
-                first_name=data.get("first_name"),
-                created_admin=admin_user, 
-            )
-            user.is_free_user = True
-            user.save()
-
-            # Assign the user to selected modules
-            selected_modules = data.get("selected_modules")
-            assigned_module_names = []
-            if selected_modules:
-                    
-                    existing_assign_user = UserAssignedModules.objects.filter(user=user).first()
-
-                    if existing_assign_user:
-                        
-                        existing_assign_user.module.clear()
-                    else:  
-                        existing_assign_user = UserAssignedModules.objects.create(user=user)
-
-                    for module_id in selected_modules:
-                        try:
-                            module = ModuleDetails.objects.get(id=module_id)
-                        except ModuleDetails.DoesNotExist:
-                            response_dict["error"] = f"Module with ID {module_id} doesn't exist"
-                            return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
-
-                        existing_assign_user.module.add(module)
-                        assigned_module_names.append(module.title)
-
-            admin_user.available_free_users -= 1
-            admin_user.save()
-
-            response_dict["session_data"] = {
-                "id": user.id,
-                "name": user.first_name,
-                "username": user.username,
-                "email": user.email,
-                "id": user.id,
-                "user_type": user.user_type,
-                "created_admin": user.created_admin.id,
-                "assigned_module_names":assigned_module_names
-            }
-            response_dict["status"] = True
-            response_dict["message"] = "User invitation and module assignment successful"
-        else:
-            if available_paid_user>0:
-                # Create a new UserProfile instance for the invited user
                 user = UserProfile.objects.create(
                     user_type="USER",
                     username=data.get("email"),
@@ -612,37 +641,54 @@ class UserInviteModule(APIView):
                     first_name=data.get("first_name"),
                     created_admin=admin_user, 
                 )
+                user.is_free_user = True
                 user.save()
 
-                
+                # Assign the user to selected modules
                 selected_modules = data.get("selected_modules")
                 assigned_module_names = []
-
                 if selected_modules:
-                    
-                    existing_assign_user = UserAssignedModules.objects.filter(user=user).first()
-
-                    if existing_assign_user:
                         
-                        existing_assign_user.module.clear() 
-                    else:
-                        
-                        existing_assign_user = UserAssignedModules.objects.create(user=user)
+                        existing_assign_user = UserAssignedModules.objects.filter(user=user).first()
 
-                    for module_id in selected_modules:
-                        try:
-                            module = ModuleDetails.objects.get(id=module_id)
-                        except ModuleDetails.DoesNotExist:
-                            response_dict["error"] = f"Module with ID {module_id} doesn't exist"
-                            return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
+                        if existing_assign_user:
+                            
+                            existing_assign_user.module.clear()
+                        else:  
+                            existing_assign_user = UserAssignedModules.objects.create(user=user)
 
-                        existing_assign_user.module.add(module)
-                        assigned_module_names.append(module.title)
+                        for module_id in selected_modules:
+                            try:
+                                module = ModuleDetails.objects.get(id=module_id)
+                            except ModuleDetails.DoesNotExist:
+                                response_dict["error"] = f"Module with ID {module_id} doesn't exist"
+                                return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
 
-                admin_user.available_paid_users -= 1
+                            existing_assign_user.module.add(module)
+                            assigned_module_names.append(module.title)
+
+                admin_user.available_free_users -= 1
                 admin_user.save()
 
+                # send otp to mail
+                email = request.data.get('email')
+                mail_subject = 'OTP for registration'
+                otp = random_otp_generator()
+                LoginOTP.objects.create(
+                    email=request.data.get("email"),
+                    otp=otp,
+                    user_type="USER"
+                )
+                
+                html_message = render_to_string(
+                    'register.html', {"otp":otp}
+                )
+                email = EmailMessage("OTP for Registration", html_message, to=[email])
+                email.content_subtype = "html"
+                email.send() 
+
                 response_dict["session_data"] = {
+                    "id": user.id,
                     "name": user.first_name,
                     "username": user.username,
                     "email": user.email,
@@ -652,10 +698,86 @@ class UserInviteModule(APIView):
                     "assigned_module_names":assigned_module_names
                 }
                 response_dict["status"] = True
-                response_dict["message"] = "User invitation and module assignment successful"
+                response_dict["message"] = "Invite OTP Send to mail"
             else:
-                response_dict["message"] = "No paid or free users are available"    
+                if available_paid_user>0:
+                    # Create a new UserProfile instance for the invited user
+                    user = UserProfile.objects.create(
+                        user_type="USER",
+                        username=data.get("email"),
+                        email=data.get("email"),
+                        first_name=data.get("first_name"),
+                        created_admin=admin_user, 
+                    )
+                    user.save()
+
+                    
+                    selected_modules = data.get("selected_modules")
+                    assigned_module_names = []
+
+                    if selected_modules:
+                        
+                        existing_assign_user = UserAssignedModules.objects.filter(user=user).first()
+
+                        if existing_assign_user:
+                            
+                            existing_assign_user.module.clear() 
+                        else:
+                            
+                            existing_assign_user = UserAssignedModules.objects.create(user=user)
+
+                        for module_id in selected_modules:
+                            try:
+                                module = ModuleDetails.objects.get(id=module_id)
+                            except ModuleDetails.DoesNotExist:
+                                response_dict["error"] = f"Module with ID {module_id} doesn't exist"
+                                return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
+
+                            existing_assign_user.module.add(module)
+                            assigned_module_names.append(module.title)
+
+                    admin_user.available_paid_users -= 1
+                    admin_user.save()
+
+                    # send otp to mail
+                    email=request.data.get('email')
+                    mail_subject = 'OTP for registration'
+                    otp = random_otp_generator()
+                    LoginOTP.objects.create(
+                        email=request.data.get("email"),
+                        otp=otp,
+                        user_type="USER"
+                    )
+                    
+                    html_message = render_to_string(
+                        'register.html', {"otp":otp}
+                    )
+                    email = EmailMessage("OTP for Registration", html_message, to=[email])
+                    email.content_subtype = "html"
+                    email.send() 
+
+                    response_dict["session_data"] = {
+                        "id": user.id,
+                        "name": user.first_name,
+                        "username": user.username,
+                        "email": user.email,
+                        "id": user.id,
+                        "user_type": user.user_type,
+                        "created_admin": user.created_admin.id,
+                        "assigned_module_names":assigned_module_names
+                    }
+                    response_dict["status"] = True
+                    response_dict["message"] = "Invite OTP Send to mail"
+                else:
+                    response_dict["message"] = "No paid or free users are available"  
+                    return Response(response_dict, status=status.HTTP_200_OK)
+
+        else:
+            response_dict["error"] = "Access denied, Only Admin can access the module list"
+            return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
         return Response(response_dict, status=status.HTTP_200_OK)
+
+
 
 
 
@@ -668,14 +790,22 @@ class UnAssignUserlist(APIView):
         user = request.user
         module = ModuleDetails.objects.get(id=pk)
 
-        subscribed_modules = SubscriptionDetails.objects.filter(user=request.user, module=pk)
-        print(subscribed_modules)
-        if subscribed_modules:
+        # is_free_subcribed =user.
+        if user.free_subscribed == True:
             un_assigned_user = UserProfile.objects.filter(created_admin=user).exclude(userassignedmodules__module=module)  
             # unassigned_user = un_assigned_user.filter(created_admin=user)
+            response_dict["module"] = module.title
             response_dict["un_assigned_users"] = UserSerializer(un_assigned_user, context={"request":request}, many=True).data
+
         else:
-            response_dict["error"] = "User is not subscribed the module"
+            subscribed_modules = SubscriptionDetails.objects.filter(user=request.user, module=pk).exists()
+            if subscribed_modules:
+                un_assigned_user = UserProfile.objects.filter(created_admin=user).exclude(userassignedmodules__module=module)  
+                # unassigned_user = un_assigned_user.filter(created_admin=user)
+                response_dict["module"] = module.title
+                response_dict["un_assigned_users"] = UserSerializer(un_assigned_user, context={"request":request}, many=True).data
+            else:
+                response_dict["error"] = "User is not subscribed the module"
         return Response(response_dict, status=status.HTTP_200_OK)
 
 
@@ -686,44 +816,49 @@ class AssignUser(APIView):
     authentication_classes = (CustomTokenAuthentication,) 
 
     def post(self, request, pk):
-        response_dict = {"status":True}
+        response_dict = {"status":False}
         user = request.user
-        print(user)
-        try:
-            module = ModuleDetails.objects.get(id=pk)
-        except ModuleDetails.DoesNotExist:
-            response_dict["error"] = f"Module with ID {pk} does not exists"
-            return Response(response_dict, status=status.HTTP_200_OK)
-        
-
-        users_to_assign = request.data.get("user_ids", [])
-        
-        for user_id in users_to_assign:
+        if user.user_type == "ADMIN":
             try:
-                user_profile = UserProfile.objects.get(id=user_id)
+                module = ModuleDetails.objects.get(id=pk)
+            except ModuleDetails.DoesNotExist:
+                response_dict["error"] = f"Module with ID {pk} does not exists"
+                return Response(response_dict, status=status.HTTP_200_OK)
+            users_to_assign = request.data.get("user_ids", [])
+            # print(users_to_assign)
+            for user_id in users_to_assign:
+                try:
+                    user_profile = UserProfile.objects.get(id=user_id)
 
-            except UserProfile.DoesNotExist:
-                response_dict["error"] = f"User with the ID {user_id} does not exsts"
+                except UserProfile.DoesNotExist:
+                    response_dict["error"] = f"User with the ID {user_id} does not exsts"
+                    return Response(response_dict, status=status.HTTP_403_FORBIDDEN)
+                # print(user_profile,"USE PROFIEL")
 
-            subscribed_module = SubscriptionDetails.objects.filter(user=request.user, module=pk)
-            if subscribed_module:
-                if UserAssignedModules.objects.filter(user=user_id).exists():
-                    if UserAssignedModules.objects.filter(user=user_id, module=module).exists():
-                        response_dict["message"] = f"User {user_profile.id} is already assigned to module {module.id}"
+                subscribed_module = SubscriptionDetails.objects.filter(user=request.user, module=pk).exists()
+                # print(subscribed_module)
+                if subscribed_module:
+                    if UserAssignedModules.objects.filter(user=user_profile).exists():
+                        if UserAssignedModules.objects.filter(user=user_profile, module=module).exists():
+                            response_dict["message"] = f"User {user_profile.id} is already assigned to module {module.id}"
+                        else:
+                            user_assign_object = UserAssignedModules.objects.filter(user=user_profile).first()
+                            user_assign_object.module.add(module)
+                            response_dict["message"] = "User is assigned to the module"
                     else:
-                        user_assign_object = UserAssignedModules.objects.filter(user=user_id).first()
-                        user_assign_object.module.add(module)
-                        response_dict["message"] = "User is assigned to the module"
-                        continue
+                        assign_user = UserAssignedModules.objects.create(user=user_profile)
+                        assign_user.module.add(module)
+                        response_dict["message"] = f"User is added to the module"
+                else:
+                    response_dict["error"] = "Not subscribed the module"
+            
+            return Response(response_dict, status=status.HTTP_200_OK)
+        else:
+            response_dict["error"] = "Access denied, Only Admin can access the module list"
+            return Response(response_dict, status=status.HTTP_403_FORBIDDEN)
+    
 
-                assign_user = UserAssignedModules.objects.create(user=user)
-                assign_user.module.add(module)
-                response_dict["message"] = f"User with ID {user_profile.id} added to the module id{module.id}"
-            else:
-                response_dict["error"] = "Not subscribed the module"
-        return Response(response_dict, status=status.HTTP_200_OK)
-    
-    
+
 
 class UserModuleList(APIView):
     permission_classes = (IsAuthenticated,)
@@ -779,14 +914,68 @@ class UnassignedModule(APIView):
     def get(self, request, pk):
         response_dict = {"status":True}
         try:
-            user_obj = UserProfile.objects.get(id=pk)
+            user_obj = UserProfile.objects.get(id=pk, )
         except UserProfile.DoesNotExist:
             response_dict["message"] = f"User with the ID {pk} does not exists"
             return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
-        unassigned_modules = ModuleDetails.objects.exclude(userassignedmodules__user=user_obj)
-        response_dict["unassigned module"] = ModuleDetailsSerializer(unassigned_modules, context={"request":request}, many=True).data
+        if user_obj.created_admin.free_subscribed == True:
+            unassigned_modules = ModuleDetails.objects.exclude(userassignedmodules__user=user_obj)
+            response_dict["unassigned module"] = ModuleDetailsSerializer(unassigned_modules, context={"request":request}, many=True).data
+        elif SubscriptionDetails.objects.filter(user=user_obj.created_admin).exists():
+            subscribtion = SubscriptionDetails.objects.filter(user=user_obj.created_admin).first()
+            subscribed_modules = subscribtion.module.all()
+            unassigned_modules = ModuleDetails.objects.exclude(userassignedmodules__user=user_obj)
+            available_un_assiged_module = subscribed_modules & unassigned_modules
+            response_dict["unassigned module"] = ModuleDetailsSerializer(available_un_assiged_module, context={"request":request}, many=True).data
+        else:
+            response_dict["message"] = f"Adimin dons not have subscription"
         return Response(response_dict, status=status.HTTP_200_OK)
 
 
+
+class AssignModulesToUser(APIView):
+    permission_classes =(IsAuthenticated,)
+    authentication_classes = (CustomTokenAuthentication,) 
+
+    def post(self, request, pk):
+        response_dict = {"status":True}
+        serializer = ModuleSToUserserializer(data=request.data)
+        # print(serializer.data)
+        if request.user.user_type == "ADMIN":
+            try:
+                assign_user = UserProfile.objects.get(id=pk)
+            except UserProfile.DoesNotExist:
+                response_dict["error"] = f"User with ID {pk} does not exists"
+                return Response(response_dict, status=status.HTTP_404_NOT_FOUND)
+            
+            serializer.is_valid(raise_exception=True)
+
+            module_to_assign = serializer.validated_data.get('module_ids',[])  
+
+            for module_id in module_to_assign:
+                # print(type(module_to_assign))
+                # print(module_id)
+                try:
+                    module = ModuleDetails.objects.get(id=module_id)
+
+                except ModuleDetails.DoesNotExist:
+                    response_dict["error"] = f"Module with the ID {module_id} does not exsts"
+
+                if UserAssignedModules.objects.filter(user=assign_user).exists():
+                    if UserAssignedModules.objects.filter(user=assign_user, module=module).exists():
+                        response_dict["message"] = "User  is already assigned to module"
+                    else:
+                        user_assign_object = UserAssignedModules.objects.filter(user=assign_user).first()
+                        user_assign_object.module.add(module)
+                        response_dict["message"] = "Mdule assigned for the user"
+                else:
+                    assigned_user = UserAssignedModules.objects.create(user=assign_user)
+                    assigned_user.module.add(module)
+                    response_dict["message"] = f"User with ID {assign_user.id} added to the module id{module.id}"
+        else:
+            response_dict["error"] = "Access denied, Only Admin can access the module list"
+            return Response(response_dict, status=status.HTTP_403_FORBIDDEN)
+
+        return Response(response_dict, status=status.HTTP_200_OK)
 
         
