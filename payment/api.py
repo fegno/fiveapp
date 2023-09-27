@@ -37,7 +37,8 @@ class InitiatePayment(APIView):
 			user=request.user,
 			status="Pending",
 			subscription_type=subscription_type,
-			total_price=total_price
+			total_price=total_price,
+			is_subscribed=False
 		)
 		order.module.add(*request.POST.getlist("modules_ids"))      
 		order.bundle.add(*request.POST.getlist("bundle_ids"))    
@@ -94,44 +95,45 @@ class StripePaymentWebhook(APIView):
 			if not payment_attempt:
 				return HttpResponse(status=404)
 
-			PaymentAttempt.objects.filter(payment_intent_id=intent['id']).update(
-				last_payment_json=json.dumps(event)
-			)
-			payment_attempt.status='succeeded'
-			payment_attempt.charges_json=json.dumps(intent['charges'])
-			payment_attempt.total_charge=sum(i['amount'] for i in intent['charges']['data'])
-			order=payment_attempt.parchase
-			payment_attempt.save()
-			order.status='Placed'
-			order.received_amounts=intent['amount_received']/100
-			order.payment_dates=timezone.now()
-			order.save()
-			user = order.user
-			user.is_subscribed = True
-			user.save()
-			if SubscriptionDetails.objects.filter(user=order.user):
-				subscription = SubscriptionDetails.objects.filter(user=order.user).last()
-				if subscription.subscription_end_date < timezone.now().date():
-					subscription.module.clear()
-					subscription.bundle.clear()
-					subscription.module.add(order.module.values_list("id", flat=True))      
-					subscription.bundle.add(order.bundle.values_list("id", flat=True))    
-					subscription.save()
-				else:
-					subscription.module.add(order.module.values_list("id", flat=True))      
-					subscription.bundle.add(order.bundle.values_list("id", flat=True))    
-					subscription.save()
-			else:
-				subscription = SubscriptionDetails.objects.create(
-					user=order.user,
-					subscription_start_date=order.subscription_start_date,
-					subscription_end_date=order.subscription_end_date,
-					is_subscribed=True,
-					subscription_type=order.subscription_type,
+			if payment_attempt.status != "Placed":
+				PaymentAttempt.objects.filter(payment_intent_id=intent['id']).update(
+					last_payment_json=json.dumps(event)
 				)
-				subscription.module.add(order.module.values_list("id", flat=True))      
-				subscription.bundle.add(order.bundle.values_list("id", flat=True))    
-				subscription.save()
+				payment_attempt.status='succeeded'
+				payment_attempt.charges_json=json.dumps(intent['charges'])
+				payment_attempt.total_charge=sum(i['amount'] for i in intent['charges']['data'])
+				order=payment_attempt.parchase
+				payment_attempt.save()
+				order.status='Placed'
+				order.received_amounts=intent['amount_received']/100
+				order.payment_dates=timezone.now()
+				order.save()
+				user = order.user
+				user.is_subscribed = True
+				user.save()
+				if SubscriptionDetails.objects.filter(user=order.user):
+					subscription = SubscriptionDetails.objects.filter(user=order.user).last()
+					if subscription.subscription_end_date < timezone.now().date():
+						subscription.module.clear()
+						subscription.bundle.clear()
+						subscription.module.add(order.module.values_list("id", flat=True))      
+						subscription.bundle.add(order.bundle.values_list("id", flat=True))    
+						subscription.save()
+					else:
+						subscription.module.add(order.module.values_list("id", flat=True))      
+						subscription.bundle.add(order.bundle.values_list("id", flat=True))    
+						subscription.save()
+				else:
+					subscription = SubscriptionDetails.objects.create(
+						user=order.user,
+						subscription_start_date=order.subscription_start_date,
+						subscription_end_date=order.subscription_end_date,
+						is_subscribed=True,
+						subscription_type=order.subscription_type,
+					)
+					subscription.module.add(order.module.values_list("id", flat=True))      
+					subscription.bundle.add(order.bundle.values_list("id", flat=True))    
+					subscription.save()
 		elif event.type == 'payment_intent.cancelled':
 			intent = event.data.object # contains a stripe.PaymentIntent
 			payment_attempt=PaymentAttempt.objects.filter(payment_intent_id=intent['id'],is_active=True).first()
