@@ -83,7 +83,8 @@ class Homepage(APIView):
         if user.user_type == "ADMIN":
             expired_subscription = None
             subscription = SubscriptionDetails.objects.filter(
-                user=request.user, is_subscribed=True,
+                user=request.user, 
+                is_subscribed=True,
                 subscription_end_date__gte=current_date
             ).order_by("-id").first()
             if not subscription:
@@ -96,10 +97,15 @@ class Homepage(APIView):
                     id__in=subscription.module.all().values_list("id", flat=True)
                 )
                 bundles = BundleDetails.objects.filter(is_active=True, id__in=subscription.bundle.all().values_list("id", flat=True))
+                assigned_user = UserAssignedModules.objects.filter(
+                    user__created_admin=request.user,
+                    module__id__in=subscription.module.all().values_list("id", flat=True)
+                ).count()
                 response_dict["bundles"] = BundleDetailsSerializer(bundles,context={"request": request}, many=True).data
                 response_dict["modules"] = ModuleDetailsSerializer(modules,context={"request": request}, many=True,).data
                 response_dict["status"] = True
                 response_dict["take_subscription"] = True
+                response_dict["assigned_user"] = assigned_user
                 return Response(response_dict, status=status.HTTP_200_OK)
             elif expired_subscription:
                 response_dict["message"] = "Subscription Expired"
@@ -111,6 +117,12 @@ class Homepage(APIView):
                 if user.free_subscription_end_date and user.free_subscription_end_date > current_date:
                     modules = ModuleDetails.objects.filter(is_active=True)
                     bundles = BundleDetails.objects.filter(is_active=True)
+                    
+                    assigned_user = UserAssignedModules.objects.filter(
+                        user__created_admin=request.user,
+                        module__id__in=modules.values_list("id", flat=True)
+                    ).count()
+                    response_dict["assigned_user"] = assigned_user
                     response_dict["bundles"] = BundleDetailsSerializer(bundles,context={"request": request}, many=True).data
                     response_dict["modules"] = ModuleDetailsSerializer(modules,context={"request": request}, many=True,).data
                 else:
