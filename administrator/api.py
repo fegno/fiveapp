@@ -24,6 +24,9 @@ from django.db.models import (
     IntegerField,
     F,
     IntegerField,
+    Avg,
+    FloatField,
+    Func
 )
 from fiveapp.utils import PageSerializer
 
@@ -57,7 +60,9 @@ from django.core.mail import send_mail, EmailMessage
 from django.template.loader import render_to_string
 from django.contrib.auth import get_user_model
 
-
+class Round(Func):
+    function = 'ROUND'
+    template='%(function)s(%(expressions)s, 2)'
 
 def random_otp_generator(size=4, chars="123456789"):
     return "".join(random.choice(chars) for _ in range(size))
@@ -556,6 +561,7 @@ class GenerateReport(APIView):
                         i.save()
 
             csv_file.is_report_generated = True
+            csv_file.standard_working_hour = week_working_hour
             csv_file.save()
             response_dict["status"] = True
             response_dict["message"] = "Generated"
@@ -564,6 +570,105 @@ class GenerateReport(APIView):
         return Response(response_dict, status=status.HTTP_200_OK)
     
 
+class ViewReport(APIView):
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (CustomTokenAuthentication,)
+
+    def get(self, request, pk):
+        response_dict = {"status": False}
+        week_working_hour = request.data.get("week_working_hour", 0)
+        csv_file = UploadedCsvFiles.objects.filter(
+            id=pk
+        ).first()
+        response_dict["module"] = {
+            "id":csv_file.modules.id,
+            "name":csv_file.modules.title,
+            "department":csv_file.modules.department
+        }
+        if csv_file.modules.title == "Team Indicator":
+            log  = tuple(CsvLogDetails.objects.filter(
+                uploaded_file__id=pk
+            ).filter(
+                Q(uploaded_file__uploaded_by=request.user)|
+                Q(uploaded_file__uploaded_by__created_admin=request.user)
+            ).values("team").annotate(
+                employee_count=Count("id"),
+                team_working_hr=Sum("working_hour"),
+                team_absent_days=Round(Sum("absent_days")),
+                avg_team_working_hr=Round(Avg("working_hour")),
+            ).annotate(
+                team_actual_working_hr=F("employee_count")*F("uploaded_file__standard_working_hour")
+            ).values(
+                "team", "employee_count",
+                "team_working_hr", "team_absent_days",
+                "avg_team_working_hr",
+                "team_actual_working_hr"
+            ))
+            response_dict["report"] = log
+
+        
+        response_dict["status"] = True
+        return Response(response_dict, status=status.HTTP_200_OK)
+
+
+class AnalyticsReport(APIView):
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (CustomTokenAuthentication,)
+
+    def get(self, request, pk):
+        response_dict = {"status": False}
+        week_working_hour = request.data.get("week_working_hour", 0)
+        csv_file = UploadedCsvFiles.objects.filter(
+            id=pk
+        ).first()
+        response_dict["module"] = {
+            "id":csv_file.modules.id,
+            "name":csv_file.modules.title,
+            "department":csv_file.modules.department
+        }
+        response_dict["csv_file"] = {
+            "name":csv_file.csv_file.name,
+            "created":csv_file.created,
+            "uploaded_by":csv_file.uploaded_by.first_name
+        }
+        if csv_file.modules.title != "Team Indicator":
+            log  = CsvLogDetails.objects.filter(
+                uploaded_file__id=pk
+            ).filter(
+                Q(uploaded_file__uploaded_by=request.user)|
+                Q(uploaded_file__uploaded_by__created_admin=request.user)
+            ).values("team").annotate(
+                employee_count=Count("id"),
+                team_working_hr=Sum("working_hour"),
+                team_absent_days=Round(Sum("absent_days")),
+                avg_team_working_hr=Round(Avg("working_hour")),
+            ).annotate(
+                team_actual_working_hr=F("employee_count")*F("uploaded_file__standard_working_hour")
+            ).values(
+                "team", 
+                "employee_count",
+                "team_working_hr", "team_absent_days",
+                "avg_team_working_hr",
+                "team_actual_working_hr"
+            )
+
+            total_absent_days = log.aggregate(total=Sum("team_absent_days"))
+            response_dict["total_absent_days"] = total_absent_days.get("total") if total_absent_days else 0
+
+            total_working_hr = log.aggregate(total=Sum("team_working_hr"))
+            response_dict["total_working_hr"] = total_working_hr.get("total") if total_working_hr else 0
+
+            total_actual_working_hr = log.aggregate(total=Sum("team_actual_working_hr"))
+            response_dict["total_actual_working_hr"] = total_actual_working_hr.get("total") if total_actual_working_hr else 0
+
+            total_employee = log.aggregate(total=Sum("employee_count"))
+            response_dict["total_employee"] = total_employee.get("total") if total_employee else 0
+            response_dict["working_hours_report"] = log.values("team", "employee_count", "team_working_hr", "team_actual_working_hr")
+            response_dict["absent_days_report"] = log.values("team", "employee_count", "team_absent_days")
+
+        
+        response_dict["status"] = True
+        return Response(response_dict, status=status.HTTP_200_OK)
 
 class AdminModules(APIView):
     permission_classes = (IsAuthenticated,)

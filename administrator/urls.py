@@ -28,5 +28,7 @@ urlpatterns = [
     re_path(r'^list-csv/(?P<pk>\d+)/$', api.ListCsv.as_view(), name='list-csv'),
     re_path(r'^view-csv/(?P<pk>\d+)/$', api.ViewCsv.as_view(), name='view-csv'),
     re_path(r'^generate-report/(?P<pk>\d+)/$', api.GenerateReport.as_view(), name='generate-report'),
+    re_path(r'^view-report/(?P<pk>\d+)/$', api.ViewReport.as_view(), name='view-report'),
+    re_path(r'^analytics-report/(?P<pk>\d+)/$', api.AnalyticsReport.as_view(), name='analytics-report'),
 
 ]
