@@ -179,11 +179,11 @@ class ListSubscriptionPlans(APIView):
         subscription = SubscriptionDetails.objects.filter(
             user=request.user, is_subscribed=True,
             subscription_end_date__gte=current_date
-        )
+        ).last()
         if subscription:
             bundles = bundles.exclude(id__in=subscription.bundle.all().values_list("id", flat=True))
             modules = modules.exclude(
-                id__in=subscription.modules.all().values_list("id", flat=True)
+                id__in=subscription.module.all().values_list("id", flat=True)
             )
 
         response_dict["bundles"] = BundleDetailsSerializer(bundles,context={"request": request}, many=True).data
