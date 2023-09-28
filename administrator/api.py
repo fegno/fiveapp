@@ -548,11 +548,11 @@ class GenerateReport(APIView):
                 for i in log:
                     working_hr = float(i.working_hour)
 
-                    if float(i.working_hour) > float(week_working_hour):
-                        extra_hr = float(i.working_hour) - float(week_working_hour)
-                        i.extra_hour = extra_hr
-                        i.save()
-                    elif float(i.working_hour) < float(week_working_hour):
+                    
+                    extra_hr = float(i.working_hour) - float(week_working_hour)
+                    i.extra_hour = extra_hr
+                    i.save()
+                    if float(i.working_hour) < float(week_working_hour):
                         per_day = float(week_working_hour) / 5
                         abn = float(i.working_hour) / float(per_day)
                         absent = float(5.0) - float(abn)
@@ -563,12 +563,12 @@ class GenerateReport(APIView):
                 week_working_hour =float(week_working_hour) *4
                 for i in log:
                     working_hr = float(i.working_hour)
-                    if float(i.working_hour) > float(week_working_hour):
-                        extra_hr = float(i.working_hour) - float(week_working_hour)
-                        i.extra_hour = extra_hr
-                        i.save()
+                   
+                    extra_hr = float(i.working_hour) - float(week_working_hour)
+                    i.extra_hour = extra_hr
+                    i.save()
                     
-                    elif float(i.working_hour) < float(week_working_hour):
+                    if float(i.working_hour) < float(week_working_hour):
                         per_day = float(week_working_hour) / 20
                         abn = float(i.working_hour) / float(per_day)
                         absent = float(20.0) - float(abn)
@@ -626,52 +626,29 @@ class ViewReport(APIView):
                 "absent_days"
             ).order_by("id"))
             response_dict["report"] = log
-        elif csv_file.modules.title != "Team Workforce Plan Corporate":
-            log  = CsvLogDetails.objects.filter(
+        elif csv_file.modules.title == "Team Workforce Plan Corporate":
+            log  = tuple(CsvLogDetails.objects.filter(
                 uploaded_file__id=pk,
                 is_active=True
             ).filter(
                 Q(uploaded_file__uploaded_by=request.user)|
                 Q(uploaded_file__uploaded_by__created_admin=request.user)
-            ).values("team").annotate(
-                employee_count=Count("id"),
-                team_working_hr=Sum("working_hour"),
-                avg_team_working_hr=Avg("working_hour"),
-                total_extra_hr=Sum("extra_hour"),
-            ).annotate(
-                team_actual_working_hr=F("employee_count")*F("uploaded_file__standard_working_hour")
             ).annotate(
                 status=Case(
                     *status_list, default=Value(""), output_field=CharField()
                 ),
             ).values(
-                "team", "employee_count",
-                "team_working_hr",
-                "avg_team_working_hr",
-                "team_actual_working_hr",
-                "status", "total_extra_hr"
-            )
-
-            dep_log  = tuple(log.values("department").annotate(
-                employee_count=Count("id"),
-                team_working_hr=Sum("working_hour"),
-                avg_team_working_hr=Avg("working_hour"),
-                total_extra_hr=Sum("extra_hour"),
-            ).annotate(
-                team_actual_working_hr=F("employee_count")*F("uploaded_file__standard_working_hour")
-            ).annotate(
-                status=Case(
-                    *status_list, default=Value(""), output_field=CharField()
-                ),
-            ).values(
-                "department", "employee_count",
-                "team_working_hr",
-                "avg_team_working_hr",
-                "team_actual_working_hr",
-                "status", "total_extra_hr"
-            ))
-            for i in dep_log:
-                i["team_log"] = log.filter(department=i["department"])
+                "team",
+                "sl_no", 
+                "employee_id",
+                "employee_name",
+                "working_hour",
+                "status",
+                "absent_days",
+                "department",
+                "designation",
+                "extra_hour"
+            ).order_by("id"))
             
             response_dict["report"] = log
         
