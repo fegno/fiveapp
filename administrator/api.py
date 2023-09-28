@@ -26,7 +26,9 @@ from django.db.models import (
     IntegerField,
     Avg,
     FloatField,
-    Func
+    Func,
+    DecimalField,
+    ExpressionWrapper
 )
 from fiveapp.utils import PageSerializer
 
@@ -606,7 +608,7 @@ class ViewReport(APIView):
 
         ]
 
-        if csv_file.modules.title == "Team Indicator":
+        if csv_file.modules.title != "Team Indicator":
             log  = tuple(CsvLogDetails.objects.filter(
                 uploaded_file__id=pk,
                 is_active=True
@@ -616,8 +618,8 @@ class ViewReport(APIView):
             ).values("team").annotate(
                 employee_count=Count("id"),
                 team_working_hr=Sum("working_hour"),
-                team_absent_days=Round(Sum("absent_days")),
-                avg_team_working_hr=Round(Avg("working_hour")),
+                team_absent_days=Sum("absent_days"),
+                avg_team_working_hr=Avg("working_hour"),
             ).annotate(
                 team_actual_working_hr=F("employee_count")*F("uploaded_file__standard_working_hour")
             ).annotate(
@@ -633,17 +635,36 @@ class ViewReport(APIView):
             ))
             response_dict["report"] = log
         elif csv_file.modules.title == "Team Workforce Plan Corporate":
-            log  = tuple(CsvLogDetails.objects.filter(
+            log  = CsvLogDetails.objects.filter(
                 uploaded_file__id=pk,
                 is_active=True
             ).filter(
                 Q(uploaded_file__uploaded_by=request.user)|
                 Q(uploaded_file__uploaded_by__created_admin=request.user)
-            ).values("department").annotate(
+            ).values("team").annotate(
                 employee_count=Count("id"),
                 team_working_hr=Sum("working_hour"),
-                avg_team_working_hr=Round(Avg("working_hour")),
-                total_extra_hr=Round(Sum("extra_hour")),
+                avg_team_working_hr=Avg("working_hour"),
+                total_extra_hr=Sum("extra_hour"),
+            ).annotate(
+                team_actual_working_hr=F("employee_count")*F("uploaded_file__standard_working_hour")
+            ).annotate(
+                status=Case(
+                    *status_list, default=Value(""), output_field=CharField()
+                ),
+            ).values(
+                "team", "employee_count",
+                "team_working_hr",
+                "avg_team_working_hr",
+                "team_actual_working_hr",
+                "status", "total_extra_hr"
+            )
+
+            dep_log  = tuple(log.values("department").annotate(
+                employee_count=Count("id"),
+                team_working_hr=Sum("working_hour"),
+                avg_team_working_hr=Avg("working_hour"),
+                total_extra_hr=Sum("extra_hour"),
             ).annotate(
                 team_actual_working_hr=F("employee_count")*F("uploaded_file__standard_working_hour")
             ).annotate(
@@ -657,6 +678,9 @@ class ViewReport(APIView):
                 "team_actual_working_hr",
                 "status", "total_extra_hr"
             ))
+            for i in dep_log:
+                print(i,"pp")
+            
             response_dict["report"] = log
         
         response_dict["status"] = True
@@ -706,8 +730,8 @@ class AnalyticsReport(APIView):
             ).values("team").annotate(
                 employee_count=Count("id"),
                 team_working_hr=Sum("working_hour"),
-                team_absent_days=Round(Sum("absent_days")),
-                avg_team_working_hr=Round(Avg("working_hour")),
+                team_absent_days=Sum("absent_days"),
+                avg_team_working_hr=Avg("working_hour"),
             ).annotate(
                 team_actual_working_hr=F("employee_count")*F("uploaded_file__standard_working_hour")
             ).annotate(
