@@ -631,7 +631,32 @@ class ViewReport(APIView):
                 "status"
             ))
             response_dict["report"] = log
-
+        elif csv_file.modules.title == "Team Workforce Plan Corporate":
+            log  = tuple(CsvLogDetails.objects.filter(
+                uploaded_file__id=pk,
+                is_active=True
+            ).filter(
+                Q(uploaded_file__uploaded_by=request.user)|
+                Q(uploaded_file__uploaded_by__created_admin=request.user)
+            ).values("department").annotate(
+                employee_count=Count("id"),
+                team_working_hr=Sum("working_hour"),
+                avg_team_working_hr=Round(Avg("working_hour")),
+                total_extra_hr=Round(Sum("extra_hour")),
+            ).annotate(
+                team_actual_working_hr=F("employee_count")*F("uploaded_file__standard_working_hour")
+            ).annotate(
+                status=Case(
+                    *status_list, default=Value(""), output_field=CharField()
+                ),
+            ).values(
+                "department", "employee_count",
+                "team_working_hr",
+                "avg_team_working_hr",
+                "team_actual_working_hr",
+                "status", "total_extra_hr"
+            ))
+            response_dict["report"] = log
         
         response_dict["status"] = True
         return Response(response_dict, status=status.HTTP_200_OK)
