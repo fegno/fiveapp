@@ -671,7 +671,7 @@ class AnalyticsReport(APIView):
 
         ]
 
-        if csv_file.modules.title != "Team Indicator":
+        if csv_file.modules.title == "Team Indicator":
             log  = CsvLogDetails.objects.filter(
                 uploaded_file__id=pk
             ).filter(
