@@ -606,7 +606,7 @@ class ViewReport(APIView):
 
         ]
 
-        if csv_file.modules.title != "Team Indicator":
+        if csv_file.modules.title == "Team Indicator":
             log  = tuple(CsvLogDetails.objects.filter(
                 uploaded_file__id=pk,
                 is_active=True
