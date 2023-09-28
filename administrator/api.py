@@ -363,11 +363,12 @@ class DeleteUserFromModule(APIView):
             #     return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
 
             # else:
-            deleted_user = DeleteUsersLog.objects.create(
-            deleted_by=request.user,
-            user=user_to_delete.user,
-            module=module_to_delete,
-            )
+            deleted_user = DeleteUsersLog(
+                    deleted_by=request.user,
+                    user=user_to_delete.user,
+                )
+            deleted_user.save()
+            deleted_user.module.add(module_to_delete)
             response_dict["message"] = "Successfully deleted the user from the module"
             response_dict["status"] = True
 
@@ -1180,7 +1181,7 @@ class PermanentDeleteUserFromAdmin(APIView):
         except UserAssignedModules.DoesNotExist:
             deleted_user_module = None
 
-        # Create a log entry with user information and assigned modules
+        
         if deleted_user_module:
             # Get all modules assigned to the user
             modules_assigned = list(deleted_user_module.module.all())
@@ -1189,19 +1190,40 @@ class PermanentDeleteUserFromAdmin(APIView):
             delete_user_log_entry = DeleteUsersLog.objects.create(
                 user=deleted_user,
                 deleted_by=admin_user,
-                is_active=False,  # Mark the user as deleted
+                is_active=False, 
             )
-            delete_user_log_entry.modules.set(modules_assigned)  # Associate all modules
+            delete_user_log_entry.module.set(modules_assigned)  # Associate all modules
 
             # Remove all modules from the UserAssignedModules
             deleted_user_module.module.clear()
         else:
             modules_assigned = []
 
-        # Instead of deleting the user, mark them as deleted (e.g., set is_active=False)
+        
         deleted_user.is_active = False
         deleted_user.save()
 
         response_dict["message"] = "Permanently marked the user as deleted and deleted all assigned modules."
         response_dict["status"] = True
+        return Response(response_dict, status=status.HTTP_200_OK)
+
+
+
+class CartHome(APIView):
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (CustomTokenAuthentication,)
+
+    def get(self, request):
+
+        response_dict = {"status":True}
+        admin_user = request.user
+
+        subscribed_module = SubscriptionDetails.objects.filter(user=admin_user)
+        module_count = subscribed_module.aggregate(total_modules=Count('module'))
+        total_user_count = int(admin_user.available_free_users) + int(admin_user.available_paid_users) 
+
+    
+        response_dict["subscribed_module"] = SubscriptionModuleSerilzer(subscribed_module, context={'request':request}, many=True).data
+        response_dict["module_count"] = module_count['total_modules']
+        response_dict["user_count"] = total_user_count
         return Response(response_dict, status=status.HTTP_200_OK)

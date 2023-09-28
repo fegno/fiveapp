@@ -133,19 +133,25 @@ STATIC_ROOT = os.environ.get("STATIC_ROOT")
 MEDIA_ROOT = os.environ.get("MEDIA_ROOT")
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
-# EMAIL_HOST = "smtp.gmail.com"
-# EMAIL_USE_TLS = True
+
+
+# EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+# EMAIL_HOST = 'smtp.gmail.com'
 # EMAIL_PORT = 587
-# EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER")
-# EMAIL_HOST_PASSWORD =  os.environ.get("EMAIL_HOST_PASSWORD")
+# EMAIL_USE_TLS = True
+# # OAuth 2.0 Configuration
+# EMAIL_HOST_USER = 'webchoicefiveapptest@gmail.com'
+# EMAIL_HOST_PASSWORD = 'WebChoice123$'
+# DEFAULT_FROM_EMAIL = 'shilpa.fegno@gmail.com'
 
 
+
+# sendgrid
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 EMAIL_HOST = "smtp.sendgrid.net"
 EMAIL_USE_TLS = True
 EMAIL_PORT = 587
-EMAIL_HOST_USER = 'apikey'  # This is the username for SendGrid SMTP
+EMAIL_HOST_USER = 'apikey' 
 EMAIL_HOST_PASSWORD = os.environ.get("SENDGRID_API_KEY")
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'shilpa.fegno@gmail.com')
 
