@@ -783,7 +783,7 @@ class UserInviteModule(APIView):
                     username=data.get("email"),
                     email=data.get("email"),
                     first_name=data.get("first_name"),
-                    created_admin=admin_user, 
+                    created_admin=admin_user,
                 )
                 user.is_free_user = True
                 user.save()
@@ -1122,4 +1122,47 @@ class AssignModulesToUser(APIView):
 
         return Response(response_dict, status=status.HTTP_200_OK)
 
-        
+
+class PermanentDeleteUserFromAdmin(APIView):
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (CustomTokenAuthentication,)
+
+    def post(self, request, pk):
+        response_dict = {"status": False}
+        admin_user = request.user
+
+        try:
+            deleted_user = UserProfile.objects.get(id=pk, created_admin=admin_user)
+        except UserProfile.DoesNotExist:
+            return Response({"message": "User not found or access denied", "status": False}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            deleted_user_module = UserAssignedModules.objects.get(user=deleted_user)
+        except UserAssignedModules.DoesNotExist:
+            deleted_user_module = None
+
+        # Create a log entry with user information and the first module
+        if deleted_user_module:
+            # Get all modules assigned to the user
+            modules_assigned = list(deleted_user_module.module.all())
+
+            # Create a DeleteUsersLog entry and associate all modules with it
+            delete_user_log_entry = DeleteUsersLog.objects.create(
+                user=deleted_user,
+                module=", ".join([str(module) for module in modules_assigned]),  # Store module names as a comma-separated string
+                deleted_by=admin_user,
+                is_active=False,  # Mark the user as deleted
+            )
+
+            # Remove all modules from the UserAssignedModules
+            deleted_user_module.module.clear()
+        else:
+            modules_assigned = []
+
+        # Instead of deleting the user, mark them as deleted (e.g., set is_active=False)
+        deleted_user.is_active = False
+        deleted_user.save()
+
+        response_dict["message"] = "Permanently marked the user as deleted and deleted all assigned modules."
+        response_dict["status"] = True
+        return Response(response_dict, status=status.HTTP_200_OK)
