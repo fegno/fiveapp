@@ -597,9 +597,18 @@ class ViewReport(APIView):
             "name":csv_file.modules.title,
             "department":csv_file.modules.department
         }
+
+        status_list = [
+            When(team_actual_working_hr__lt=F("team_working_hr"), then=Value("Overloaded")),
+            When(team_actual_working_hr__gt=F("team_working_hr"), then=Value("Underloaded")),
+            When(team_actual_working_hr=F("team_working_hr"), then=Value("Standard")),
+
+        ]
+
         if csv_file.modules.title == "Team Indicator":
             log  = tuple(CsvLogDetails.objects.filter(
-                uploaded_file__id=pk
+                uploaded_file__id=pk,
+                is_active=True
             ).filter(
                 Q(uploaded_file__uploaded_by=request.user)|
                 Q(uploaded_file__uploaded_by__created_admin=request.user)
@@ -610,11 +619,16 @@ class ViewReport(APIView):
                 avg_team_working_hr=Round(Avg("working_hour")),
             ).annotate(
                 team_actual_working_hr=F("employee_count")*F("uploaded_file__standard_working_hour")
+            ).annotate(
+                status=Case(
+                    *status_list, default=Value(""), output_field=CharField()
+                ),
             ).values(
                 "team", "employee_count",
                 "team_working_hr", "team_absent_days",
                 "avg_team_working_hr",
-                "team_actual_working_hr"
+                "team_actual_working_hr",
+                "status"
             ))
             response_dict["report"] = log
 
@@ -643,7 +657,15 @@ class AnalyticsReport(APIView):
             "created":csv_file.created,
             "uploaded_by":csv_file.uploaded_by.first_name
         }
-        if csv_file.modules.title == "Team Indicator":
+
+        status_list = [
+            When(team_actual_working_hr__lt=F("team_working_hr"), then=Value("Overloaded")),
+            When(team_actual_working_hr__gt=F("team_working_hr"), then=Value("Underloaded")),
+            When(team_actual_working_hr=F("team_working_hr"), then=Value("Standard")),
+
+        ]
+
+        if csv_file.modules.title != "Team Indicator":
             log  = CsvLogDetails.objects.filter(
                 uploaded_file__id=pk
             ).filter(
@@ -656,12 +678,17 @@ class AnalyticsReport(APIView):
                 avg_team_working_hr=Round(Avg("working_hour")),
             ).annotate(
                 team_actual_working_hr=F("employee_count")*F("uploaded_file__standard_working_hour")
+            ).annotate(
+                status=Case(
+                    *status_list, default=Value(""), output_field=CharField()
+                ),
             ).values(
                 "team", 
                 "employee_count",
                 "team_working_hr", "team_absent_days",
                 "avg_team_working_hr",
-                "team_actual_working_hr"
+                "team_actual_working_hr",
+                "status"
             )
 
             total_absent_days = log.aggregate(total=Sum("team_absent_days"))
@@ -675,8 +702,8 @@ class AnalyticsReport(APIView):
 
             total_employee = log.aggregate(total=Sum("employee_count"))
             response_dict["total_employee"] = total_employee.get("total") if total_employee else 0
-            response_dict["working_hours_report"] = log.values("team", "employee_count", "team_working_hr", "team_actual_working_hr")
-            response_dict["absent_days_report"] = log.values("team", "employee_count", "team_absent_days")
+            response_dict["working_hours_report"] = log.values("team", "status", "employee_count", "team_working_hr", "team_actual_working_hr")
+            response_dict["absent_days_report"] = log.values("team","status", "employee_count", "team_absent_days")
 
         
         response_dict["status"] = True
@@ -1045,7 +1072,7 @@ class UnassignedModule(APIView):
             available_un_assiged_module = subscribed_modules & unassigned_modules
             response_dict["unassigned module"] = ModuleDetailsSerializer(available_un_assiged_module, context={"request":request}, many=True).data
         else:
-            response_dict["message"] = f"Adimin dons not have subscription"
+            response_dict["message"] = f"Admin dons not have subscription"
         return Response(response_dict, status=status.HTTP_200_OK)
 
 

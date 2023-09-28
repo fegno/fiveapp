@@ -43,7 +43,8 @@ class PurchaseDetails(models.Model):
     )
     received_amounts			=	models.FloatField(null=True,blank=True)
     payment_dates			=	models.DateTimeField(null=True,blank=True)
-    
+    parchase_user_type		=	models.CharField(null=True,blank=True,max_length=255, default="Subscription")
+    user_count              = models.IntegerField(null=True, blank=True)
     status =	models.CharField(max_length=50,blank=True,null=False,db_index=True,choices=STATUS_CHOICES)
     is_active = models.BooleanField(null=False, blank=True, default=True)
     created = models.DateTimeField(auto_now_add=True)

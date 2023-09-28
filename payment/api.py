@@ -71,7 +71,7 @@ class InitiatePayment(APIView):
 		with transaction.atomic():
 			stripe.api_key=settings.STRIPE_API_KEY
 			intent = stripe.PaymentIntent.create(amount=round(order.total_price*100),currency='gbp')
-			payment_attempt=PaymentAttempt.objects.create(parchase_user_type="Subscription",parchase=order,user=request.user,currency='aed',amount=order.total_price,
+			payment_attempt=PaymentAttempt.objects.create(parchase_user_type="Subscription",parchase=order,user=request.user,currency='gbp',amount=order.total_price,
 				status='Initiated',client_secret=intent['client_secret'],payment_intent_id=intent['id'],last_attempt_date=timezone.now())
 		
 			response_dict['client_secret']=payment_attempt.client_secret
@@ -147,3 +147,42 @@ class StripePaymentWebhook(APIView):
 				payment_attempt.save()
 				
 		return HttpResponse(status.HTTP_200_OK)
+
+class InitiateUserPayment(APIView):
+	permission_classes = (IsAuthenticated,)
+	authentication_classes = (CustomTokenAuthentication,)
+
+	def post(self,request):
+		response_dict={'status':False}
+		user_count = request.data.get("user_count")
+		total_price = request.data.get("total_price")
+		subscription_type = request.data.get("subscription_type")
+
+		subscription = SubscriptionDetails.objects.filter(
+			user=order.user, 
+			is_subscribed=True
+		).last()
+		if not subscription:
+			response_dict['error']= "No active subscription"
+			return Response(response_dict,status.HTTP_200_OK)
+
+		order = PurchaseDetails.objects.create(
+			user=request.user,
+			status="Pending",
+			subscription_type=subscription_type,
+			total_price=total_price,
+			is_subscribed=False,
+			subscription_end_date=subscription.subscription_end_date,
+			subscription_start_date=order.subscription_start_date,
+			user_count=user_count,
+			parchase_user_type="User"
+		)
+		with transaction.atomic():
+			stripe.api_key=settings.STRIPE_API_KEY
+			intent = stripe.PaymentIntent.create(amount=round(order.total_price*100),currency='gbp')
+			payment_attempt=PaymentAttempt.objects.create(parchase_user_type="User",parchase=order,user=request.user,currency='gbp',amount=order.total_price,
+				status='Initiated',client_secret=intent['client_secret'],payment_intent_id=intent['id'],last_attempt_date=timezone.now())
+		
+			response_dict['client_secret']=payment_attempt.client_secret
+			response_dict['status']=True
+		return Response(response_dict,status.HTTP_200_OK)
