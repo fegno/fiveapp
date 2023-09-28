@@ -59,10 +59,8 @@ from user.serializers import UserSerializer
 from django.core.mail import send_mail, EmailMessage
 from django.template.loader import render_to_string
 from django.contrib.auth import get_user_model
+from django.db.models.functions import Round
 
-class Round(Func):
-    function = 'ROUND'
-    template='%(function)s(%(expressions)s, 2)'
 
 def random_otp_generator(size=4, chars="123456789"):
     return "".join(random.choice(chars) for _ in range(size))
@@ -608,7 +606,7 @@ class ViewReport(APIView):
 
         ]
 
-        if csv_file.modules.title == "Team Indicator":
+        if csv_file.modules.title != "Team Indicator":
             log  = tuple(CsvLogDetails.objects.filter(
                 uploaded_file__id=pk,
                 is_active=True
