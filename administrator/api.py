@@ -441,7 +441,7 @@ class UploadCsv(APIView):
                     )
                 )
         CsvLogDetails.objects.bulk_create(to_save)
-        response_dict["message"] = "Successfully uplaoded"
+        response_dict["message"] = "Successfully uploaded"
         response_dict["status"] = True
         return Response(response_dict, status=status.HTTP_200_OK)
 
@@ -608,7 +608,7 @@ class ViewReport(APIView):
 
         ]
 
-        if csv_file.modules.title != "Team Indicator":
+        if csv_file.modules.title == "Team Indicator":
             log  = tuple(CsvLogDetails.objects.filter(
                 uploaded_file__id=pk,
                 is_active=True
@@ -634,7 +634,7 @@ class ViewReport(APIView):
                 "status"
             ))
             response_dict["report"] = log
-        elif csv_file.modules.title == "Team Workforce Plan Corporate":
+        elif csv_file.modules.title != "Team Workforce Plan Corporate":
             log  = CsvLogDetails.objects.filter(
                 uploaded_file__id=pk,
                 is_active=True
@@ -679,9 +679,9 @@ class ViewReport(APIView):
                 "status", "total_extra_hr"
             ))
             for i in dep_log:
-                print(i,"pp")
+                i["team_log"] = log.filter(department=i["department"])
             
-            response_dict["report"] = log
+            response_dict["report"] = dep_log
         
         response_dict["status"] = True
         return Response(response_dict, status=status.HTTP_200_OK)
