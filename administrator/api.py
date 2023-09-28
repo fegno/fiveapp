@@ -634,7 +634,7 @@ class ViewReport(APIView):
                 "status"
             ))
             response_dict["report"] = log
-        elif csv_file.modules.title != "Team Workforce Plan Corporate":
+        elif csv_file.modules.title == "Team Workforce Plan Corporate":
             log  = CsvLogDetails.objects.filter(
                 uploaded_file__id=pk,
                 is_active=True
