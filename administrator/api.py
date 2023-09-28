@@ -631,7 +631,32 @@ class ViewReport(APIView):
                 "status"
             ))
             response_dict["report"] = log
-
+        elif csv_file.modules.title == "Team Workforce Plan Corporate":
+            log  = tuple(CsvLogDetails.objects.filter(
+                uploaded_file__id=pk,
+                is_active=True
+            ).filter(
+                Q(uploaded_file__uploaded_by=request.user)|
+                Q(uploaded_file__uploaded_by__created_admin=request.user)
+            ).values("department").annotate(
+                employee_count=Count("id"),
+                team_working_hr=Sum("working_hour"),
+                avg_team_working_hr=Round(Avg("working_hour")),
+                total_extra_hr=Round(Sum("extra_hour")),
+            ).annotate(
+                team_actual_working_hr=F("employee_count")*F("uploaded_file__standard_working_hour")
+            ).annotate(
+                status=Case(
+                    *status_list, default=Value(""), output_field=CharField()
+                ),
+            ).values(
+                "department", "employee_count",
+                "team_working_hr",
+                "avg_team_working_hr",
+                "team_actual_working_hr",
+                "status", "total_extra_hr"
+            ))
+            response_dict["report"] = log
         
         response_dict["status"] = True
         return Response(response_dict, status=status.HTTP_200_OK)
@@ -664,8 +689,14 @@ class AnalyticsReport(APIView):
             When(team_actual_working_hr=F("team_working_hr"), then=Value("Standard")),
 
         ]
+        absent_status_list = [
+            When(team_absent_days__gte=3, then=Value("Overloaded")),
+            When(team_absent_days__gt=1,team_absent_days__lt=3 , then=Value("Underloaded")),
+            When(team_absent_days__lte=1, then=Value("Standard")),
 
-        if csv_file.modules.title != "Team Indicator":
+        ]
+
+        if csv_file.modules.title == "Team Indicator":
             log  = CsvLogDetails.objects.filter(
                 uploaded_file__id=pk
             ).filter(
@@ -682,13 +713,17 @@ class AnalyticsReport(APIView):
                 status=Case(
                     *status_list, default=Value(""), output_field=CharField()
                 ),
+                absent_status=Case(
+                    *absent_status_list, default=Value(""), output_field=CharField()
+                ),
             ).values(
                 "team", 
                 "employee_count",
                 "team_working_hr", "team_absent_days",
                 "avg_team_working_hr",
                 "team_actual_working_hr",
-                "status"
+                "status",
+                "absent_status"
             )
 
             total_absent_days = log.aggregate(total=Sum("team_absent_days"))
@@ -703,7 +738,7 @@ class AnalyticsReport(APIView):
             total_employee = log.aggregate(total=Sum("employee_count"))
             response_dict["total_employee"] = total_employee.get("total") if total_employee else 0
             response_dict["working_hours_report"] = log.values("team", "status", "employee_count", "team_working_hr", "team_actual_working_hr")
-            response_dict["absent_days_report"] = log.values("team","status", "employee_count", "team_absent_days")
+            response_dict["absent_days_report"] = log.values("team","absent_status", "employee_count", "team_absent_days")
 
         
         response_dict["status"] = True
