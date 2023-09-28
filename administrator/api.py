@@ -688,6 +688,9 @@ class AnalyticsReport(APIView):
             When(team_absent_days__lte=1, then=Value("Standard")),
 
         ]
+        standard_working_hour = csv_file.standard_working_hour
+        if csv_file.working_type == "MONTH":
+            standard_working_hour = standard_working_hour * 4
 
         if csv_file.modules.title == "Team Indicator":
             log  = CsvLogDetails.objects.filter(
@@ -702,7 +705,7 @@ class AnalyticsReport(APIView):
                 avg_team_working_hr=Avg("working_hour"),
                 total_extra_hour=Sum("extra_hour")
             ).annotate(
-                team_actual_working_hr=F("employee_count")*F("uploaded_file__standard_working_hour")
+                team_actual_working_hr=F("employee_count")*standard_working_hour
             ).annotate(
                 status=Case(
                     *status_list, default=Value(""), output_field=CharField()
