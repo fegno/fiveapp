@@ -543,45 +543,48 @@ class GenerateReport(APIView):
             response_dict["error"] = "Report Already generated"
             return Response(response_dict, status=status.HTTP_200_OK)
         
-        try:
-            if csv_file.working_type == "WEEK":
-                for i in log:
-                    working_hr = float(i.working_hour)
+        if csv_file.modules.title == "Team Indicator" or csv_file.modules.title == "Team Workforce Plan Corporate":
+            try:
+                if csv_file.working_type == "WEEK":
+                    for i in log:
+                        working_hr = float(i.working_hour)
 
+                        
+                        extra_hr = float(i.working_hour) - float(week_working_hour)
+                        i.extra_hour = extra_hr
+                        i.save()
+                        if float(i.working_hour) < float(week_working_hour):
+                            per_day = float(week_working_hour) / 5
+                            abn = float(i.working_hour) / float(per_day)
+                            absent = float(5.0) - float(abn)
+                            i.absent_days = absent
+                            i.save()
+                            
+                elif csv_file.working_type == "MONTH":
+                    week_working_hour =float(week_working_hour) *4
+                    for i in log:
+                        working_hr = float(i.working_hour)
                     
-                    extra_hr = float(i.working_hour) - float(week_working_hour)
-                    i.extra_hour = extra_hr
-                    i.save()
-                    if float(i.working_hour) < float(week_working_hour):
-                        per_day = float(week_working_hour) / 5
-                        abn = float(i.working_hour) / float(per_day)
-                        absent = float(5.0) - float(abn)
-                        i.absent_days = absent
+                        extra_hr = float(i.working_hour) - float(week_working_hour)
+                        i.extra_hour = extra_hr
                         i.save()
                         
-            elif csv_file.working_type == "MONTH":
-                week_working_hour =float(week_working_hour) *4
-                for i in log:
-                    working_hr = float(i.working_hour)
-                   
-                    extra_hr = float(i.working_hour) - float(week_working_hour)
-                    i.extra_hour = extra_hr
-                    i.save()
-                    
-                    if float(i.working_hour) < float(week_working_hour):
-                        per_day = float(week_working_hour) / 20
-                        abn = float(i.working_hour) / float(per_day)
-                        absent = float(20.0) - float(abn)
-                        i.absent_days = absent
-                        i.save()
+                        if float(i.working_hour) < float(week_working_hour):
+                            per_day = float(week_working_hour) / 20
+                            abn = float(i.working_hour) / float(per_day)
+                            absent = float(20.0) - float(abn)
+                            i.absent_days = absent
+                            i.save()
 
-            csv_file.is_report_generated = True
-            csv_file.standard_working_hour = week_working_hour
-            csv_file.save()
-            response_dict["status"] = True
-            response_dict["message"] = "Generated"
-        except Exception as e:
-            response_dict["error"] = str(e)
+                csv_file.is_report_generated = True
+                csv_file.standard_working_hour = week_working_hour
+                csv_file.save()
+                response_dict["status"] = True
+                response_dict["message"] = "Generated"
+            except Exception as e:
+                response_dict["error"] = str(e)
+        else:
+            response_dict["error"] = "Module not Valid"
         return Response(response_dict, status=status.HTTP_200_OK)
     
 
@@ -737,6 +740,82 @@ class AnalyticsReport(APIView):
             response_dict["working_hours_report"] = log.values("team", "status", "employee_count", "team_working_hr", "team_actual_working_hr")
             response_dict["absent_days_report"] = log.values("team","absent_status", "employee_count", "team_absent_days")
 
+        elif csv_file.modules.title == "Team Workforce Plan Corporate":
+            tab = request.GET.get("tab", "Department")
+
+            if tab == "Department":
+                log  = CsvLogDetails.objects.filter(
+                    uploaded_file__id=pk
+                ).filter(
+                    Q(uploaded_file__uploaded_by=request.user)|
+                    Q(uploaded_file__uploaded_by__created_admin=request.user)
+                ).values("department").annotate(
+                    employee_count=Count("id"),
+                    team_working_hr=Sum("working_hour"),
+                    total_extra_hour=Sum("extra_hour"),
+                    team_actual_working_hr=F("employee_count")*standard_working_hour
+                ).annotate(
+                    status=Case(
+                        *status_list, default=Value(""), output_field=CharField()
+                    ),
+                    resource_required=F("team_working_hr")/standard_working_hour
+                ).values(
+                    "department", 
+                    "employee_count",
+                    "team_working_hr",
+                    "total_extra_hour",
+                    "team_actual_working_hr",
+                    "status",
+                    "resource_required"
+                )
+                response_dict["working_hour_report"] = log.values(
+                    "department", "team_actual_working_hr",
+                    "team_working_hr", "total_extra_hour",
+                    "status"
+                )
+                response_dict["resource_status_report"] = log.values(
+                    "department", "employee_count",
+                    "resource_required",
+                    "status"
+                )
+
+            if tab == "Team":
+                select_department = request.GET.get("department")
+                log  = CsvLogDetails.objects.filter(
+                    uploaded_file__id=pk,
+                    department=select_department
+                ).filter(
+                    Q(uploaded_file__uploaded_by=request.user)|
+                    Q(uploaded_file__uploaded_by__created_admin=request.user)
+                ).values("team").annotate(
+                    employee_count=Count("id"),
+                    team_working_hr=Sum("working_hour"),
+                    total_extra_hour=Sum("extra_hour"),
+                    team_actual_working_hr=F("employee_count")*standard_working_hour
+                ).annotate(
+                    status=Case(
+                        *status_list, default=Value(""), output_field=CharField()
+                    ),
+                    resource_required=F("team_working_hr")/standard_working_hour
+                ).values(
+                    "team", 
+                    "employee_count",
+                    "team_working_hr",
+                    "total_extra_hour",
+                    "team_actual_working_hr",
+                    "status",
+                    "resource_required"
+                )
+                response_dict["working_hour_report"] = log.values(
+                    "team", "team_actual_working_hr",
+                    "team_working_hr", "total_extra_hour",
+                    "status"
+                )
+                response_dict["resource_status_report"] = log.values(
+                    "team", "employee_count",
+                    "resource_required",
+                    "status"
+                )
         
         response_dict["status"] = True
         return Response(response_dict, status=status.HTTP_200_OK)
