@@ -392,7 +392,7 @@ class UploadCsv(APIView):
     def post(self, request, pk):
         response_dict = {"status": False}
         csv_file = request.FILES.get("file")
-        working_type = request.FILES.get("working_type")
+        working_type = request.data.get("working_type")
 
         module = ModuleDetails.objects.filter(id=pk).last()
         print(module)
@@ -400,7 +400,10 @@ class UploadCsv(APIView):
             response_dict["error"] = "Module Not Found"
             return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
         if not csv_file:
-            response_dict["error"] = "Module Not Found"
+            response_dict["error"] = "File Not Found"
+            return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
+        if not working_type:
+            response_dict["error"] = "Type Required"
             return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
         to_save = []
         decoded_file = csv_file.read().decode('utf-8').splitlines()
