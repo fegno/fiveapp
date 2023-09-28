@@ -691,11 +691,12 @@ class AnalyticsReport(APIView):
             When(team_absent_days__lte=1, then=Value("Standard")),
 
         ]
-        standard_working_hour = csv_file.standard_working_hour
-        if csv_file.working_type == "MONTH":
-            standard_working_hour = standard_working_hour * 4
+        
 
         if csv_file.modules.title == "Team Indicator":
+            standard_working_hour = csv_file.standard_working_hour
+            if csv_file.working_type == "MONTH":
+                standard_working_hour = standard_working_hour * 4
             log  = CsvLogDetails.objects.filter(
                 uploaded_file__id=pk
             ).filter(
@@ -741,8 +742,11 @@ class AnalyticsReport(APIView):
             response_dict["absent_days_report"] = log.values("team","absent_status", "employee_count", "team_absent_days")
 
         elif csv_file.modules.title == "Team Workforce Plan Corporate":
+            standard_working_hour = csv_file.standard_working_hour
+            if csv_file.working_type == "MONTH":
+                standard_working_hour = standard_working_hour * 4
+                
             tab = request.GET.get("tab", "Department")
-
             if tab == "Department":
                 log  = CsvLogDetails.objects.filter(
                     uploaded_file__id=pk
