@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from administrator.api import Cart
 
 from superadmin.models import (
     DeleteUsersLog, 
@@ -180,4 +181,11 @@ class SubscriptionModuleSerilzer(serializers.Serializer):
 class ModuleSToUserserializer(serializers.Serializer):
     # user_id = serializers.IntegerField()
     module_ids = serializers.ListField(child=serializers.IntegerField(), default=[])
+
+
+class CartSerializer(serializers.ModelSerializer):
+    added_by = UserSerializer()
+    class Meta:
+        model = Cart
+        fields = ('added_by', 'count', 'amount')
 

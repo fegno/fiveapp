@@ -32,8 +32,9 @@ from django.db.models import (
 )
 from fiveapp.utils import PageSerializer
 
-from administrator.models import SubscriptionDetails,  CsvLogDetails, UploadedCsvFiles
+from administrator.models import SubscriptionDetails,  CsvLogDetails, UploadedCsvFiles, Cart
 from administrator.serializers import (
+    CartSerializer,
     DeletedUserLogSerializers,
     ModuleDetailsSerializer, 
     BundleDetailsSerializer,
@@ -62,6 +63,7 @@ from django.core.mail import send_mail, EmailMessage
 from django.template.loader import render_to_string
 from django.contrib.auth import get_user_model
 from django.db.models.functions import Round
+from dateutil.relativedelta import relativedelta 
 
 
 def random_otp_generator(size=4, chars="123456789"):
@@ -1299,8 +1301,62 @@ class CartHome(APIView):
         module_count = subscribed_module.aggregate(total_modules=Count('module'))
         total_user_count = int(admin_user.available_free_users) + int(admin_user.available_paid_users) 
 
+        users_with_password_count = UserProfile.objects.filter(created_admin=admin_user).exclude(password='').count()
     
         response_dict["subscribed_module"] = SubscriptionModuleSerilzer(subscribed_module, context={'request':request}, many=True).data
         response_dict["module_count"] = module_count['total_modules']
-        response_dict["user_count"] = total_user_count
+        response_dict["total_user_count"] = total_user_count
+        response_dict["assigned_users"] = users_with_password_count
         return Response(response_dict, status=status.HTTP_200_OK)
+    
+
+class UserPurchasePrice(APIView):
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (CustomTokenAuthentication,)
+
+    def post(self, request):
+       
+        response_dict = {"status":True}
+        admin_user = request.user
+
+        admin_subscription = SubscriptionDetails.objects.filter(user=admin_user).first()
+
+        if admin_subscription is None:
+            return Response({"error": "Admin subscription not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        if not hasattr(admin_subscription, 'subscription_end_date'):
+            return Response({"error": "Admin subscription doesn't have a subscription_end_date"}, status=status.HTTP_400_BAD_REQUEST)
+
+        
+        subscription_end_date = admin_subscription.subscription_end_date
+        current_date = datetime.now().date()
+        remaining_days = (subscription_end_date - current_date).days
+
+        subscription_type = admin_subscription.subscription_type
+
+        response_dict["Subscription_type"] = subscription_type
+
+        weekly_price = 20
+        monthly_price = 80
+        yearly_price = 100
+
+        if subscription_type == "WEEK":
+            amount = (weekly_price / 7) * remaining_days
+        elif subscription_type == "MONTH":
+            amount = (monthly_price / 28) * remaining_days
+        elif subscription_type == "YEAR":
+            amount = (yearly_price / 365) * remaining_days
+        else:
+            return Response({"error": "Invalid purchase duration"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        
+
+        price_data = {
+            "added_by": {"id": admin_user.id}, 
+            "amount": amount, 
+        }
+
+        response_dict["price_data"] = price_data
+        response_dict["subscription_end_date"] = subscription_end_date
+        return Response(response_dict, status=status.HTTP_200_OK)
+    
