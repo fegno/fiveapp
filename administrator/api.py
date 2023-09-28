@@ -395,6 +395,7 @@ class UploadCsv(APIView):
         working_type = request.FILES.get("working_type")
 
         module = ModuleDetails.objects.filter(id=pk).last()
+        print(module)
         if not module:
             response_dict["error"] = "Module Not Found"
             return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
@@ -1176,7 +1177,7 @@ class PermanentDeleteUserFromAdmin(APIView):
         except UserAssignedModules.DoesNotExist:
             deleted_user_module = None
 
-        # Create a log entry with user information and the first module
+        # Create a log entry with user information and assigned modules
         if deleted_user_module:
             # Get all modules assigned to the user
             modules_assigned = list(deleted_user_module.module.all())
@@ -1184,10 +1185,10 @@ class PermanentDeleteUserFromAdmin(APIView):
             # Create a DeleteUsersLog entry and associate all modules with it
             delete_user_log_entry = DeleteUsersLog.objects.create(
                 user=deleted_user,
-                module=", ".join([str(module) for module in modules_assigned]),  # Store module names as a comma-separated string
                 deleted_by=admin_user,
                 is_active=False,  # Mark the user as deleted
             )
+            delete_user_log_entry.modules.set(modules_assigned)  # Associate all modules
 
             # Remove all modules from the UserAssignedModules
             deleted_user_module.module.clear()

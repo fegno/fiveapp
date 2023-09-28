@@ -24,7 +24,7 @@ urlpatterns = [
     re_path(r'^unassign-module/(?P<pk>\d+)/$', api.UnassignedModule.as_view(), name= 'unassigned-module'),
     re_path(r'^modules-assign/(?P<pk>\d+)/$', api.AssignModulesToUser.as_view(), name='modules-assign'),
 
-    re_path(r'^permanent-delete-user/(?P<pk>\d+)/$', api.PermanentDeleteUserFromAdmin.as_view(), name='permanent-delete-user'),
+    # re_path(r'^permanent-delete-user/(?P<pk>\d+)/$', api.PermanentDeleteUserFromAdmin.as_view(), name='permanent-delete-user'),
 
     re_path(r'^upload-csv/(?P<pk>\d+)/$', api.UploadCsv.as_view(), name='upload-csv'),
     re_path(r'^list-csv/(?P<pk>\d+)/$', api.ListCsv.as_view(), name='list-csv'),
