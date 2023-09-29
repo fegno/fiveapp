@@ -1341,7 +1341,7 @@ class UserPurchasePrice(APIView):
         if subscription_type == "WEEK":
             amount = (weekly_price / 7) * remaining_days
         elif subscription_type == "MONTH":
-            amount = (monthly_price / 28) * remaining_days
+            amount = (monthly_price / 30) * remaining_days
         elif subscription_type == "YEAR":
             amount = (yearly_price / 365) * remaining_days
         else:
