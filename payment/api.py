@@ -14,7 +14,7 @@ from datetime import timedelta, date, datetime
 
 from superadmin.models import ModuleDetails, FeatureDetails,  BundleDetails
 from payment.models import PaymentAttempt
-from administrator.models import PurchaseDetails, SubscriptionDetails
+from administrator.models import PurchaseDetails, SubscriptionDetails, AddToCart
 
 import json
 import stripe
@@ -46,6 +46,21 @@ class InitiatePayment(APIView):
 			user=order.user, 
 			is_subscribed=True
 		).last()
+		if subscription:
+			total_days = subscription.subscription_end_date - timezone.now().date()
+			total_day = total_days.days
+			if subscription_type == "WEEK":
+				my_price = total_price/7
+				total_price = float(my_price) * float(total_day)
+
+			elif subscription_type == "MONTH":
+				my_price = total_price/30
+				total_price = float(my_price) * float(total_day)
+			
+			elif subscription_type == "YEAR":
+				my_price = total_price/365
+				total_price = float(my_price) * float(total_day)
+
 		if subscription_type == "WEEK":
 			order.subscription_start_date =  timezone.now().date()
 			if subscription:
@@ -108,32 +123,43 @@ class StripePaymentWebhook(APIView):
 				order.received_amounts=intent['amount_received']/100
 				order.payment_dates=timezone.now()
 				order.save()
-				user = order.user
-				user.is_subscribed = True
-				user.save()
-				if SubscriptionDetails.objects.filter(user=order.user):
-					subscription = SubscriptionDetails.objects.filter(user=order.user).last()
-					if subscription.subscription_end_date < timezone.now().date():
-						subscription.module.clear()
-						subscription.bundle.clear()
-						subscription.module.add(order.module.values_list("id", flat=True))      
-						subscription.bundle.add(order.bundle.values_list("id", flat=True))    
-						subscription.save()
+				
+				if order.parchase_user_type !="User":
+					user = order.user
+					user.is_subscribed = True
+					user.save()
+					if SubscriptionDetails.objects.filter(user=order.user):
+						subscription = SubscriptionDetails.objects.filter(user=order.user).last()
+						if subscription.subscription_end_date < timezone.now().date():
+							subscription.subscription_start_date = order.subscription_start_date
+							subscription.subscription_end_date = order.subscription_end_date
+							subscription.is_subscribed = True
+							subscription.module.clear()
+							subscription.bundle.clear()
+							subscription.module.add(order.module.values_list("id", flat=True))      
+							subscription.bundle.add(order.bundle.values_list("id", flat=True))    
+							subscription.save()
+						else:
+							subscription.module.add(order.module.values_list("id", flat=True))      
+							subscription.bundle.add(order.bundle.values_list("id", flat=True))    
+							subscription.save()
 					else:
+						subscription = SubscriptionDetails.objects.create(
+							user=order.user,
+							subscription_start_date=order.subscription_start_date,
+							subscription_end_date=order.subscription_end_date,
+							is_subscribed=True,
+							subscription_type=order.subscription_type,
+						)
 						subscription.module.add(order.module.values_list("id", flat=True))      
 						subscription.bundle.add(order.bundle.values_list("id", flat=True))    
 						subscription.save()
 				else:
-					subscription = SubscriptionDetails.objects.create(
-						user=order.user,
-						subscription_start_date=order.subscription_start_date,
-						subscription_end_date=order.subscription_end_date,
-						is_subscribed=True,
-						subscription_type=order.subscription_type,
-					)
-					subscription.module.add(order.module.values_list("id", flat=True))      
-					subscription.bundle.add(order.bundle.values_list("id", flat=True))    
-					subscription.save()
+					user = order.user
+					user.total_users = user.total_users + order.user_count
+					user.available_paid_users = user.available_paid_users + order.user_count
+					user.save()
+					AddToCart.objects.filter(added_by=user, is_active=True).update(is_active=False)
 		elif event.type == 'payment_intent.cancelled':
 			intent = event.data.object # contains a stripe.PaymentIntent
 			payment_attempt=PaymentAttempt.objects.filter(payment_intent_id=intent['id'],is_active=True).first()
@@ -173,7 +199,7 @@ class InitiateUserPayment(APIView):
 			total_price=total_price,
 			is_subscribed=False,
 			subscription_end_date=subscription.subscription_end_date,
-			subscription_start_date=order.subscription_start_date,
+			subscription_start_date=timezone.now().date(),
 			user_count=user_count,
 			parchase_user_type="User"
 		)
