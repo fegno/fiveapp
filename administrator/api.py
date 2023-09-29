@@ -32,13 +32,14 @@ from django.db.models import (
 )
 from fiveapp.utils import PageSerializer
 
-from administrator.models import SubscriptionDetails,  CsvLogDetails, UploadedCsvFiles, AddToCart
+from administrator.models import PurchaseDetails, SubscriptionDetails,  CsvLogDetails, UploadedCsvFiles, AddToCart
 from administrator.serializers import (
     DeletedUserLogSerializers,
     ModuleDetailsSerializer, 
     BundleDetailsSerializer,
     BundleDetailsLiteSerializer,
     ModuleSToUserserializer,
+    PurchaseHistorySerializer,
     SubscriptionModuleSerilzer,
     UserAssignedModuleSerializers,
     CsvSerializers,
@@ -881,10 +882,6 @@ class AdminModules(APIView):
         
     
             
-
-
-
-
 class UserInviteModule(APIView):
     permission_classes = (IsAuthenticated,)
     authentication_classes = (CustomTokenAuthentication,)
@@ -1053,9 +1050,6 @@ class UserInviteModule(APIView):
         return Response(response_dict, status=status.HTTP_200_OK)
 
 
-
-
-
 class UnAssignUserlist(APIView):
     permission_classes = (IsAuthenticated,)
     authentication_classes = (CustomTokenAuthentication,) 
@@ -1083,9 +1077,7 @@ class UnAssignUserlist(APIView):
                 response_dict["error"] = "User is not subscribed the module"
         return Response(response_dict, status=status.HTTP_200_OK)
 
-
-
-    
+   
 class AssignUser(APIView):
     permission_classes =(IsAuthenticated,)
     authentication_classes = (CustomTokenAuthentication,) 
@@ -1133,8 +1125,6 @@ class AssignUser(APIView):
             return Response(response_dict, status=status.HTTP_403_FORBIDDEN)
     
 
-
-
 class UserModuleList(APIView):
     permission_classes = (IsAuthenticated,)
     authentication_classes = (CustomTokenAuthentication,)
@@ -1151,7 +1141,6 @@ class UserModuleList(APIView):
             response_dict["message"] = f"User with ID {pk} has no assigned modules"
         return Response(response_dict, status=status.HTTP_200_OK)
     
-
 
 class DeleteModule(APIView):
     permission_classes = (IsAuthenticated,)
@@ -1181,7 +1170,6 @@ class DeleteModule(APIView):
         return Response(response_dict, status=status.HTTP_200_OK)
 
 
-
 class UnassignedModule(APIView):
     permission_classes = (IsAuthenticated,)
     authentication_classes = (CustomTokenAuthentication,)
@@ -1205,7 +1193,6 @@ class UnassignedModule(APIView):
         else:
             response_dict["message"] = f"Admin dons not have subscription"
         return Response(response_dict, status=status.HTTP_200_OK)
-
 
 
 class AssignModulesToUser(APIView):
@@ -1299,7 +1286,6 @@ class PermanentDeleteUserFromAdmin(APIView):
         return Response(response_dict, status=status.HTTP_200_OK)
 
 
-
 class CartHome(APIView):
     permission_classes = (IsAuthenticated,)
     authentication_classes = (CustomTokenAuthentication,)
@@ -1373,7 +1359,6 @@ class UserPurchasePrice(APIView):
         return Response(response_dict, status=status.HTTP_200_OK)
     
 
-
 class AddToCartView(APIView):
     permission_classes = (IsAuthenticated,)
     authentication_classes = (CustomTokenAuthentication,)
@@ -1386,20 +1371,91 @@ class AddToCartView(APIView):
             user_count = request.data.get('count')
             amount = request.data.get('amount')
 
-            if AddToCart.objects.filter(added_by=admin_user, is_active=True).exists():
-                cart_obj = AddToCart.objects.filter(added_by=admin_user).last()
-                cart_obj.count = user_count
-                cart_obj.amount = amount
-                cart_obj.save()
-                response_dict["message"] = "Update the User count"
-                return Response(response_dict, status=status.HTTP_200_OK)
+            admin_subscription = SubscriptionDetails.objects.filter(user=admin_user).first()
+            subscription_end_date = admin_subscription.subscription_end_date
+            current_date = datetime.now().date()
+
+            if subscription_end_date != current_date:
+
+                if AddToCart.objects.filter(added_by=admin_user, is_active=True).exists():
+                    cart_obj = AddToCart.objects.filter(added_by=admin_user).last()
+                    cart_obj.count = user_count
+                    cart_obj.amount = amount
+                    cart_obj.save()
+                    response_dict["message"] = "Update the User count"
+                    return Response(response_dict, status=status.HTTP_200_OK)
 
 
+                else:
+                    AddToCart.objects.create(added_by=admin_user, count=user_count, amount=amount, is_active=True)
+                    response_dict["message"] = "Users Added to cart"
+                
+                    return Response(response_dict, status=status.HTTP_200_OK)
             else:
-                AddToCart.objects.create(added_by=admin_user, count=user_count, amount=amount, is_active=True)
-                response_dict["message"] = "Users Added to cart"
-            
+                response_dict["error"] = "Your subscription Expired !"
+                return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            response_dict["error"] = "Access denied, Only Admin can access the module list"
+            return Response(response_dict, status=status.HTTP_403_FORBIDDEN)
+        
+
+class ModulePurchaseHistory(APIView):
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (CustomTokenAuthentication,)
+
+    def get(self, request):
+        admin_user = request.user
+        response_dict = {'status': False}
+
+        if admin_user.user_type == 'ADMIN':
+            if admin_user.free_subscribed == True:
+                free_user_subscription = UserProfile.objects.get(id=admin_user.id)
+                free_module = ModuleDetails.objects.all()
+                response_dict["module"] = ModuleDetailsSerializer(free_module, context={'request':request}, many=True).data
+                return Response(response_dict)
+            else:
+                subscription_details =  PurchaseDetails.objects.filter(user=admin_user, status='Placed', is_active=True)
+                
+                module_data = []
+                for subscription_detail in subscription_details:
+                    module_data.append(ModuleDetailsSerializer(subscription_detail.module.all(), many=True).data)
+
+                # subscription_module = SubscriptionDetails.objects.filter(user=admin_user).last()
+                # if subscription_module:
+                #     subscription_module_queryset = [subscription_module]
+                #     modules_data = SubscriptionModuleSerilzer(subscription_module_queryset, context={'request': request}, many=True).data
+                #     flat_modules = [module for sublist in modules_data for module in sublist['module']]
+                # else:
+                #     flat_modules = []
+
+                response_dict["subscription-details"] = PurchaseHistorySerializer(subscription_details, context={'request': request}, many=True).data
+                response_dict["module"] = module_data
+
                 return Response(response_dict, status=status.HTTP_200_OK)
         else:
             response_dict["error"] = "Access denied, Only Admin can access the module list"
             return Response(response_dict, status=status.HTTP_403_FORBIDDEN)
+
+
+class UserPurchaseHistory(APIView):
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (CustomTokenAuthentication,)
+
+    def get(self, request):
+        admin_user = request.user
+        response_dict = {'status': True}
+
+        if admin_user.user_type == 'ADMIN':
+            purchase_user_details = PurchaseDetails.objects.filter(user=admin_user, status='Placed', is_active=True).first()
+
+            if purchase_user_details:
+                user_count = purchase_user_details.user_count
+                response_dict["user_count"] = user_count
+            else:
+                response_dict["error"] = "No purchase details found for this user."
+        else:
+            response_dict["error"] = "Access denied, Only Admin can access the module list"
+
+        return Response(response_dict, status=status.HTTP_200_OK)
+
+        

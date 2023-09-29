@@ -9,7 +9,7 @@ from superadmin.models import (
     UserAssignedModules,
   
 )
-from administrator.models import  CsvLogDetails, SubscriptionDetails,UploadedCsvFiles
+from administrator.models import  CsvLogDetails, PurchaseDetails, SubscriptionDetails,UploadedCsvFiles
 from fiveapp.custom_serializer import CustomSerializer
 from user.serializers import UserSerializer
 
@@ -189,4 +189,17 @@ class CartSerializer(serializers.ModelSerializer):
     class Meta:
         model = AddToCart
         fields = ('added_by', 'count', 'amount')
+
+
+
+class PurchaseHistorySerializer(serializers.ModelSerializer):
+    user = UserSerializer()
+    class Meta:
+        model = PurchaseDetails
+        fields = ('user', 'total_price', 'subscription_start_date', 'subscription_type', 'status', 'module')
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        representation['user'] = instance.user.id
+        return representation
 
