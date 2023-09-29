@@ -605,7 +605,12 @@ class ViewReport(APIView):
         response_dict["module"] = {
             "id":csv_file.modules.id,
             "name":csv_file.modules.title,
-            "department":csv_file.modules.department
+            "department":csv_file.modules.department,
+        }
+        response_dict["csv_file"] = {
+            "name":csv_file.csv_file.name,
+            "created":csv_file.created,
+            "uploaded_by":csv_file.uploaded_by.first_name,
         }
 
         status_list = [
@@ -633,7 +638,7 @@ class ViewReport(APIView):
                 "absent_days"
             ).order_by("id"))
             response_dict["report"] = log
-        elif csv_file.modules.title == "Team Workforce Plan Corporate":
+        elif csv_file.modules.title != "Team Workforce Plan Corporate":
             log  = tuple(CsvLogDetails.objects.filter(
                 uploaded_file__id=pk,
                 is_active=True
@@ -676,12 +681,12 @@ class AnalyticsReport(APIView):
         response_dict["module"] = {
             "id":csv_file.modules.id,
             "name":csv_file.modules.title,
-            "department":csv_file.modules.department
+            "department":csv_file.modules.department,
         }
         response_dict["csv_file"] = {
             "name":csv_file.csv_file.name,
             "created":csv_file.created,
-            "uploaded_by":csv_file.uploaded_by.first_name
+            "uploaded_by":csv_file.uploaded_by.first_name,
         }
 
         status_list = [
@@ -787,7 +792,7 @@ class AnalyticsReport(APIView):
                     "status"
                 )
 
-            if tab == "Team":
+            elif tab == "Team":
                 select_department = request.GET.get("department")
                 log  = CsvLogDetails.objects.filter(
                     uploaded_file__id=pk,
@@ -824,9 +829,74 @@ class AnalyticsReport(APIView):
                     "resource_required",
                     "status"
                 )
+            elif tab == "Designation":
+                select_department = request.GET.get("department")
+                select_team = request.GET.get("team")
+
+                log  = CsvLogDetails.objects.filter(
+                    uploaded_file__id=pk,
+                    department=select_department,
+                    team=select_team
+                ).filter(
+                    Q(uploaded_file__uploaded_by=request.user)|
+                    Q(uploaded_file__uploaded_by__created_admin=request.user)
+                ).values("designation").annotate(
+                    employee_count=Count("id"),
+                    team_working_hr=Sum("working_hour"),
+                    total_extra_hour=Sum("extra_hour"),
+                    team_actual_working_hr=F("employee_count")*standard_working_hour
+                ).annotate(
+                    status=Case(
+                        *status_list, default=Value(""), output_field=CharField()
+                    ),
+                    resource_required=F("team_working_hr")/standard_working_hour
+                ).values(
+                    "designation", 
+                    "employee_count",
+                    "team_working_hr",
+                    "total_extra_hour",
+                    "team_actual_working_hr",
+                    "status",
+                    "resource_required"
+                )
+                response_dict["working_hour_report"] = log.values(
+                    "designation", "team_actual_working_hr",
+                    "team_working_hr", "total_extra_hour",
+                    "status"
+                )
+                response_dict["resource_status_report"] = log.values(
+                    "designation", "employee_count",
+                    "resource_required",
+                    "status"
+                )
         
         response_dict["status"] = True
         return Response(response_dict, status=status.HTTP_200_OK)
+
+class GetDepartment(APIView):
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (CustomTokenAuthentication,)
+    def get(self, request, pk):
+        response_dict={"status":False}
+
+        departments = list(set(CsvLogDetails.objects.filter(uploaded_file__id=pk).values_list("department", flat=True)))
+        response_dict["departments"] = departments
+        response_dict["status"] = True
+        return Response(response_dict, status=status.HTTP_200_OK)
+
+
+class GetTeam(APIView):
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (CustomTokenAuthentication,)
+    def get(self, request, pk):
+        response_dict={"status":False}
+        select_department = request.GET.get("department")
+        team = list(set(CsvLogDetails.objects.filter(
+            uploaded_file__id=pk, department=select_department).values_list("team", flat=True)))
+        response_dict["team"] = team
+        response_dict["status"] = True
+        return Response(response_dict, status=status.HTTP_200_OK)
+
 
 class AdminModules(APIView):
     permission_classes = (IsAuthenticated,)
@@ -856,7 +926,7 @@ class AdminModules(APIView):
                     "email": logined_user.email,
                 
                 }
-
+                response_dict["status"] = True
                 response_dict["modules"] = flat_modules
                 response_dict["additional_users"] = self.get_users_with_password()
                 response_dict["invited_users"] = self.get_users_without_password()
