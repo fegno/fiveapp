@@ -34,6 +34,7 @@ urlpatterns = [
     re_path(r'^analytics-report/(?P<pk>\d+)/$', api.AnalyticsReport.as_view(), name='analytics-report'),
 
     re_path(r'^cart-home/', api.CartHome.as_view(), name='cart-home'),
-    re_path(r'^user-purchase-price', api.UserPurchasePrice.as_view(), name='user-purchase-price')
+    re_path(r'^user-purchase-price', api.UserPurchasePrice.as_view(), name='user-purchase-price'),
+    re_path(r'^added-to-cart/', api.AddToCartView.as_view(), name='add-to-cart'),
 
 ]

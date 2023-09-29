@@ -97,10 +97,10 @@ class CsvLogDetails(models.Model):
 
 
 
-class Cart(models.Model):
+class AddToCart(models.Model):
     added_by = models.ForeignKey(UserProfile, on_delete=models.CASCADE, null=True, blank=True)
-    count = models.IntegerField(default=1)
-    amount = models.FloatField()
+    count = models.IntegerField(default=1, null=True, blank=True)
+    amount = models.FloatField(default=0, null=True, blank=True)
 
     is_active = models.BooleanField(default=False, null=True, blank=True)
     created = models.DateTimeField(auto_now_add=True)

@@ -32,9 +32,8 @@ from django.db.models import (
 )
 from fiveapp.utils import PageSerializer
 
-from administrator.models import SubscriptionDetails,  CsvLogDetails, UploadedCsvFiles, Cart
+from administrator.models import SubscriptionDetails,  CsvLogDetails, UploadedCsvFiles, AddToCart
 from administrator.serializers import (
-    CartSerializer,
     DeletedUserLogSerializers,
     ModuleDetailsSerializer, 
     BundleDetailsSerializer,
@@ -844,7 +843,20 @@ class AdminModules(APIView):
                 return Response(response_dict, status=status.HTTP_200_OK)
             else:
                 Subscribed_modules = SubscriptionDetails.objects.filter(user=request.user)
-                response_dict["modules"] = SubscriptionModuleSerilzer(Subscribed_modules, context={"request":request,}, many=True).data
+                modules_data = SubscriptionModuleSerilzer(Subscribed_modules, many=True).data
+
+                flat_modules = [module for sublist in modules_data for module in sublist['module']]
+                print(flat_modules)
+
+                response_dict["user"] = {
+                    "id": logined_user.id,
+                    "first_name": logined_user.first_name,
+                    "last_name": logined_user.last_name,
+                    "email": logined_user.email,
+                
+                }
+
+                response_dict["modules"] = flat_modules
                 response_dict["additional_users"] = self.get_users_with_password()
                 response_dict["invited_users"] = self.get_users_without_password()
                 return Response(response_dict, status=status.HTTP_200_OK)
@@ -1336,9 +1348,9 @@ class UserPurchasePrice(APIView):
 
         response_dict["Subscription_type"] = subscription_type
 
-        weekly_price = 20
-        monthly_price = 80
-        yearly_price = 100
+        weekly_price = 18
+        monthly_price = 69
+        yearly_price = 800
 
         if subscription_type == "WEEK":
             amount = (weekly_price / 7) * remaining_days
@@ -1360,3 +1372,34 @@ class UserPurchasePrice(APIView):
         response_dict["subscription_end_date"] = subscription_end_date
         return Response(response_dict, status=status.HTTP_200_OK)
     
+
+
+class AddToCartView(APIView):
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (CustomTokenAuthentication,)
+
+    def post(self, request):
+        response_dict = {'status':True}
+        admin_user = request.user
+
+        if admin_user.user_type == 'ADMIN':
+            user_count = request.data.get('count')
+            amount = request.data.get('amount')
+
+            if AddToCart.objects.filter(added_by=admin_user, is_active=True).exists():
+                cart_obj = AddToCart.objects.filter(added_by=admin_user).last()
+                cart_obj.count = user_count
+                cart_obj.amount = amount
+                cart_obj.save()
+                response_dict["message"] = "Update the User count"
+                return Response(response_dict, status=status.HTTP_200_OK)
+
+
+            else:
+                AddToCart.objects.create(added_by=admin_user, count=user_count, amount=amount, is_active=True)
+                response_dict["message"] = "Users Added to cart"
+            
+                return Response(response_dict, status=status.HTTP_200_OK)
+        else:
+            response_dict["error"] = "Access denied, Only Admin can access the module list"
+            return Response(response_dict, status=status.HTTP_403_FORBIDDEN)
