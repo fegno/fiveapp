@@ -846,7 +846,7 @@ class AdminModules(APIView):
                 modules_data = SubscriptionModuleSerilzer(Subscribed_modules, many=True).data
 
                 flat_modules = [module for sublist in modules_data for module in sublist['module']]
-                print(flat_modules)
+                
 
                 response_dict["user"] = {
                     "id": logined_user.id,
