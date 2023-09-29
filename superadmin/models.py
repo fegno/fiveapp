@@ -105,7 +105,7 @@ class UserAssignedModules(models.Model):
 
 class DeleteUsersLog(models.Model):
     user = models.ForeignKey(UserProfile, on_delete=models.CASCADE, null=True, blank=True, related_name='deleted_user_log')
-    module = models.ForeignKey(ModuleDetails, on_delete=models.CASCADE, null=True, blank=True)
+    module = models.ManyToManyField(ModuleDetails, null=True, blank=True)
     deleted_by = models.ForeignKey(UserProfile, on_delete=models.CASCADE, related_name='user_deleted_by')
 
     is_active = models.BooleanField(default=True, null=True, blank=True)

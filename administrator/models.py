@@ -43,7 +43,8 @@ class PurchaseDetails(models.Model):
     )
     received_amounts			=	models.FloatField(null=True,blank=True)
     payment_dates			=	models.DateTimeField(null=True,blank=True)
-    
+    parchase_user_type		=	models.CharField(null=True,blank=True,max_length=255, default="Subscription")
+    user_count              = models.IntegerField(null=True, blank=True)
     status =	models.CharField(max_length=50,blank=True,null=False,db_index=True,choices=STATUS_CHOICES)
     is_active = models.BooleanField(null=False, blank=True, default=True)
     created = models.DateTimeField(auto_now_add=True)
@@ -93,3 +94,14 @@ class CsvLogDetails(models.Model):
     is_active = models.BooleanField(null=False, blank=True, default=True)
     created = models.DateTimeField(auto_now_add=True)
     updated = models.DateTimeField(auto_now=True)
+
+
+
+class AddToCart(models.Model):
+    added_by = models.ForeignKey(UserProfile, on_delete=models.CASCADE, null=True, blank=True)
+    count = models.IntegerField(default=1, null=True, blank=True)
+    amount = models.FloatField(default=0, null=True, blank=True)
+
+    is_active = models.BooleanField(default=False, null=True, blank=True)
+    created = models.DateTimeField(auto_now_add=True)
+    updated = models.DateTimeField(auto_now_add=True)

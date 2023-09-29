@@ -24,9 +24,17 @@ urlpatterns = [
     re_path(r'^unassign-module/(?P<pk>\d+)/$', api.UnassignedModule.as_view(), name= 'unassigned-module'),
     re_path(r'^modules-assign/(?P<pk>\d+)/$', api.AssignModulesToUser.as_view(), name='modules-assign'),
 
+    re_path(r'^permanent-delete-user/(?P<pk>\d+)/$', api.PermanentDeleteUserFromAdmin.as_view(), name='permanent-delete-user'),
+
     re_path(r'^upload-csv/(?P<pk>\d+)/$', api.UploadCsv.as_view(), name='upload-csv'),
     re_path(r'^list-csv/(?P<pk>\d+)/$', api.ListCsv.as_view(), name='list-csv'),
     re_path(r'^view-csv/(?P<pk>\d+)/$', api.ViewCsv.as_view(), name='view-csv'),
     re_path(r'^generate-report/(?P<pk>\d+)/$', api.GenerateReport.as_view(), name='generate-report'),
+    re_path(r'^view-report/(?P<pk>\d+)/$', api.ViewReport.as_view(), name='view-report'),
+    re_path(r'^analytics-report/(?P<pk>\d+)/$', api.AnalyticsReport.as_view(), name='analytics-report'),
+
+    re_path(r'^cart-home/', api.CartHome.as_view(), name='cart-home'),
+    re_path(r'^user-purchase-price', api.UserPurchasePrice.as_view(), name='user-purchase-price'),
+    re_path(r'^added-to-cart/', api.AddToCartView.as_view(), name='add-to-cart'),
 
 ]

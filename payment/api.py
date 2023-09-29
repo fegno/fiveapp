@@ -37,7 +37,8 @@ class InitiatePayment(APIView):
 			user=request.user,
 			status="Pending",
 			subscription_type=subscription_type,
-			total_price=total_price
+			total_price=total_price,
+			is_subscribed=False
 		)
 		order.module.add(*request.POST.getlist("modules_ids"))      
 		order.bundle.add(*request.POST.getlist("bundle_ids"))    
@@ -70,7 +71,7 @@ class InitiatePayment(APIView):
 		with transaction.atomic():
 			stripe.api_key=settings.STRIPE_API_KEY
 			intent = stripe.PaymentIntent.create(amount=round(order.total_price*100),currency='gbp')
-			payment_attempt=PaymentAttempt.objects.create(parchase_user_type="Subscription",parchase=order,user=request.user,currency='aed',amount=order.total_price,
+			payment_attempt=PaymentAttempt.objects.create(parchase_user_type="Subscription",parchase=order,user=request.user,currency='gbp',amount=order.total_price,
 				status='Initiated',client_secret=intent['client_secret'],payment_intent_id=intent['id'],last_attempt_date=timezone.now())
 		
 			response_dict['client_secret']=payment_attempt.client_secret
@@ -94,44 +95,45 @@ class StripePaymentWebhook(APIView):
 			if not payment_attempt:
 				return HttpResponse(status=404)
 
-			PaymentAttempt.objects.filter(payment_intent_id=intent['id']).update(
-				last_payment_json=json.dumps(event)
-			)
-			payment_attempt.status='succeeded'
-			payment_attempt.charges_json=json.dumps(intent['charges'])
-			payment_attempt.total_charge=sum(i['amount'] for i in intent['charges']['data'])
-			order=payment_attempt.parchase
-			payment_attempt.save()
-			order.status='Placed'
-			order.received_amounts=intent['amount_received']/100
-			order.payment_dates=timezone.now()
-			order.save()
-			user = order.user
-			user.is_subscribed = True
-			user.save()
-			if SubscriptionDetails.objects.filter(user=order.user):
-				subscription = SubscriptionDetails.objects.filter(user=order.user).last()
-				if subscription.subscription_end_date < timezone.now().date():
-					subscription.module.clear()
-					subscription.bundle.clear()
-					subscription.module.add(order.module.values_list("id", flat=True))      
-					subscription.bundle.add(order.bundle.values_list("id", flat=True))    
-					subscription.save()
-				else:
-					subscription.module.add(order.module.values_list("id", flat=True))      
-					subscription.bundle.add(order.bundle.values_list("id", flat=True))    
-					subscription.save()
-			else:
-				subscription = SubscriptionDetails.objects.create(
-					user=order.user,
-					subscription_start_date=order.subscription_start_date,
-					subscription_end_date=order.subscription_end_date,
-					is_subscribed=True,
-					subscription_type=order.subscription_type,
+			if payment_attempt.status != "Placed":
+				PaymentAttempt.objects.filter(payment_intent_id=intent['id']).update(
+					last_payment_json=json.dumps(event)
 				)
-				subscription.module.add(order.module.values_list("id", flat=True))      
-				subscription.bundle.add(order.bundle.values_list("id", flat=True))    
-				subscription.save()
+				payment_attempt.status='succeeded'
+				payment_attempt.charges_json=json.dumps(intent['charges'])
+				payment_attempt.total_charge=sum(i['amount'] for i in intent['charges']['data'])
+				order=payment_attempt.parchase
+				payment_attempt.save()
+				order.status='Placed'
+				order.received_amounts=intent['amount_received']/100
+				order.payment_dates=timezone.now()
+				order.save()
+				user = order.user
+				user.is_subscribed = True
+				user.save()
+				if SubscriptionDetails.objects.filter(user=order.user):
+					subscription = SubscriptionDetails.objects.filter(user=order.user).last()
+					if subscription.subscription_end_date < timezone.now().date():
+						subscription.module.clear()
+						subscription.bundle.clear()
+						subscription.module.add(order.module.values_list("id", flat=True))      
+						subscription.bundle.add(order.bundle.values_list("id", flat=True))    
+						subscription.save()
+					else:
+						subscription.module.add(order.module.values_list("id", flat=True))      
+						subscription.bundle.add(order.bundle.values_list("id", flat=True))    
+						subscription.save()
+				else:
+					subscription = SubscriptionDetails.objects.create(
+						user=order.user,
+						subscription_start_date=order.subscription_start_date,
+						subscription_end_date=order.subscription_end_date,
+						is_subscribed=True,
+						subscription_type=order.subscription_type,
+					)
+					subscription.module.add(order.module.values_list("id", flat=True))      
+					subscription.bundle.add(order.bundle.values_list("id", flat=True))    
+					subscription.save()
 		elif event.type == 'payment_intent.cancelled':
 			intent = event.data.object # contains a stripe.PaymentIntent
 			payment_attempt=PaymentAttempt.objects.filter(payment_intent_id=intent['id'],is_active=True).first()
@@ -145,3 +147,42 @@ class StripePaymentWebhook(APIView):
 				payment_attempt.save()
 				
 		return HttpResponse(status.HTTP_200_OK)
+
+class InitiateUserPayment(APIView):
+	permission_classes = (IsAuthenticated,)
+	authentication_classes = (CustomTokenAuthentication,)
+
+	def post(self,request):
+		response_dict={'status':False}
+		user_count = request.data.get("user_count")
+		total_price = request.data.get("total_price")
+		subscription_type = request.data.get("subscription_type")
+
+		subscription = SubscriptionDetails.objects.filter(
+			user=order.user, 
+			is_subscribed=True
+		).last()
+		if not subscription:
+			response_dict['error']= "No active subscription"
+			return Response(response_dict,status.HTTP_200_OK)
+
+		order = PurchaseDetails.objects.create(
+			user=request.user,
+			status="Pending",
+			subscription_type=subscription_type,
+			total_price=total_price,
+			is_subscribed=False,
+			subscription_end_date=subscription.subscription_end_date,
+			subscription_start_date=order.subscription_start_date,
+			user_count=user_count,
+			parchase_user_type="User"
+		)
+		with transaction.atomic():
+			stripe.api_key=settings.STRIPE_API_KEY
+			intent = stripe.PaymentIntent.create(amount=round(order.total_price*100),currency='gbp')
+			payment_attempt=PaymentAttempt.objects.create(parchase_user_type="User",parchase=order,user=request.user,currency='gbp',amount=order.total_price,
+				status='Initiated',client_secret=intent['client_secret'],payment_intent_id=intent['id'],last_attempt_date=timezone.now())
+		
+			response_dict['client_secret']=payment_attempt.client_secret
+			response_dict['status']=True
+		return Response(response_dict,status.HTTP_200_OK)

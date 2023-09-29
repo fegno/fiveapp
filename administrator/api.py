@@ -24,10 +24,15 @@ from django.db.models import (
     IntegerField,
     F,
     IntegerField,
+    Avg,
+    FloatField,
+    Func,
+    DecimalField,
+    ExpressionWrapper
 )
 from fiveapp.utils import PageSerializer
 
-from administrator.models import SubscriptionDetails,  CsvLogDetails, UploadedCsvFiles
+from administrator.models import SubscriptionDetails,  CsvLogDetails, UploadedCsvFiles, AddToCart
 from administrator.serializers import (
     DeletedUserLogSerializers,
     ModuleDetailsSerializer, 
@@ -56,7 +61,8 @@ from user.serializers import UserSerializer
 from django.core.mail import send_mail, EmailMessage
 from django.template.loader import render_to_string
 from django.contrib.auth import get_user_model
-
+from django.db.models.functions import Round
+from dateutil.relativedelta import relativedelta 
 
 
 def random_otp_generator(size=4, chars="123456789"):
@@ -78,7 +84,8 @@ class Homepage(APIView):
         if user.user_type == "ADMIN":
             expired_subscription = None
             subscription = SubscriptionDetails.objects.filter(
-                user=request.user, is_subscribed=True,
+                user=request.user, 
+                is_subscribed=True,
                 subscription_end_date__gte=current_date
             ).order_by("-id").first()
             if not subscription:
@@ -91,10 +98,15 @@ class Homepage(APIView):
                     id__in=subscription.module.all().values_list("id", flat=True)
                 )
                 bundles = BundleDetails.objects.filter(is_active=True, id__in=subscription.bundle.all().values_list("id", flat=True))
+                assigned_user = UserAssignedModules.objects.filter(
+                    user__created_admin=request.user,
+                    module__id__in=subscription.module.all().values_list("id", flat=True)
+                ).count()
                 response_dict["bundles"] = BundleDetailsSerializer(bundles,context={"request": request}, many=True).data
                 response_dict["modules"] = ModuleDetailsSerializer(modules,context={"request": request}, many=True,).data
                 response_dict["status"] = True
                 response_dict["take_subscription"] = True
+                response_dict["assigned_user"] = assigned_user
                 return Response(response_dict, status=status.HTTP_200_OK)
             elif expired_subscription:
                 response_dict["message"] = "Subscription Expired"
@@ -106,6 +118,12 @@ class Homepage(APIView):
                 if user.free_subscription_end_date and user.free_subscription_end_date > current_date:
                     modules = ModuleDetails.objects.filter(is_active=True)
                     bundles = BundleDetails.objects.filter(is_active=True)
+                    
+                    assigned_user = UserAssignedModules.objects.filter(
+                        user__created_admin=request.user,
+                        module__id__in=modules.values_list("id", flat=True)
+                    ).count()
+                    response_dict["assigned_user"] = assigned_user
                     response_dict["bundles"] = BundleDetailsSerializer(bundles,context={"request": request}, many=True).data
                     response_dict["modules"] = ModuleDetailsSerializer(modules,context={"request": request}, many=True,).data
                 else:
@@ -346,11 +364,12 @@ class DeleteUserFromModule(APIView):
             #     return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
 
             # else:
-            deleted_user = DeleteUsersLog.objects.create(
-            deleted_by=request.user,
-            user=user_to_delete.user,
-            module=module_to_delete,
-            )
+            deleted_user = DeleteUsersLog(
+                    deleted_by=request.user,
+                    user=user_to_delete.user,
+                )
+            deleted_user.save()
+            deleted_user.module.add(module_to_delete)
             response_dict["message"] = "Successfully deleted the user from the module"
             response_dict["status"] = True
 
@@ -375,14 +394,18 @@ class UploadCsv(APIView):
     def post(self, request, pk):
         response_dict = {"status": False}
         csv_file = request.FILES.get("file")
-        working_type = request.FILES.get("working_type")
+        working_type = request.data.get("working_type")
 
         module = ModuleDetails.objects.filter(id=pk).last()
+        print(module)
         if not module:
             response_dict["error"] = "Module Not Found"
             return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
         if not csv_file:
-            response_dict["error"] = "Module Not Found"
+            response_dict["error"] = "File Not Found"
+            return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
+        if not working_type:
+            response_dict["error"] = "Type Required"
             return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
         to_save = []
         decoded_file = csv_file.read().decode('utf-8').splitlines()
@@ -421,7 +444,7 @@ class UploadCsv(APIView):
                     )
                 )
         CsvLogDetails.objects.bulk_create(to_save)
-        response_dict["message"] = "Successfully uplaoded"
+        response_dict["message"] = "Successfully uploaded"
         response_dict["status"] = True
         return Response(response_dict, status=status.HTTP_200_OK)
 
@@ -523,47 +546,286 @@ class GenerateReport(APIView):
             response_dict["error"] = "Report Already generated"
             return Response(response_dict, status=status.HTTP_200_OK)
         
-        try:
-            if csv_file.working_type == "WEEK":
-                for i in log:
-                    working_hr = float(i.working_hour)
+        if csv_file.modules.title == "Team Indicator" or csv_file.modules.title == "Team Workforce Plan Corporate":
+            try:
+                if csv_file.working_type == "WEEK":
+                    for i in log:
+                        working_hr = float(i.working_hour)
 
-                    if float(i.working_hour) > float(week_working_hour):
+                        
                         extra_hr = float(i.working_hour) - float(week_working_hour)
                         i.extra_hour = extra_hr
                         i.save()
-                    elif float(i.working_hour) < float(week_working_hour):
-                        per_day = float(week_working_hour) / 5
-                        abn = float(i.working_hour) / float(per_day)
-                        absent = float(5.0) - float(abn)
-                        i.absent_days = absent
+                        if float(i.working_hour) < float(week_working_hour):
+                            per_day = float(week_working_hour) / 5
+                            abn = float(i.working_hour) / float(per_day)
+                            absent = float(5.0) - float(abn)
+                            i.absent_days = absent
+                            i.save()
+                            
+                elif csv_file.working_type == "MONTH":
+                    week_working_hour =float(week_working_hour) *4
+                    for i in log:
+                        working_hr = float(i.working_hour)
+                    
+                        extra_hr = float(i.working_hour) - float(week_working_hour)
+                        i.extra_hour = extra_hr
                         i.save()
                         
-            elif csv_file.working_type == "MONTH":
-                week_working_hour =float(week_working_hour) *4
-                for i in log:
-                    working_hr = float(i.working_hour)
-                    if float(i.working_hour) > float(week_working_hour):
-                        extra_hr = float(i.working_hour) - float(week_working_hour)
-                        i.extra_hour = extra_hr
-                        i.save()
-                    
-                    elif float(i.working_hour) < float(week_working_hour):
-                        per_day = float(week_working_hour) / 20
-                        abn = float(i.working_hour) / float(per_day)
-                        absent = float(20.0) - float(abn)
-                        i.absent_days = absent
-                        i.save()
+                        if float(i.working_hour) < float(week_working_hour):
+                            per_day = float(week_working_hour) / 20
+                            abn = float(i.working_hour) / float(per_day)
+                            absent = float(20.0) - float(abn)
+                            i.absent_days = absent
+                            i.save()
 
-            csv_file.is_report_generated = True
-            csv_file.save()
-            response_dict["status"] = True
-            response_dict["message"] = "Generated"
-        except Exception as e:
-            response_dict["error"] = str(e)
+                csv_file.is_report_generated = True
+                csv_file.standard_working_hour = week_working_hour
+                csv_file.save()
+                response_dict["status"] = True
+                response_dict["message"] = "Generated"
+            except Exception as e:
+                response_dict["error"] = str(e)
+        else:
+            response_dict["error"] = "Module not Valid"
         return Response(response_dict, status=status.HTTP_200_OK)
     
 
+class ViewReport(APIView):
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (CustomTokenAuthentication,)
+
+    def get(self, request, pk):
+        response_dict = {"status": False}
+        week_working_hour = request.data.get("week_working_hour", 0)
+        csv_file = UploadedCsvFiles.objects.filter(
+            id=pk
+        ).first()
+        response_dict["module"] = {
+            "id":csv_file.modules.id,
+            "name":csv_file.modules.title,
+            "department":csv_file.modules.department
+        }
+
+        status_list = [
+            When(extra_hour__gt=0, then=Value("Overloaded")),
+            When(extra_hour__lt=0, then=Value("Underloaded")),
+            When(extra_hour=0, then=Value("Standard")),
+        ]
+        if csv_file.modules.title == "Team Indicator":
+            log  = tuple(CsvLogDetails.objects.filter(
+                uploaded_file__id=pk,
+                is_active=True
+            ).filter(
+                Q(uploaded_file__uploaded_by=request.user)|
+                Q(uploaded_file__uploaded_by__created_admin=request.user)
+            ).annotate(
+                status=Case(
+                    *status_list, default=Value(""), output_field=CharField()
+                ),
+            ).values(
+                "team",
+                "sl_no", "employee_id",
+                "employee_name",
+                "working_hour",
+                "status",
+                "absent_days"
+            ).order_by("id"))
+            response_dict["report"] = log
+        elif csv_file.modules.title == "Team Workforce Plan Corporate":
+            log  = tuple(CsvLogDetails.objects.filter(
+                uploaded_file__id=pk,
+                is_active=True
+            ).filter(
+                Q(uploaded_file__uploaded_by=request.user)|
+                Q(uploaded_file__uploaded_by__created_admin=request.user)
+            ).annotate(
+                status=Case(
+                    *status_list, default=Value(""), output_field=CharField()
+                ),
+            ).values(
+                "team",
+                "sl_no", 
+                "employee_id",
+                "employee_name",
+                "working_hour",
+                "status",
+                "absent_days",
+                "department",
+                "designation",
+                "extra_hour"
+            ).order_by("id"))
+            
+            response_dict["report"] = log
+        
+        response_dict["status"] = True
+        return Response(response_dict, status=status.HTTP_200_OK)
+
+
+class AnalyticsReport(APIView):
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (CustomTokenAuthentication,)
+
+    def get(self, request, pk):
+        response_dict = {"status": False}
+        week_working_hour = request.data.get("week_working_hour", 0)
+        csv_file = UploadedCsvFiles.objects.filter(
+            id=pk
+        ).first()
+        response_dict["module"] = {
+            "id":csv_file.modules.id,
+            "name":csv_file.modules.title,
+            "department":csv_file.modules.department
+        }
+        response_dict["csv_file"] = {
+            "name":csv_file.csv_file.name,
+            "created":csv_file.created,
+            "uploaded_by":csv_file.uploaded_by.first_name
+        }
+
+        status_list = [
+            When(total_extra_hour__gt=0, then=Value("Overloaded")),
+            When(total_extra_hour__lt=0, then=Value("Underloaded")),
+            When(total_extra_hour=0, then=Value("Standard")),
+        ]
+        absent_status_list = [
+            When(team_absent_days__gte=3, then=Value("Overloaded")),
+            When(team_absent_days__gt=1,team_absent_days__lt=3 , then=Value("Underloaded")),
+            When(team_absent_days__lte=1, then=Value("Standard")),
+
+        ]
+        
+
+        if csv_file.modules.title == "Team Indicator":
+            standard_working_hour = csv_file.standard_working_hour
+            if csv_file.working_type == "MONTH":
+                standard_working_hour = standard_working_hour * 4
+            log  = CsvLogDetails.objects.filter(
+                uploaded_file__id=pk
+            ).filter(
+                Q(uploaded_file__uploaded_by=request.user)|
+                Q(uploaded_file__uploaded_by__created_admin=request.user)
+            ).values("team").annotate(
+                employee_count=Count("id"),
+                team_working_hr=Sum("working_hour"),
+                team_absent_days=Sum("absent_days"),
+                avg_team_working_hr=Avg("working_hour"),
+                total_extra_hour=Sum("extra_hour")
+            ).annotate(
+                team_actual_working_hr=F("employee_count")*standard_working_hour
+            ).annotate(
+                status=Case(
+                    *status_list, default=Value(""), output_field=CharField()
+                ),
+                absent_status=Case(
+                    *absent_status_list, default=Value(""), output_field=CharField()
+                ),
+            ).values(
+                "team", 
+                "employee_count",
+                "team_working_hr", "team_absent_days",
+                "avg_team_working_hr",
+                "team_actual_working_hr",
+                "status",
+                "absent_status"
+            )
+
+            total_absent_days = log.aggregate(total=Sum("team_absent_days"))
+            response_dict["total_absent_days"] = total_absent_days.get("total") if total_absent_days else 0
+
+            total_working_hr = log.aggregate(total=Sum("team_working_hr"))
+            response_dict["total_working_hr"] = total_working_hr.get("total") if total_working_hr else 0
+
+            total_actual_working_hr = log.aggregate(total=Sum("team_actual_working_hr"))
+            response_dict["total_actual_working_hr"] = total_actual_working_hr.get("total") if total_actual_working_hr else 0
+
+            total_employee = log.aggregate(total=Sum("employee_count"))
+            response_dict["total_employee"] = total_employee.get("total") if total_employee else 0
+            response_dict["working_hours_report"] = log.values("team", "status", "employee_count", "team_working_hr", "team_actual_working_hr")
+            response_dict["absent_days_report"] = log.values("team","absent_status", "employee_count", "team_absent_days")
+
+        elif csv_file.modules.title == "Team Workforce Plan Corporate":
+            standard_working_hour = csv_file.standard_working_hour
+            if csv_file.working_type == "MONTH":
+                standard_working_hour = standard_working_hour * 4
+                
+            tab = request.GET.get("tab", "Department")
+            if tab == "Department":
+                log  = CsvLogDetails.objects.filter(
+                    uploaded_file__id=pk
+                ).filter(
+                    Q(uploaded_file__uploaded_by=request.user)|
+                    Q(uploaded_file__uploaded_by__created_admin=request.user)
+                ).values("department").annotate(
+                    employee_count=Count("id"),
+                    team_working_hr=Sum("working_hour"),
+                    total_extra_hour=Sum("extra_hour"),
+                    team_actual_working_hr=F("employee_count")*standard_working_hour
+                ).annotate(
+                    status=Case(
+                        *status_list, default=Value(""), output_field=CharField()
+                    ),
+                    resource_required=F("team_working_hr")/standard_working_hour
+                ).values(
+                    "department", 
+                    "employee_count",
+                    "team_working_hr",
+                    "total_extra_hour",
+                    "team_actual_working_hr",
+                    "status",
+                    "resource_required"
+                )
+                response_dict["working_hour_report"] = log.values(
+                    "department", "team_actual_working_hr",
+                    "team_working_hr", "total_extra_hour",
+                    "status"
+                )
+                response_dict["resource_status_report"] = log.values(
+                    "department", "employee_count",
+                    "resource_required",
+                    "status"
+                )
+
+            if tab == "Team":
+                select_department = request.GET.get("department")
+                log  = CsvLogDetails.objects.filter(
+                    uploaded_file__id=pk,
+                    department=select_department
+                ).filter(
+                    Q(uploaded_file__uploaded_by=request.user)|
+                    Q(uploaded_file__uploaded_by__created_admin=request.user)
+                ).values("team").annotate(
+                    employee_count=Count("id"),
+                    team_working_hr=Sum("working_hour"),
+                    total_extra_hour=Sum("extra_hour"),
+                    team_actual_working_hr=F("employee_count")*standard_working_hour
+                ).annotate(
+                    status=Case(
+                        *status_list, default=Value(""), output_field=CharField()
+                    ),
+                    resource_required=F("team_working_hr")/standard_working_hour
+                ).values(
+                    "team", 
+                    "employee_count",
+                    "team_working_hr",
+                    "total_extra_hour",
+                    "team_actual_working_hr",
+                    "status",
+                    "resource_required"
+                )
+                response_dict["working_hour_report"] = log.values(
+                    "team", "team_actual_working_hr",
+                    "team_working_hr", "total_extra_hour",
+                    "status"
+                )
+                response_dict["resource_status_report"] = log.values(
+                    "team", "employee_count",
+                    "resource_required",
+                    "status"
+                )
+        
+        response_dict["status"] = True
+        return Response(response_dict, status=status.HTTP_200_OK)
 
 class AdminModules(APIView):
     permission_classes = (IsAuthenticated,)
@@ -581,7 +843,20 @@ class AdminModules(APIView):
                 return Response(response_dict, status=status.HTTP_200_OK)
             else:
                 Subscribed_modules = SubscriptionDetails.objects.filter(user=request.user)
-                response_dict["modules"] = SubscriptionModuleSerilzer(Subscribed_modules, context={"request":request,}, many=True).data
+                modules_data = SubscriptionModuleSerilzer(Subscribed_modules, many=True).data
+
+                flat_modules = [module for sublist in modules_data for module in sublist['module']]
+                
+
+                response_dict["user"] = {
+                    "id": logined_user.id,
+                    "first_name": logined_user.first_name,
+                    "last_name": logined_user.last_name,
+                    "email": logined_user.email,
+                
+                }
+
+                response_dict["modules"] = flat_modules
                 response_dict["additional_users"] = self.get_users_with_password()
                 response_dict["invited_users"] = self.get_users_without_password()
                 return Response(response_dict, status=status.HTTP_200_OK)
@@ -639,7 +914,7 @@ class UserInviteModule(APIView):
                     username=data.get("email"),
                     email=data.get("email"),
                     first_name=data.get("first_name"),
-                    created_admin=admin_user, 
+                    created_admin=admin_user,
                 )
                 user.is_free_user = True
                 user.save()
@@ -928,7 +1203,7 @@ class UnassignedModule(APIView):
             available_un_assiged_module = subscribed_modules & unassigned_modules
             response_dict["unassigned module"] = ModuleDetailsSerializer(available_un_assiged_module, context={"request":request}, many=True).data
         else:
-            response_dict["message"] = f"Adimin dons not have subscription"
+            response_dict["message"] = f"Admin dons not have subscription"
         return Response(response_dict, status=status.HTTP_200_OK)
 
 
@@ -978,4 +1253,153 @@ class AssignModulesToUser(APIView):
 
         return Response(response_dict, status=status.HTTP_200_OK)
 
+
+class PermanentDeleteUserFromAdmin(APIView):
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (CustomTokenAuthentication,)
+
+    def post(self, request, pk):
+        response_dict = {"status": False}
+        admin_user = request.user
+
+        try:
+            deleted_user = UserProfile.objects.get(id=pk, created_admin=admin_user)
+        except UserProfile.DoesNotExist:
+            return Response({"message": "User not found or access denied", "status": False}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            deleted_user_module = UserAssignedModules.objects.get(user=deleted_user)
+        except UserAssignedModules.DoesNotExist:
+            deleted_user_module = None
+
         
+        if deleted_user_module:
+            # Get all modules assigned to the user
+            modules_assigned = list(deleted_user_module.module.all())
+
+            # Create a DeleteUsersLog entry and associate all modules with it
+            delete_user_log_entry = DeleteUsersLog.objects.create(
+                user=deleted_user,
+                deleted_by=admin_user,
+                is_active=False, 
+            )
+            delete_user_log_entry.module.set(modules_assigned)  # Associate all modules
+
+            # Remove all modules from the UserAssignedModules
+            deleted_user_module.module.clear()
+        else:
+            modules_assigned = []
+
+        
+        deleted_user.is_active = False
+        deleted_user.save()
+
+        response_dict["message"] = "Permanently marked the user as deleted and deleted all assigned modules."
+        response_dict["status"] = True
+        return Response(response_dict, status=status.HTTP_200_OK)
+
+
+
+class CartHome(APIView):
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (CustomTokenAuthentication,)
+
+    def get(self, request):
+
+        response_dict = {"status":True}
+        admin_user = request.user
+
+        subscribed_module = SubscriptionDetails.objects.filter(user=admin_user)
+        module_count = subscribed_module.aggregate(total_modules=Count('module'))
+        total_user_count = int(admin_user.available_free_users) + int(admin_user.available_paid_users) 
+
+        users_with_password_count = UserProfile.objects.filter(created_admin=admin_user).exclude(password='').count()
+    
+        response_dict["subscribed_module"] = SubscriptionModuleSerilzer(subscribed_module, context={'request':request}, many=True).data
+        response_dict["module_count"] = module_count['total_modules']
+        response_dict["total_user_count"] = total_user_count
+        response_dict["assigned_users"] = users_with_password_count
+        return Response(response_dict, status=status.HTTP_200_OK)
+    
+
+class UserPurchasePrice(APIView):
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (CustomTokenAuthentication,)
+
+    def post(self, request):
+       
+        response_dict = {"status":True}
+        admin_user = request.user
+
+        admin_subscription = SubscriptionDetails.objects.filter(user=admin_user).first()
+
+        if admin_subscription is None:
+            return Response({"error": "Admin subscription not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        if not hasattr(admin_subscription, 'subscription_end_date'):
+            return Response({"error": "Admin subscription doesn't have a subscription_end_date"}, status=status.HTTP_400_BAD_REQUEST)
+
+        
+        subscription_end_date = admin_subscription.subscription_end_date
+        current_date = datetime.now().date()
+        remaining_days = (subscription_end_date - current_date).days
+
+        subscription_type = admin_subscription.subscription_type
+
+        response_dict["Subscription_type"] = subscription_type
+
+        weekly_price = 18
+        monthly_price = 69
+        yearly_price = 800
+
+        if subscription_type == "WEEK":
+            amount = (weekly_price / 7) * remaining_days
+        elif subscription_type == "MONTH":
+            amount = (monthly_price / 28) * remaining_days
+        elif subscription_type == "YEAR":
+            amount = (yearly_price / 365) * remaining_days
+        else:
+            return Response({"error": "Invalid purchase duration"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        
+
+        price_data = {
+            "added_by": {"id": admin_user.id}, 
+            "amount": amount, 
+        }
+
+        response_dict["price_data"] = price_data
+        response_dict["subscription_end_date"] = subscription_end_date
+        return Response(response_dict, status=status.HTTP_200_OK)
+    
+
+
+class AddToCartView(APIView):
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (CustomTokenAuthentication,)
+
+    def post(self, request):
+        response_dict = {'status':True}
+        admin_user = request.user
+
+        if admin_user.user_type == 'ADMIN':
+            user_count = request.data.get('count')
+            amount = request.data.get('amount')
+
+            if AddToCart.objects.filter(added_by=admin_user, is_active=True).exists():
+                cart_obj = AddToCart.objects.filter(added_by=admin_user).last()
+                cart_obj.count = user_count
+                cart_obj.amount = amount
+                cart_obj.save()
+                response_dict["message"] = "Update the User count"
+                return Response(response_dict, status=status.HTTP_200_OK)
+
+
+            else:
+                AddToCart.objects.create(added_by=admin_user, count=user_count, amount=amount, is_active=True)
+                response_dict["message"] = "Users Added to cart"
+            
+                return Response(response_dict, status=status.HTTP_200_OK)
+        else:
+            response_dict["error"] = "Access denied, Only Admin can access the module list"
+            return Response(response_dict, status=status.HTTP_403_FORBIDDEN)
