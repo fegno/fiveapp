@@ -1565,11 +1565,11 @@ class ModulePurchaseHistory(APIView):
                 response_dict["module"] = ModuleDetailsSerializer(free_module, context={'request':request}, many=True).data
                 return Response(response_dict)
             else:
-                subscription_details =  PurchaseDetails.objects.filter(user=admin_user, status='Placed', is_active=True)
+                subscription_details =  PurchaseDetails.objects.filter(user=admin_user, status='Placed', is_active=True, parchase_user_type='Subscription')
                 
-                module_data = []
-                for subscription_detail in subscription_details:
-                    module_data.append(ModuleDetailsSerializer(subscription_detail.module.all(), many=True).data)
+                # module_data = []
+                # for subscription_detail in subscription_details:
+                #     module_data.append(ModuleDetailsSerializer(subscription_detail.module.all(), many=True).data)
 
                 # subscription_module = SubscriptionDetails.objects.filter(user=admin_user).last()
                 # if subscription_module:
@@ -1580,7 +1580,7 @@ class ModulePurchaseHistory(APIView):
                 #     flat_modules = []
 
                 response_dict["subscription-details"] = PurchaseHistorySerializer(subscription_details, context={'request': request}, many=True).data
-                response_dict["module"] = module_data
+                # response_dict["module"] = module_data
 
                 return Response(response_dict, status=status.HTTP_200_OK)
         else:
