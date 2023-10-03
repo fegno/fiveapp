@@ -1397,6 +1397,13 @@ class PermanentDeleteUserFromAdmin(APIView):
             deleted_user = UserProfile.objects.get(id=pk, created_admin=admin_user)
         except UserProfile.DoesNotExist:
             return Response({"message": "User not found or access denied", "status": False}, status=status.HTTP_404_NOT_FOUND)
+        
+        if deleted_user.is_free_user:
+            admin_user.available_free_users += 1
+        else:
+            admin_user.available_paid_users += 1
+        admin_user.total_users +=1
+        admin_user.save()
 
         try:
             deleted_user_module = UserAssignedModules.objects.get(user=deleted_user)
@@ -1590,11 +1597,30 @@ class UserPurchaseHistory(APIView):
         response_dict = {'status': True}
 
         if admin_user.user_type == 'ADMIN':
-            purchase_user_details = PurchaseDetails.objects.filter(user=admin_user, status='Placed', is_active=True).first()
-
+            purchase_user_details = PurchaseDetails.objects.filter(user=admin_user, status='Placed', is_active=True, parchase_user_type='User').first()
             if purchase_user_details:
+
+                purchased_by = {
+                    "id": admin_user.id,
+                    "username": admin_user.first_name,
+                    "email": admin_user.email,
+                }
+
+                subscription_start_date = purchase_user_details.subscription_start_date
+                subscription_end_date = purchase_user_details.subscription_end_date
+                subscription_type = purchase_user_details.subscription_type
+                total_price = purchase_user_details.total_price
                 user_count = purchase_user_details.user_count
-                response_dict["user_count"] = user_count
+
+                response_dict["user_purchase_data"] = {
+                    "purchased_by":purchased_by,
+                    "subscription_start_date":subscription_start_date,
+                    "subscription_end_date":subscription_end_date,
+                    "subscription_type":subscription_type,
+                    "total_price":total_price,
+                    "user_count":user_count
+                }
+                
             else:
                 response_dict["error"] = "No purchase details found for this user."
         else:

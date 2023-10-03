@@ -204,4 +204,16 @@ class PurchaseHistorySerializer(serializers.ModelSerializer):
         representation = super().to_representation(instance)
         representation['user'] = instance.user.id
         return representation
+    
+
+class UserPurchaseHistorySerializer(serializers.ModelSerializer):
+    user = UserSerializer()
+    class Meta:
+        model = PurchaseDetails
+        fields = ('user', 'total_price', 'subscription_start_date', 'subscription_end_date', 'subscription_type', 'status', 'user_count')
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        representation['user'] = instance.user.id
+        return representation
 
