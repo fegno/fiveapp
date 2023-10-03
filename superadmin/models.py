@@ -25,6 +25,8 @@ class ModuleDetails(models.Model):
     bundle_name = models.TextField(null=True, blank=True)
     csv_file = models.FileField(null=True, blank=True)
     position = models.IntegerField(default=0)
+    module_identifier = models.IntegerField(default=0)
+
     weekly_price = models.FloatField(
         null=True, blank=True, default=0
     )

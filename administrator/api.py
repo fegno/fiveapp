@@ -234,6 +234,58 @@ class ListBundleModules(APIView):
         response_dict = {"status": False}
         response_dict["modules"] = []
         current_date = timezone.now().date()
+        bundle_mod = []
+        
+        subscribed_modules = []
+        
+        bundle_modules = BundleDetails.objects.filter(
+            id=pk
+        ).last()
+        if bundle_modules:
+            bundle_mod = bundle_modules.modules.all().values_list("id", flat=True)
+        modules = ModuleDetails.objects.filter(is_active=True, id__in=bundle_mod)
+        if request.user.user_type == "ADMIN":
+            subscription = SubscriptionDetails.objects.filter(
+                user=request.user, 
+                is_subscribed=True,
+                subscription_end_date__gte=current_date
+            ).last()
+            if subscription:
+                subscribed_modules = modules.filter(
+                    id__in=subscription.module.all().values_list("id", flat=True)
+                )            
+                response_dict["modules"] = ModuleDetailsSerializer(
+                    subscribed_modules,context={"request": request, "from_module":True}, many=True,).data
+        else:
+            user_assigned_modules = UserAssignedModules.objects.filter(
+                user=request.user
+            ).last()
+            subscription = SubscriptionDetails.objects.filter(
+                user=request.user.created_admin, 
+                is_subscribed=True,
+                subscription_end_date__gte=current_date
+            ).last()
+            if user_assigned_modules and subscription:
+                subscribed_modules = modules.filter(
+                    id__in=subscription.module.all().values_list("id", flat=True)
+                ).filter(id__in=user_assigned_modules.module.all().values_list("id", flat=True))            
+                response_dict["modules"] = ModuleDetailsSerializer(
+                    subscribed_modules,context={"request": request, "from_module":True}, many=True,).data
+        
+        
+        response_dict["status"] = True
+        return Response(response_dict, status=status.HTTP_200_OK)
+
+
+
+class ListParchasedModules(APIView):
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (CustomTokenAuthentication, IsAdmin)
+
+    def get(self, request):
+        response_dict = {"status": False}
+        response_dict["modules"] = []
+        current_date = timezone.now().date()
         modules = ModuleDetails.objects.filter(is_active=True)
         subscribed_modules = []
         
@@ -398,7 +450,6 @@ class UploadCsv(APIView):
         working_type = request.data.get("working_type")
 
         module = ModuleDetails.objects.filter(id=pk).last()
-        print(module)
         if not module:
             response_dict["error"] = "Module Not Found"
             return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
@@ -418,7 +469,7 @@ class UploadCsv(APIView):
             csv_file=csv_file,
             working_type=working_type
         )
-        if module.title == "Team Indicator":
+        if module.module_identifier == 1:
             for row in reader:
                 to_save.append(
                     CsvLogDetails(
@@ -430,7 +481,7 @@ class UploadCsv(APIView):
                         working_hour=row.get("WORKING HOURS/WEEK/ MONTHLY")
                     )
                 )
-        elif module.title == "Team Workforce Plan Corporate":
+        elif module.module_identifier == 2:
             for row in reader:
                 to_save.append(
                     CsvLogDetails(
@@ -445,6 +496,7 @@ class UploadCsv(APIView):
                     )
                 )
         CsvLogDetails.objects.bulk_create(to_save)
+        response_dict["csv_id"] = upload_log.id
         response_dict["message"] = "Successfully uploaded"
         response_dict["status"] = True
         return Response(response_dict, status=status.HTTP_200_OK)
@@ -459,6 +511,14 @@ class ListCsv(APIView):
         if not module:
             response_dict["error"] = "Module Not Found"
             return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
+
+        response_dict["module"] = {
+            "id":module.id,
+            "name":module.title,
+            "department":module.department,
+            "module_identifier":module.module_identifier
+        }
+
         csv_log = UploadedCsvFiles.objects.filter(
             modules=module
         ).filter(
@@ -494,7 +554,8 @@ class ViewCsv(APIView):
         response_dict["module"] = {
             "id":csv_file.modules.id,
             "name":csv_file.modules.title,
-            "department":csv_file.modules.department
+            "department":csv_file.modules.department,
+            "module_identifier":csv_file.modules.module_identifier
         }
         csvlog = CsvLogDetails.objects.filter(
             uploaded_file__id=pk
@@ -534,7 +595,8 @@ class GenerateReport(APIView):
         response_dict["module"] = {
             "id":csv_file.modules.id,
             "name":csv_file.modules.title,
-            "department":csv_file.modules.department
+            "department":csv_file.modules.department,
+            "module_identifier":csv_file.modules.module_identifier
         }
         log  = CsvLogDetails.objects.filter(
             uploaded_file__id=pk
@@ -547,7 +609,7 @@ class GenerateReport(APIView):
             response_dict["error"] = "Report Already generated"
             return Response(response_dict, status=status.HTTP_200_OK)
         
-        if csv_file.modules.title == "Team Indicator" or csv_file.modules.title == "Team Workforce Plan Corporate":
+        if csv_file.modules.module_identifier == 1 or csv_file.modules.module_identifier == 2:
             try:
                 if csv_file.working_type == "WEEK":
                     for i in log:
@@ -606,6 +668,7 @@ class ViewReport(APIView):
             "id":csv_file.modules.id,
             "name":csv_file.modules.title,
             "department":csv_file.modules.department,
+            "module_identifier":csv_file.modules.module_identifier
         }
         response_dict["csv_file"] = {
             "name":csv_file.csv_file.name,
@@ -618,7 +681,7 @@ class ViewReport(APIView):
             When(extra_hour__lt=0, then=Value("Underloaded")),
             When(extra_hour=0, then=Value("Standard")),
         ]
-        if csv_file.modules.title == "Team Indicator":
+        if csv_file.modules.module_identifier == 1:
             log  = tuple(CsvLogDetails.objects.filter(
                 uploaded_file__id=pk,
                 is_active=True
@@ -638,7 +701,7 @@ class ViewReport(APIView):
                 "absent_days"
             ).order_by("id"))
             response_dict["report"] = log
-        elif csv_file.modules.title != "Team Workforce Plan Corporate":
+        elif csv_file.modules.module_identifier == 2:
             log  = tuple(CsvLogDetails.objects.filter(
                 uploaded_file__id=pk,
                 is_active=True
@@ -682,6 +745,7 @@ class AnalyticsReport(APIView):
             "id":csv_file.modules.id,
             "name":csv_file.modules.title,
             "department":csv_file.modules.department,
+            "module_identifier":csv_file.modules.module_identifier
         }
         response_dict["csv_file"] = {
             "name":csv_file.csv_file.name,
@@ -702,7 +766,7 @@ class AnalyticsReport(APIView):
         ]
         
 
-        if csv_file.modules.title == "Team Indicator":
+        if csv_file.modules.module_identifier == 1:
             standard_working_hour = csv_file.standard_working_hour
             if csv_file.working_type == "MONTH":
                 standard_working_hour = standard_working_hour * 4
@@ -750,7 +814,7 @@ class AnalyticsReport(APIView):
             response_dict["working_hours_report"] = log.values("team", "status", "employee_count", "team_working_hr", "team_actual_working_hr")
             response_dict["absent_days_report"] = log.values("team","absent_status", "employee_count", "team_absent_days")
 
-        elif csv_file.modules.title == "Team Workforce Plan Corporate":
+        elif csv_file.modules.module_identifier == 2:
             standard_working_hour = csv_file.standard_working_hour
             if csv_file.working_type == "MONTH":
                 standard_working_hour = standard_working_hour * 4
@@ -880,7 +944,17 @@ class GetDepartment(APIView):
         response_dict={"status":False}
 
         departments = list(set(CsvLogDetails.objects.filter(uploaded_file__id=pk).values_list("department", flat=True)))
-        response_dict["departments"] = departments
+        departments_dict = []
+        for i in departments:
+            team_list = list(set(CsvLogDetails.objects.filter(
+            uploaded_file__id=pk, department=i).values_list("team", flat=True)))
+            departments_dict.append(
+                {
+                    "department":i,
+                    "team":team_list
+                }
+            )
+        response_dict["departments"] = departments_dict
         response_dict["status"] = True
         return Response(response_dict, status=status.HTTP_200_OK)
 
