@@ -1403,7 +1403,6 @@ class PermanentDeleteUserFromAdmin(APIView):
         else:
             admin_user.available_paid_users += 1
         admin_user.total_users +=1
-        print(admin_user.total_users)
         admin_user.save()
 
         try:
@@ -1599,7 +1598,6 @@ class UserPurchaseHistory(APIView):
 
         if admin_user.user_type == 'ADMIN':
             purchase_user_details = PurchaseDetails.objects.filter(user=admin_user, status='Placed', is_active=True, parchase_user_type='User').first()
-            print(purchase_user_details)
             if purchase_user_details:
 
                 purchased_by = {
@@ -1613,7 +1611,7 @@ class UserPurchaseHistory(APIView):
                 subscription_type = purchase_user_details.subscription_type
                 total_price = purchase_user_details.total_price
                 user_count = purchase_user_details.user_count
-                
+
                 response_dict["user_purchase_data"] = {
                     "purchased_by":purchased_by,
                     "subscription_start_date":subscription_start_date,
