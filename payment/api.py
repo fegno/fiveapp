@@ -185,7 +185,7 @@ class InitiateUserPayment(APIView):
 		subscription_type = request.data.get("subscription_type")
 
 		subscription = SubscriptionDetails.objects.filter(
-			user=order.user, 
+			user=request.user, 
 			is_subscribed=True
 		).last()
 		if not subscription:
