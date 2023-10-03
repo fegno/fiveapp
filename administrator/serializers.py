@@ -28,6 +28,7 @@ class ModuleDetailsSerializer(serializers.ModelSerializer):
             "monthly_price",
             "yearly_price",
             "is_submodule",
+            "module_identifier"
         )
     def to_representation(self, obj, *args, **kwargs):
         cd = super(ModuleDetailsSerializer, self).to_representation(
@@ -77,6 +78,7 @@ class ModuleLiteSerializer(serializers.ModelSerializer):
             "weekly_price",
             "monthly_price",
             "yearly_price",
+            "module_identifier"
         )
     def to_representation(self, obj, *args, **kwargs):
         cd = super(ModuleLiteSerializer, self).to_representation(
