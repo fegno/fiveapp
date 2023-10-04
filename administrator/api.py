@@ -3,6 +3,7 @@ from django.shortcuts import render
 from django.shortcuts import get_object_or_404
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
+from payment.models import PaymentAttempt
 from user.api_permissions import CustomTokenAuthentication, IsAdmin
 from rest_framework.views import APIView
 from rest_framework import status
@@ -39,6 +40,7 @@ from administrator.serializers import (
     BundleDetailsSerializer,
     BundleDetailsLiteSerializer,
     ModuleSToUserserializer,
+    PaymentAttemptsSerializer,
     PurchaseHistorySerializer,
     SubscriptionModuleSerilzer,
     UserAssignedModuleSerializers,
@@ -800,6 +802,8 @@ class AnalyticsReport(APIView):
                 "absent_status"
             )
 
+            
+
             total_absent_days = log.aggregate(total=Sum("team_absent_days"))
             response_dict["total_absent_days"] = total_absent_days.get("total") if total_absent_days else 0
 
@@ -813,6 +817,23 @@ class AnalyticsReport(APIView):
             response_dict["total_employee"] = total_employee.get("total") if total_employee else 0
             response_dict["working_hours_report"] = log.values("team", "status", "employee_count", "team_working_hr", "team_actual_working_hr")
             response_dict["absent_days_report"] = log.values("team","absent_status", "employee_count", "team_absent_days")
+
+            if (response_dict["total_working_hr"]) > (response_dict["total_actual_working_hr"] ):
+                response_dict["working_hr_status"] = "Overloaded"
+            elif (response_dict['total_working_hr']) < (response_dict["total_actual_working_hr"]):
+                response_dict["working_hr_status"] = "Underloaded"
+            else:
+                response_dict["working_hr_status"] = "Standard"
+
+
+            if response_dict["total_absent_days"] >= 3:
+                response_dict["absent_days_status"] = "Overloaded"
+            elif response_dict["total_absent_days"] <= 1:
+                response_dict["absent_days_status"] = "Standard"
+            else:
+                response_dict["absent_days_status"] = "Underloaded"
+            
+
 
         elif csv_file.modules.module_identifier == 2:
             standard_working_hour = csv_file.standard_working_hour
@@ -1185,7 +1206,7 @@ class UserInviteModule(APIView):
                     response_dict["status"] = True
                     response_dict["message"] = "Invite OTP Send to mail"
                 else:
-                    response_dict["message"] = "No paid or free users are available"  
+                    response_dict["error"] = "No paid or free users are available"  
                     return Response(response_dict, status=status.HTTP_200_OK)
 
         else:
@@ -1251,7 +1272,7 @@ class AssignUser(APIView):
                 if subscribed_module:
                     if UserAssignedModules.objects.filter(user=user_profile).exists():
                         if UserAssignedModules.objects.filter(user=user_profile, module=module).exists():
-                            response_dict["message"] = f"User {user_profile.id} is already assigned to module {module.id}"
+                            response_dict["error"] = f"User {user_profile.id} is already assigned to module {module.id}"
                         else:
                             user_assign_object = UserAssignedModules.objects.filter(user=user_profile).first()
                             user_assign_object.module.add(module)
@@ -1282,7 +1303,7 @@ class UserModuleList(APIView):
             response_dict["satatus"] = True
             response_dict["modules"] = serializer.data
         else:
-            response_dict["message"] = f"User with ID {pk} has no assigned modules"
+            response_dict["error"] = f"User with ID {pk} has no assigned modules"
         return Response(response_dict, status=status.HTTP_200_OK)
     
 
@@ -1297,10 +1318,10 @@ class DeleteModule(APIView):
             user_to_delete = UserAssignedModules.objects.get(user__id=user_id)
             module_to_delete = ModuleDetails.objects.get(id=module_id)
         except UserAssignedModules.DoesNotExist:
-            response_dict["message"] = f"User with the id  does not exists"
+            response_dict["error"] = f"User with the id  does not exists"
             return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
         except ModuleDetails.DoesNotExist:
-            response_dict["message"] = f"Module with the id  does not exists"
+            response_dict["error"] = f"Module with the id  does not exists"
             return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
         
         if not user_to_delete.module.filter(id=module_id).exists():
@@ -1323,7 +1344,7 @@ class UnassignedModule(APIView):
         try:
             user_obj = UserProfile.objects.get(id=pk, )
         except UserProfile.DoesNotExist:
-            response_dict["message"] = f"User with the ID {pk} does not exists"
+            response_dict["error"] = f"User with the ID {pk} does not exists"
             return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
         if user_obj.created_admin.free_subscribed == True:
             unassigned_modules = ModuleDetails.objects.exclude(userassignedmodules__user=user_obj)
@@ -1335,7 +1356,7 @@ class UnassignedModule(APIView):
             available_un_assiged_module = subscribed_modules & unassigned_modules
             response_dict["unassigned module"] = ModuleDetailsSerializer(available_un_assiged_module, context={"request":request}, many=True).data
         else:
-            response_dict["message"] = f"Admin dons not have subscription"
+            response_dict["message"] = f"Admin  not have subscription"
         return Response(response_dict, status=status.HTTP_200_OK)
 
 
@@ -1565,11 +1586,11 @@ class ModulePurchaseHistory(APIView):
                 response_dict["module"] = ModuleDetailsSerializer(free_module, context={'request':request}, many=True).data
                 return Response(response_dict)
             else:
-                subscription_details =  PurchaseDetails.objects.filter(user=admin_user, status='Placed', is_active=True)
+                subscription_details =  PurchaseDetails.objects.filter(user=admin_user, status='Placed', is_active=True, parchase_user_type='Subscription')
                 
-                module_data = []
-                for subscription_detail in subscription_details:
-                    module_data.append(ModuleDetailsSerializer(subscription_detail.module.all(), many=True).data)
+                # module_data = []
+                # for subscription_detail in subscription_details:
+                #     module_data.append(ModuleDetailsSerializer(subscription_detail.module.all(), many=True).data)
 
                 # subscription_module = SubscriptionDetails.objects.filter(user=admin_user).last()
                 # if subscription_module:
@@ -1578,12 +1599,13 @@ class ModulePurchaseHistory(APIView):
                 #     flat_modules = [module for sublist in modules_data for module in sublist['module']]
                 # else:
                 #     flat_modules = []
-
+                response_dict = {'status': True}
                 response_dict["subscription-details"] = PurchaseHistorySerializer(subscription_details, context={'request': request}, many=True).data
-                response_dict["module"] = module_data
+                # response_dict["module"] = module_data
 
                 return Response(response_dict, status=status.HTTP_200_OK)
         else:
+            response_dict = {'status': False}
             response_dict["error"] = "Access denied, Only Admin can access the module list"
             return Response(response_dict, status=status.HTTP_403_FORBIDDEN)
 
@@ -1624,8 +1646,34 @@ class UserPurchaseHistory(APIView):
             else:
                 response_dict["error"] = "No purchase details found for this user."
         else:
-            response_dict["error"] = "Access denied, Only Admin can access the module list"
+            response_dict["error"] = "Access denied, Only Admin can access the list"
 
         return Response(response_dict, status=status.HTTP_200_OK)
+    
+
+class PurchaseDetailsView(APIView):
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (CustomTokenAuthentication,)
+
+    def get(self, request, pk):
+        response_dict = {'status': False}
+        admin_user = request.user
+
+        if admin_user.user_type == 'ADMIN':
+            payment_details = PaymentAttempt.objects.get(parchase__id=pk, user=admin_user, status='succeeded')
+
+            if payment_details:
+                all_payment_details = PaymentAttemptsSerializer(payment_details, context = {'request':request}).data
+                response_dict["invoice-details"] = all_payment_details
+                return Response(response_dict, status=status.HTTP_200_OK)
+            
+            else:
+                response_dict["error"]  = "Admin not accosiated with the payment"
+                return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
+
+        else:
+            response_dict["error"] = "Acess denied, Only Admin can access the list"
+            return Response(response_dict, status=status.HTTP_403_FORBIDDEN)
+
 
         
