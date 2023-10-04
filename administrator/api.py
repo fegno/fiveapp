@@ -662,10 +662,13 @@ class ViewReport(APIView):
 
     def get(self, request, pk):
         response_dict = {"status": False}
-        week_working_hour = request.data.get("week_working_hour", 0)
         csv_file = UploadedCsvFiles.objects.filter(
             id=pk
         ).first()
+        if not csv_file.is_report_generated:
+            response_dict["error"] = "Report not generated"
+            return Response(response_dict, status=status.HTTP_200_OK)
+
         response_dict["module"] = {
             "id":csv_file.modules.id,
             "name":csv_file.modules.title,
@@ -739,10 +742,12 @@ class AnalyticsReport(APIView):
 
     def get(self, request, pk):
         response_dict = {"status": False}
-        week_working_hour = request.data.get("week_working_hour", 0)
         csv_file = UploadedCsvFiles.objects.filter(
             id=pk
         ).first()
+        if not csv_file.is_report_generated:
+            response_dict["error"] = "Report not generated"
+            return Response(response_dict, status=status.HTTP_200_OK)
         response_dict["module"] = {
             "id":csv_file.modules.id,
             "name":csv_file.modules.title,
@@ -877,6 +882,42 @@ class AnalyticsReport(APIView):
                     "status"
                 )
 
+                total_extra_hr = log.aggregate(total=Sum("total_extra_hour"))
+                response_dict["total_extra_hr"] = total_extra_hr.get("total") if total_extra_hr else 0
+
+                total_working_hr = log.aggregate(total=Sum("team_working_hr"))
+                response_dict["total_working_hr"] = total_working_hr.get("total") if total_working_hr else 0
+
+                total_actual_working_hr = log.aggregate(total=Sum("team_actual_working_hr"))
+                response_dict["total_actual_working_hr"] = total_actual_working_hr.get("total") if total_actual_working_hr else 0
+                
+                total_employee = log.aggregate(total=Sum("employee_count"))
+                total_resource = log.aggregate(total=Sum("resource_required"))
+                response_dict["total_employee"] = total_employee.get("total") if total_employee else 0
+                response_dict["total_resource"] = total_resource.get("total") if total_resource else 0
+
+
+                if response_dict["total_working_hr"] > response_dict["total_actual_working_hr"] :
+                    response_dict["working_hr_status"] = "Overloaded"
+                elif response_dict['total_working_hr'] < response_dict["total_actual_working_hr"]:
+                    response_dict["working_hr_status"] = "Underloaded"
+                else:
+                    response_dict["working_hr_status"] = "Standard"
+
+                if response_dict["total_resource"] > response_dict["total_employee"] :
+                    response_dict["resource_status"] = "Overloaded"
+                elif response_dict['total_resource'] < response_dict["total_employee"]:
+                    response_dict["resource_status"] = "Underloaded"
+                else:
+                    response_dict["resource_status"] = "Standard"
+                
+                if response_dict["total_extra_hr"] > 0 :
+                    response_dict["extra_hr_status"] = "Overloaded"
+                elif response_dict['total_extra_hr'] == 0:
+                    response_dict["extra_hr_status"] = "Standard"
+                else:
+                    response_dict["extra_hr_status"] = "Underloaded"
+
             elif tab == "Team":
                 select_department = request.GET.get("department")
                 log  = CsvLogDetails.objects.filter(
@@ -914,6 +955,43 @@ class AnalyticsReport(APIView):
                     "resource_required",
                     "status"
                 )
+
+                total_extra_hr = log.aggregate(total=Sum("total_extra_hour"))
+                response_dict["total_extra_hr"] = total_extra_hr.get("total") if total_extra_hr else 0
+
+                total_working_hr = log.aggregate(total=Sum("team_working_hr"))
+                response_dict["total_working_hr"] = total_working_hr.get("total") if total_working_hr else 0
+
+                total_actual_working_hr = log.aggregate(total=Sum("team_actual_working_hr"))
+                response_dict["total_actual_working_hr"] = total_actual_working_hr.get("total") if total_actual_working_hr else 0
+                
+                total_employee = log.aggregate(total=Sum("employee_count"))
+                total_resource = log.aggregate(total=Sum("resource_required"))
+                response_dict["total_employee"] = total_employee.get("total") if total_employee else 0
+                response_dict["total_resource"] = total_resource.get("total") if total_resource else 0
+
+
+                if response_dict["total_working_hr"] > response_dict["total_actual_working_hr"] :
+                    response_dict["working_hr_status"] = "Overloaded"
+                elif response_dict['total_working_hr'] < response_dict["total_actual_working_hr"]:
+                    response_dict["working_hr_status"] = "Underloaded"
+                else:
+                    response_dict["working_hr_status"] = "Standard"
+
+                if response_dict["total_resource"] > response_dict["total_employee"] :
+                    response_dict["resource_status"] = "Overloaded"
+                elif response_dict['total_resource'] < response_dict["total_employee"]:
+                    response_dict["resource_status"] = "Underloaded"
+                else:
+                    response_dict["resource_status"] = "Standard"
+                
+                if response_dict["total_extra_hr"] > 0 :
+                    response_dict["extra_hr_status"] = "Overloaded"
+                elif response_dict['total_extra_hr'] == 0:
+                    response_dict["extra_hr_status"] = "Standard"
+                else:
+                    response_dict["extra_hr_status"] = "Underloaded"
+
             elif tab == "Designation":
                 select_department = request.GET.get("department")
                 select_team = request.GET.get("team")
@@ -954,6 +1032,42 @@ class AnalyticsReport(APIView):
                     "resource_required",
                     "status"
                 )
+
+                total_extra_hr = log.aggregate(total=Sum("total_extra_hour"))
+                response_dict["total_extra_hr"] = total_extra_hr.get("total") if total_extra_hr else 0
+
+                total_working_hr = log.aggregate(total=Sum("team_working_hr"))
+                response_dict["total_working_hr"] = total_working_hr.get("total") if total_working_hr else 0
+
+                total_actual_working_hr = log.aggregate(total=Sum("team_actual_working_hr"))
+                response_dict["total_actual_working_hr"] = total_actual_working_hr.get("total") if total_actual_working_hr else 0
+                
+                total_employee = log.aggregate(total=Sum("employee_count"))
+                total_resource = log.aggregate(total=Sum("resource_required"))
+                response_dict["total_employee"] = total_employee.get("total") if total_employee else 0
+                response_dict["total_resource"] = total_resource.get("total") if total_resource else 0
+
+
+                if response_dict["total_working_hr"] > response_dict["total_actual_working_hr"] :
+                    response_dict["working_hr_status"] = "Overloaded"
+                elif response_dict['total_working_hr'] < response_dict["total_actual_working_hr"]:
+                    response_dict["working_hr_status"] = "Underloaded"
+                else:
+                    response_dict["working_hr_status"] = "Standard"
+
+                if response_dict["total_resource"] > response_dict["total_employee"] :
+                    response_dict["resource_status"] = "Overloaded"
+                elif response_dict['total_resource'] < response_dict["total_employee"]:
+                    response_dict["resource_status"] = "Underloaded"
+                else:
+                    response_dict["resource_status"] = "Standard"
+                
+                if response_dict["total_extra_hr"] > 0 :
+                    response_dict["extra_hr_status"] = "Overloaded"
+                elif response_dict['total_extra_hr'] == 0:
+                    response_dict["extra_hr_status"] = "Standard"
+                else:
+                    response_dict["extra_hr_status"] = "Underloaded"
         
         response_dict["status"] = True
         return Response(response_dict, status=status.HTTP_200_OK)
@@ -1280,6 +1394,7 @@ class AssignUser(APIView):
                     else:
                         assign_user = UserAssignedModules.objects.create(user=user_profile)
                         assign_user.module.add(module)
+                        response_dict["satatus"] = True
                         response_dict["message"] = f"User is added to the module"
                 else:
                     response_dict["error"] = "Not subscribed the module"
