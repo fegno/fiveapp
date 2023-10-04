@@ -818,9 +818,9 @@ class AnalyticsReport(APIView):
             response_dict["working_hours_report"] = log.values("team", "status", "employee_count", "team_working_hr", "team_actual_working_hr")
             response_dict["absent_days_report"] = log.values("team","absent_status", "employee_count", "team_absent_days")
 
-            if (response_dict["total_working_hr"]) > (response_dict["total_actual_working_hr"] ):
+            if response_dict["total_working_hr"] > response_dict["total_actual_working_hr"] :
                 response_dict["working_hr_status"] = "Overloaded"
-            elif (response_dict['total_working_hr']) < (response_dict["total_actual_working_hr"]):
+            elif response_dict['total_working_hr'] < response_dict["total_actual_working_hr"]:
                 response_dict["working_hr_status"] = "Underloaded"
             else:
                 response_dict["working_hr_status"] = "Standard"
