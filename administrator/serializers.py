@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from administrator.api import AddToCart
+from payment.models import PaymentAttempt
 
 from superadmin.models import (
     DeleteUsersLog, 
@@ -196,13 +197,23 @@ class CartSerializer(serializers.ModelSerializer):
 
 class PurchaseHistorySerializer(serializers.ModelSerializer):
     user = UserSerializer()
+    module = ModuleDetailsSerializer(many=True)
+    bundle = BundleDetailsSerializer(many=True)
     class Meta:
         model = PurchaseDetails
-        fields = ('user', 'total_price', 'subscription_start_date', 'subscription_type', 'status', 'module')
+        fields = ('id', 'user', 'module', 'bundle', 'total_price', 'subscription_start_date', 'subscription_end_date', 'subscription_type', 'status')
 
     def to_representation(self, instance):
         representation = super().to_representation(instance)
-        representation['user'] = instance.user.id
+
+        
+        # representation['user'] = {
+        #     'id':instance.user.id,
+        #     'first_name': instance.user.first_name,
+        #     'email': instance.user.email
+        # }
+        representation['module'] = [{'id': module.id, 'title': module.title} for module in instance.module.all()]
+        representation['bundle'] = [{'id':bundle.id, 'title':bundle.title} for bundle in instance.bundle.all()]
         return representation
     
 
@@ -217,3 +228,9 @@ class UserPurchaseHistorySerializer(serializers.ModelSerializer):
         representation['user'] = instance.user.id
         return representation
 
+
+class PaymentAttemptsSerializer(serializers.ModelSerializer):
+    parchase = PurchaseHistorySerializer()
+    class Meta:
+        model = PaymentAttempt
+        fields = ('parchase', 'user', 'payment_intent_id', 'amount', 'total_charge', 'client_secret', 'last_attempt_date')
