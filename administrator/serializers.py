@@ -201,10 +201,12 @@ class PurchaseHistorySerializer(serializers.ModelSerializer):
     bundle = BundleDetailsSerializer(many=True)
     class Meta:
         model = PurchaseDetails
-        fields = ('id', 'user', 'module', 'bundle', 'total_price', 'subscription_start_date', 'subscription_type', 'status')
+        fields = ('id', 'user', 'module', 'bundle', 'total_price', 'subscription_start_date', 'subscription_end_date', 'subscription_type', 'status')
 
     def to_representation(self, instance):
         representation = super().to_representation(instance)
+
+        
         # representation['user'] = {
         #     'id':instance.user.id,
         #     'first_name': instance.user.first_name,
