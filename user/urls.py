@@ -22,8 +22,12 @@ urlpatterns = [
 
     path("billing-details-create/", api.BillingDetailsCreateView.as_view(), name="billing-details-create"),
     path("billing-details-list/", api.BillingDetailsListView.as_view(), name="billing-details-list"),
+    path("billing-details-edit/<int:pk>/", api.BillingDetailsEdit.as_view(), name='billing-edit'),
+    path("billing-details-delete/<int:pk>/", api.BillingDetailsDelete.as_view(), name='billing-details-delete'),
 
     path("card-details-create/", api.CardDetailsCreateView.as_view(), name='card-details-create'),
     path("card-details-list/", api.CardDetailsListView.as_view(), name="card-details-list"),
+    path("card-details-edit/<int:pk>/", api.CardDetailsEdit.as_view(), name='card-edit'),
+    path("card-details-delete/<int:pk>/", api.CardDetailsDelete.as_view(), name="card-details-delete")
 
 ]
