@@ -220,67 +220,103 @@ class InitiateUserPayment(APIView):
 
 
 
-# class MockInitiatePayment(APIView):
-# 	permission_classes = (IsAuthenticated,)
-# 	authentication_classes = (CustomTokenAuthentication,)
+class MockInitiatePayment(APIView):
+	permission_classes = (IsAuthenticated,)
+	authentication_classes = (CustomTokenAuthentication,)
 
-# 	def post(self,request):
-# 		response_dict={'status':False}
-# 		billing_id = request.data.get("billing_id")
-# 		card_id = request.data.get("card_id")
-# 		bundle_ids = request.data.get("bundle_ids")
-# 		modules_ids = request.data.get("modules_ids")
-# 		total_price = request.data.get("total_price")
-# 		subscription_type = request.data.get("subscription_type")
+	def post(self,request):
+		response_dict={'status':False}
+		billing_id = request.data.get("billing_id")
+		card_id = request.data.get("card_id")
+		bundle_ids = request.data.get("bundle_ids")
+		modules_ids = request.data.get("modules_ids")
+		total_price = request.data.get("total_price")
+		subscription_type = request.data.get("subscription_type")
 
-# 		order = PurchaseDetails.objects.create(
-# 			user=request.user,
-# 			status="Pending",
-# 			subscription_type=subscription_type,
-# 			total_price=total_price,
-# 			is_subscribed=False
-# 		)
-# 		order.module.add(*request.POST.getlist("modules_ids"))      
-# 		order.bundle.add(*request.POST.getlist("bundle_ids"))    
-# 		subscription = SubscriptionDetails.objects.filter(
-# 			user=order.user, 
-# 			is_subscribed=True
-# 		).last()
-# 		if subscription:
-# 			total_days = subscription.subscription_end_date - timezone.now().date()
-# 			total_day = total_days.days
-# 			if subscription_type == "WEEK":
-# 				my_price = total_price/7
-# 				total_price = float(my_price) * float(total_day)
+		order = PurchaseDetails.objects.create(
+			user=request.user,
+			status="Placed",
+			subscription_type=subscription_type,
+			total_price=total_price,
+			is_subscribed=True
+		)
+		if modules_ids:
+			for module_id in modules_ids:
+				order.module.add(module_id)
+		if bundle_ids:
+			for bundle_id in bundle_ids:
+				order.bundle.add(bundle_id)
+		# order.module.add(modules_ids)      
+		# order.bundle.add(*request.POST.getlist("bundle_ids"))    
+		subscription = SubscriptionDetails.objects.filter(
+			user=order.user, 
+			is_subscribed=True
+		).last()
 
-# 			elif subscription_type == "MONTH":
-# 				my_price = total_price/30
-# 				total_price = float(my_price) * float(total_day)
+		
+
+
+		if subscription:
+			total_days = subscription.subscription_end_date - timezone.now().date()
+			total_day = total_days.days
+			if subscription_type == "WEEK":
+				my_price = total_price/7
+				total_price = float(my_price) * float(total_day)
+
+			elif subscription_type == "MONTH":
+				my_price = total_price/30
+				total_price = float(my_price) * float(total_day)
 			
-# 			elif subscription_type == "YEAR":
-# 				my_price = total_price/365
-# 				total_price = float(my_price) * float(total_day)
+			elif subscription_type == "YEAR":
+				my_price = total_price/365
+				total_price = float(my_price) * float(total_day)
 
-# 		if subscription_type == "WEEK":
-# 			order.subscription_start_date =  timezone.now().date()
-# 			if subscription:
-# 				end_date = subscription.subscription_end_date
-# 			else:
-# 				end_date = timezone.now().date()  + timedelta(days=7)
-# 			order.subscription_end_date =  end_date
-# 		elif  subscription_type == "MONTH":
-# 			order.subscription_start_date =  timezone.now().date()
-# 			if subscription:
-# 				end_date = subscription.subscription_end_date
-# 			else:
-# 				end_date = timezone.now().date()  + timedelta(days=30)
-# 			order.subscription_end_date =  end_date
-# 		elif subscription_type == "YEAR":
-# 			order.subscription_start_date =  timezone.now().date() 
-# 			if subscription:
-# 				end_date = subscription.subscription_end_date
-# 			else:  
-# 				end_date = timezone.now().date()  + timedelta(days=365)
-# 			order.subscription_end_date =  end_date
-# 		order.save()
-# 		return Response(response_dict,status.HTTP_200_OK)
+		if subscription_type == "WEEK":
+			order.subscription_start_date =  timezone.now().date()
+			if subscription:
+				end_date = subscription.subscription_end_date
+			else:
+				end_date = timezone.now().date()  + timedelta(days=7)
+			order.subscription_end_date =  end_date
+		elif  subscription_type == "MONTH":
+			order.subscription_start_date =  timezone.now().date()
+			if subscription:
+				end_date = subscription.subscription_end_date
+			else:
+				end_date = timezone.now().date()  + timedelta(days=30)
+			order.subscription_end_date =  end_date
+		elif subscription_type == "YEAR":
+			order.subscription_start_date =  timezone.now().date() 
+			if subscription:
+				end_date = subscription.subscription_end_date
+			else:  
+				end_date = timezone.now().date()  + timedelta(days=365)
+			order.subscription_end_date =  end_date
+		order.save()
+
+		if subscription:
+			if modules_ids:
+				for module_id in modules_ids:
+					subscription.module.add(module_id)
+			if bundle_ids:
+				for bundle_id in bundle_ids:
+					subscription.bundle.add(bundle_id)
+			subscription.subscription_start_date = timezone.now().date()
+			subscription.subscription_end_date = end_date
+			subscription.save()
+		else:
+			subscription = SubscriptionDetails.objects.create(
+				user=request.user,
+				subscription_start_date=timezone.now().date(),
+				subscription_end_date=end_date,
+				is_subscribed=True,
+				subscription_type=subscription_type
+			)
+			if modules_ids:
+				for module_id in modules_ids:
+					subscription.module.add(module_id)
+			if bundle_ids:
+				for bundle_id in bundle_ids:
+					subscription.bundle.add(bundle_id)
+
+		return Response(response_dict,status.HTTP_200_OK)

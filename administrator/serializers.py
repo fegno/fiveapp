@@ -212,7 +212,7 @@ class PurchaseHistorySerializer(serializers.ModelSerializer):
         #     'first_name': instance.user.first_name,
         #     'email': instance.user.email
         # }
-        representation['module'] = [{'id': module.id, 'title': module.title} for module in instance.module.all()]
+        representation['module'] = [{'id': module.id, 'title': module.title, 'description':module.description} for module in instance.module.all()]
         representation['bundle'] = [{'id':bundle.id, 'title':bundle.title} for bundle in instance.bundle.all()]
         return representation
     

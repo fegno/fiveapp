@@ -1697,7 +1697,7 @@ class ModulePurchaseHistory(APIView):
         response_dict = {'status': False}
 
         if admin_user.user_type == 'ADMIN':
-            if admin_user.free_subscribed == True:
+            if admin_user.free_subscribed and  admin_user.free_subscription_end_date >= date.today():
                 free_user_subscription = UserProfile.objects.get(id=admin_user.id)
                 free_module = ModuleDetails.objects.all()
                 response_dict["module"] = ModuleDetailsSerializer(free_module, context={'request':request}, many=True).data
