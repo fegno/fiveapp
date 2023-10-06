@@ -50,7 +50,8 @@ class CustomUserAdmin(UserAdmin):
                     "is_active",
                     "is_superuser",
                     "created_admin",
-                    "is_free_user"
+                    "is_free_user",
+                    "is_subscribed"
                 )
             },
         ),

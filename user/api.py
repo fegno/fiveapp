@@ -396,9 +396,65 @@ class BillingDetailsListView(APIView):
         else:
             response_dict["error"] = "Access Denied"
             return Response(response_dict,status=status.HTTP_403_FORBIDDEN)
-
         
+
+class BillingDetailsEdit(APIView):
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (CustomTokenAuthentication,)
+
+    def put(self, request, pk):
+        response_dict = {'status':False}
+        user = request.user
+        
+        if user.user_type == 'ADMIN':
+            billing_details = BillingDetails.objects.get(id=pk, user=user)
+            if not billing_details:
+                return Response({'error': 'Billing details not found for this user.'}, status=status.HTTP_404_NOT_FOUND)
+
+            serializer = BillingDetailsSerializer(billing_details, data=request.data, partial=True)
+
+            if serializer.is_valid():
+                billing_obj = serializer.save()
+                response_dict = {
+                        'id': billing_obj.id,
+                        'user': billing_obj.user.id,
+                        'company_name': billing_obj.company_name,
+                        'address': billing_obj.address,
+                        'billing_contact': billing_obj.billing_contact,
+                        'issuing_country': billing_obj.issuing_country,
+                        'legal_company_name': billing_obj.legal_company_name,
+                        'tax_id': billing_obj.tax_id
+                    }
+                return Response(response_dict, status=status.HTTP_200_OK)
+            else:
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            response_dict["error"] = "Access Denied, Only Admin acan access this"
     
+        
+
+class BillingDetailsDelete(APIView):
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (CustomTokenAuthentication,)
+
+    def delete(self, request, pk):
+        response_dict = {'status':False}
+        
+        if request.user.user_type == 'ADMIN':
+            billing_obj = BillingDetails.objects.get(id=pk, user=request.user)
+            if billing_obj:
+                billing_obj.delete()
+                response_dict["message"] = "Successfully delete address"
+                response_dict["status"] = True
+                return Response(response_dict, status=status.HTTP_404_NOT_FOUND)
+            else:
+                response_dict["error"] = "Billing details not found for this user"
+                response_dict["status"] = False
+                return Response(response_dict, status=status.HTTP_404_NOT_FOUND)
+        else:
+            response_dict["error"] = "Access Denied, Only Admin can access this"
+            return Response(response_dict, status=status.HTTP_403_FORBIDDEN)
+        
 class CardDetailsCreateView(APIView):
     permission_classes = (IsAuthenticated,)
     authentication_classes = (CustomTokenAuthentication,)
@@ -446,3 +502,58 @@ class CardDetailsListView(APIView):
         else:
             response_dict["error"] = "Access Denied"
             return Response(response_dict,status=status.HTTP_403_FORBIDDEN)
+
+
+class CardDetailsEdit(APIView):
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (CustomTokenAuthentication,)
+
+    def put(self, request, pk):
+        admin_user = request.user
+        
+        if admin_user.user_type == 'ADMIN':
+            card_obj = CardDetails.objects.get(id=pk, user=admin_user)
+
+            if not card_obj:
+                return Response({'error': 'Billing details not found for this user.'}, status=status.HTTP_404_NOT_FOUND)
+
+            serializer = CardDetailsSerializer(card_obj, data=request.data, partial=True)
+
+            if serializer.is_valid():
+                card_detail = serializer.save()
+                response_dict = {
+                        'id': card_detail.id,
+                        'user': card_detail.user.id,
+                        'holder_name': card_detail.holder_name,
+                        'card_number': card_detail.card_number,
+                        'expiration_date': card_detail.expiration_date,
+                        'ccv': card_detail.ccv,
+                    }
+                return Response(response_dict, status=status.HTTP_200_OK)
+            else:
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            response_dict["error"] = "Access Denied, Only admin can access this"
+            return Response(response_dict, status=status.HTTP_403_FORBIDDEN)
+        
+    
+class CardDetailsDelete(APIView):
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (CustomTokenAuthentication,)
+
+    def delete(self, request, pk):
+        response_dict = {'status':False}
+        
+        if request.user.user_type == 'ADMIN':
+            card_obj = CardDetails.objects.get(id=pk,  user=request.user)
+            if card_obj:
+                card_obj.delete()
+                response_dict["status"] = True
+                response_dict["message"] = "Successfull delete the card details"
+                return Response(response_dict, status=status.HTTP_200_OK)
+            else:
+                response_dict["error"] = "Billing details not found for this user"
+                return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            response_dict["error"] = "Access Denied, Only Admin can access the process"
+            return Response(response_dict, status=status.HTTP_403_FORBIDDEN)
