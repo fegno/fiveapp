@@ -111,6 +111,7 @@ class Homepage(APIView):
                 response_dict["status"] = True
                 response_dict["take_subscription"] = True
                 response_dict["assigned_user"] = assigned_user
+                response_dict["total_users"] = user.total_users
                 return Response(response_dict, status=status.HTTP_200_OK)
             elif expired_subscription:
                 response_dict["message"] = "Subscription Expired"
