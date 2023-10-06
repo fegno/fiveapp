@@ -23,8 +23,8 @@ import subprocess
 from background_task import background
 from fiveapp.utils import get_error
 
-from user.models import UserProfile, Token, LoginOTP
-from user.serializers import RegisterSerializer, UserSerializer
+from user.models import BillingDetails, CardDetails, UserProfile, Token, LoginOTP
+from user.serializers import BillingDetailsSerializer, CardDetailsSerializer, RegisterSerializer, UserSerializer
 from user.task import send_mail
 from rest_framework import status
 from django.core.mail import send_mail, EmailMessage
@@ -346,3 +346,103 @@ class CheckLoginMethod(APIView):
 
         response_dict["status"] = True
         return Response(response_dict, status=status.HTTP_200_OK)
+    
+
+class BillingDetailsCreateView(APIView):
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (CustomTokenAuthentication,)
+
+    def post(self, request):
+        response_dict = {'status': False}
+        serializer = BillingDetailsSerializer(data=request.data)  
+
+        if request.user.user_type == 'ADMIN':
+            if serializer.is_valid():
+                billing_details = serializer.save(user=request.user) 
+                response_dict = {
+                    'id': billing_details.id,
+                    'user': billing_details.user.id,
+                    'company_name': billing_details.company_name,
+                    'address': billing_details.address,
+                    'billing_contact': billing_details.billing_contact,
+                    'issuing_country': billing_details.issuing_country,
+                    'legal_company_name': billing_details.legal_company_name,
+                    'tax_id': billing_details.tax_id
+                }
+                response_dict["status"] = True
+                return Response(response_dict, status=status.HTTP_201_CREATED)
+            else:
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            response_dict["error"] = "Access Denied"
+            return Response(response_dict,status=status.HTTP_403_FORBIDDEN)
+        
+    
+class BillingDetailsListView(APIView):
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (CustomTokenAuthentication,)
+
+    def get(self, request):
+        response_dict = {'status':False}
+        billing_list = BillingDetails.objects.filter(user=request.user)
+        if request.user.user_type == 'ADMIN':
+            if billing_list:
+                response_dict["billing_list"] = BillingDetailsSerializer(billing_list, context={'request':request}, many=True).data
+                response_dict["status"] = True
+                return Response(response_dict, status=status.HTTP_200_OK)
+            else:
+                response_dict["error"] = "No billing details"
+                return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            response_dict["error"] = "Access Denied"
+            return Response(response_dict,status=status.HTTP_403_FORBIDDEN)
+
+        
+    
+class CardDetailsCreateView(APIView):
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (CustomTokenAuthentication,)
+
+    def post(self, request):
+        response_dict = {
+            'status':True
+        }
+        serializer = CardDetailsSerializer(data=request.data)
+
+        if request.user.user_type == 'ADMIN':
+            if serializer.is_valid():
+                card_details = serializer.save(user=request.user)
+                response_dict = {
+                    'id': card_details.id,
+                    'user': card_details.user.id,
+                    'holder_name': card_details.holder_name,
+                    'card_number': card_details.card_number,
+                    'expiration_date': card_details.expiration_date,
+                    'ccv': card_details.ccv,
+                }
+                return Response(response_dict, status=status.HTTP_200_OK)
+            else:
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            response_dict["error"] = "Access Denied"
+            return Response(response_dict,status=status.HTTP_403_FORBIDDEN)
+
+        
+class CardDetailsListView(APIView):
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (CustomTokenAuthentication,)
+
+    def get(self, request):
+        response_dict = {'status':False}
+        card_list = CardDetails.objects.filter(user=request.user)
+        if request.user.user_type == "ADMIN":
+            if card_list:
+                response_dict["card_list"] = CardDetailsSerializer(card_list, context={'reqiest':request}, many=True).data
+                response_dict["status"] = True
+                return Response(response_dict, status=status.HTTP_200_OK)
+            else:
+                response_dict["error"] = "No card details are found"
+                return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            response_dict["error"] = "Access Denied"
+            return Response(response_dict,status=status.HTTP_403_FORBIDDEN)

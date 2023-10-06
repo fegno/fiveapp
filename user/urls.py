@@ -19,4 +19,11 @@ urlpatterns = [
     path("change-company-name/", api.ChangeComapnyName.as_view(), name="change-company-name"),
     path("change-email/", api.ChangeEmail.as_view(), name="change-email"),
 
+
+    path("billing-details-create/", api.BillingDetailsCreateView.as_view(), name="billing-details-create"),
+    path("billing-details-list/", api.BillingDetailsListView.as_view(), name="billing-details-list"),
+
+    path("card-details-create/", api.CardDetailsCreateView.as_view(), name='card-details-create'),
+    path("card-details-list/", api.CardDetailsListView.as_view(), name="card-details-list"),
+
 ]

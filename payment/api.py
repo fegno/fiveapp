@@ -28,6 +28,8 @@ class InitiatePayment(APIView):
 
 	def post(self,request):
 		response_dict={'status':False}
+		billing_id = request.data.get("billing_id")
+		card_id = request.data.get("card_id")
 		bundle_ids = request.data.get("bundle_ids")
 		modules_ids = request.data.get("modules_ids")
 		total_price = request.data.get("total_price")
@@ -180,6 +182,8 @@ class InitiateUserPayment(APIView):
 
 	def post(self,request):
 		response_dict={'status':False}
+		billing_id = request.data.get("billing_id")
+		card_id = request.data.get("card_id")
 		user_count = request.data.get("user_count")
 		total_price = request.data.get("total_price")
 		subscription_type = request.data.get("subscription_type")
