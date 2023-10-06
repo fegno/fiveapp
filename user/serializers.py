@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from user.models import UserProfile
+from user.models import CardDetails, UserProfile, BillingDetails
 from django.utils import timezone
 from administrator.models import PurchaseDetails, SubscriptionDetails
 
@@ -66,3 +66,30 @@ class UserSerializer(serializers.ModelSerializer):
                 cd["subscription_expire_in"] = days.days
 
         return cd
+
+
+
+class BillingDetailsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BillingDetails
+        fields = (
+            'id',
+            'company_name', 
+            'address', 
+            'billing_contact',
+            'issuing_country',
+            'legal_company_name',
+            'tax_id'
+        )
+
+
+class CardDetailsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CardDetails
+        fields = (
+            'id',
+            'holder_name',
+            'card_number',
+            'expiration_date',
+            'ccv'
+        )

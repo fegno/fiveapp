@@ -145,3 +145,31 @@ class LoginOTP(models.Model):
     
     def __str__(self):
         return self.email
+
+
+class BillingDetails(models.Model):
+    user = models.ForeignKey( UserProfile, on_delete=models.CASCADE)
+    company_name = models.CharField(max_length=150, null=True, blank=True)
+    address = models.TextField(max_length=1000, null=True, blank=True)
+    billing_contact = models.CharField(max_length=100, null=True, blank=True)
+    issuing_country = models.CharField(max_length=100, null=True, blank=True)
+    legal_company_name = models.CharField(max_length=100, null=True, blank=True)
+    tax_id = models.CharField(max_length=12, null=True, blank=True)
+    
+
+    def __str__(self):
+        return self.company_name
+    
+
+class CardDetails(models.Model):
+    user = models.ForeignKey(UserProfile, on_delete=models.CASCADE)
+    holder_name = models.CharField(max_length=100, null=True, blank=True)
+    card_number = models.CharField(max_length=20, null=True, blank=True)
+    expiration_date = models.CharField(max_length=5, null=True, blank=True)
+    ccv = models.CharField(max_length=3, null=True, blank=True)
+
+
+    
+
+
+

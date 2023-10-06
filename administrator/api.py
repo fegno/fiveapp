@@ -46,7 +46,8 @@ from administrator.serializers import (
     UserAssignedModuleSerializers,
     CsvSerializers,
     UploadedCsvFilesSerializer,
-    UserInviteSerializer
+    UserInviteSerializer,
+    UserPurchaseHistorySerializer
 )
 from superadmin.models import (
     DeleteUsersLog,
@@ -1734,30 +1735,11 @@ class UserPurchaseHistory(APIView):
         response_dict = {'status': True}
 
         if admin_user.user_type == 'ADMIN':
-            purchase_user_details = PurchaseDetails.objects.filter(user=admin_user, status='Placed', is_active=True, parchase_user_type='User').first()
+            purchase_user_details = PurchaseDetails.objects.filter(user=admin_user, status='Placed', is_active=True, parchase_user_type='User')
+            print(purchase_user_details)
             if purchase_user_details:
-
-                purchased_by = {
-                    "id": admin_user.id,
-                    "username": admin_user.first_name,
-                    "email": admin_user.email,
-                }
-
-                subscription_start_date = purchase_user_details.subscription_start_date
-                subscription_end_date = purchase_user_details.subscription_end_date
-                subscription_type = purchase_user_details.subscription_type
-                total_price = purchase_user_details.total_price
-                user_count = purchase_user_details.user_count
-
-                response_dict["user_purchase_data"] = {
-                    "purchased_by":purchased_by,
-                    "subscription_start_date":subscription_start_date,
-                    "subscription_end_date":subscription_end_date,
-                    "subscription_type":subscription_type,
-                    "total_price":total_price,
-                    "user_count":user_count
-                }
-                
+                response_dict["subscription-details"] = UserPurchaseHistorySerializer(purchase_user_details, context={'request': request}, many=True).data
+                response_dict["status"] = True
             else:
                 response_dict["error"] = "No purchase details found for this user."
         else:
@@ -1776,6 +1758,7 @@ class PurchaseDetailsView(APIView):
 
         if admin_user.user_type == 'ADMIN':
             payment_details = PaymentAttempt.objects.get(parchase__id=pk, user=admin_user, status='succeeded')
+
 
             if payment_details:
                 all_payment_details = PaymentAttemptsSerializer(payment_details, context = {'request':request}).data

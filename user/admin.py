@@ -1,5 +1,7 @@
 from django.contrib import admin
 from user.models import (
+    BillingDetails,
+    CardDetails,
     UserProfile,
     Token,
     LoginOTP
@@ -70,4 +72,5 @@ class CustomUserAdmin(UserAdmin):
 admin.site.register(UserProfile, CustomUserAdmin)
 admin.site.register(Token)
 admin.site.register(LoginOTP)
-
+admin.site.register(BillingDetails)
+admin.site.register(CardDetails)
