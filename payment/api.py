@@ -42,8 +42,10 @@ class InitiatePayment(APIView):
 			total_price=total_price,
 			is_subscribed=False
 		)
-		order.module.add(*request.POST.getlist("modules_ids"))      
-		order.bundle.add(*request.POST.getlist("bundle_ids"))    
+		if modules_ids:
+			order.module.add(*request.data.get("modules_ids"))    
+		if bundle_ids:  
+			order.bundle.add(*request.data.get("bundle_ids"))    
 		subscription = SubscriptionDetails.objects.filter(
 			user=order.user, 
 			is_subscribed=True
@@ -138,12 +140,16 @@ class StripePaymentWebhook(APIView):
 							subscription.is_subscribed = True
 							subscription.module.clear()
 							subscription.bundle.clear()
-							subscription.module.add(order.module.values_list("id", flat=True))      
-							subscription.bundle.add(order.bundle.values_list("id", flat=True))    
+							if order.module:
+								subscription.module.add(list(order.module.values_list("id", flat=True)))      
+							if order.bundle:
+								subscription.bundle.add(list(order.bundle.values_list("id", flat=True)))    
 							subscription.save()
 						else:
-							subscription.module.add(order.module.values_list("id", flat=True))      
-							subscription.bundle.add(order.bundle.values_list("id", flat=True))    
+							if order.module:
+								subscription.module.add(order.module.values_list("id", flat=True))      
+							if order.bundle:
+								subscription.bundle.add(order.bundle.values_list("id", flat=True))    
 							subscription.save()
 					else:
 						subscription = SubscriptionDetails.objects.create(
@@ -153,8 +159,10 @@ class StripePaymentWebhook(APIView):
 							is_subscribed=True,
 							subscription_type=order.subscription_type,
 						)
-						subscription.module.add(order.module.values_list("id", flat=True))      
-						subscription.bundle.add(order.bundle.values_list("id", flat=True))    
+						if order.module:
+							subscription.module.add(list(order.module.values_list("id", flat=True)))      
+						if order.bundle:
+							subscription.bundle.add(list(order.bundle.values_list("id", flat=True)))     
 						subscription.save()
 				else:
 					user = order.user

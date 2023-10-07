@@ -33,7 +33,7 @@ from django.db.models import (
 )
 from fiveapp.utils import PageSerializer
 
-from administrator.models import PurchaseDetails, SubscriptionDetails,  CsvLogDetails, UploadedCsvFiles, AddToCart
+from administrator.models import PurchaseDetails, SubscriptionDetails,  CsvLogDetails, UploadedCsvFiles, AddToCart, CustomRequest
 from administrator.serializers import (
     DeletedUserLogSerializers,
     ModuleDetailsSerializer, 
@@ -1737,7 +1737,6 @@ class UserPurchaseHistory(APIView):
 
         if admin_user.user_type == 'ADMIN':
             purchase_user_details = PurchaseDetails.objects.filter(user=admin_user, status='Placed', is_active=True, parchase_user_type='User')
-            print(purchase_user_details)
             if purchase_user_details:
                 response_dict["subscription-details"] = UserPurchaseHistorySerializer(purchase_user_details, context={'request': request}, many=True).data
                 response_dict["status"] = True
@@ -1775,4 +1774,30 @@ class PurchaseDetailsView(APIView):
             return Response(response_dict, status=status.HTTP_403_FORBIDDEN)
 
 
-        
+class CreateCustomRequest(APIView):
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (CustomTokenAuthentication, )
+
+    def post(self, request):
+        response_dict = {"status": False}
+        bundle_ids = request.data.get("bundle_ids")
+        modules_ids = request.data.get("modules_ids")
+        name = request.data.get("name")
+        email = request.data.get("email")
+        phone = request.data.get("phone")
+
+        custom = CustomRequest.objects.create(
+            user=request.user,
+            status="Pending",
+            name=name,
+            phone=phone,
+            email=email,
+        )
+        if modules_ids:
+            custom.module.add(*request.data.get("modules_ids"))    
+        if bundle_ids:  
+            custom.bundle.add(*request.data.get("bundle_ids"))    
+        response_dict["message"] = "Successfully submitted"
+        response_dict["status"] = True
+        return Response(response_dict, status=status.HTTP_200_OK)
+
