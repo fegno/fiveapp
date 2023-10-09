@@ -1,5 +1,5 @@
 from django.db import models
-from user.models import UserProfile
+from user.models import UserProfile, BillingDetails, CardDetails
 from superadmin.models import BundleDetails, ModuleDetails
 
 class SubscriptionDetails(models.Model):
@@ -32,6 +32,19 @@ class PurchaseDetails(models.Model):
         null=True,
         on_delete=models.CASCADE,   
     )
+    bill = models.ForeignKey(
+        BillingDetails,
+        blank=True,
+        null=True,
+        on_delete=models.CASCADE,   
+    )
+    card = models.ForeignKey(
+        CardDetails,
+        blank=True,
+        null=True,
+        on_delete=models.CASCADE,   
+    )
+
     module = models.ManyToManyField(ModuleDetails, blank=True)
     bundle = models.ManyToManyField(BundleDetails, blank=True)
     subscription_start_date = models.DateField(null=True, blank=True)
@@ -48,6 +61,19 @@ class PurchaseDetails(models.Model):
     parchase_user_type		=	models.CharField(null=True,blank=True,max_length=255, default="Subscription")
     user_count              = models.IntegerField(null=True, blank=True)
     status =	models.CharField(max_length=50,blank=True,null=False,db_index=True,choices=STATUS_CHOICES)
+    
+    
+    company_name = models.CharField(max_length=150, null=True, blank=True)
+    address = models.TextField(max_length=1000, null=True, blank=True)
+    billing_contact = models.CharField(max_length=100, null=True, blank=True)
+    issuing_country = models.CharField(max_length=100, null=True, blank=True)
+    legal_company_name = models.CharField(max_length=100, null=True, blank=True)
+    tax_id = models.CharField(max_length=12, null=True, blank=True)
+    holder_name = models.CharField(max_length=100, null=True, blank=True)
+    card_number = models.CharField(max_length=20, null=True, blank=True)
+    expiration_date = models.CharField(max_length=5, null=True, blank=True)
+    ccv = models.CharField(max_length=3, null=True, blank=True)
+
     is_active = models.BooleanField(null=False, blank=True, default=True)
     created = models.DateTimeField(auto_now_add=True)
     updated = models.DateTimeField(auto_now=True)
@@ -70,6 +96,7 @@ class UploadedCsvFiles(models.Model):
     standard_working_hour = models.FloatField(null=True, blank=True, default=0)
     is_report_generated = models.BooleanField(null=False, blank=True, default=False)
     working_type = models.CharField(null=True, blank=True, max_length=1000)
+    monthly_revenue = models.FloatField(null=True, blank=True, default=0)
 
     is_active = models.BooleanField(null=False, blank=True, default=True)
     created = models.DateTimeField(auto_now_add=True)
@@ -93,10 +120,22 @@ class CsvLogDetails(models.Model):
     extra_hour = models.FloatField(null=True, blank=True, default=0)
     absent_days = models.FloatField(null=True, blank=True, default=0)
 
+    hourly_rate = models.FloatField(null=True, blank=True, default=0)
+    total_pay = models.FloatField(null=True, blank=True, default=0)
+
     is_active = models.BooleanField(null=False, blank=True, default=True)
     created = models.DateTimeField(auto_now_add=True)
     updated = models.DateTimeField(auto_now=True)
 
+
+class DepartmentWeightage(models.Model):
+    uploaded_file = models.ForeignKey(UploadedCsvFiles, on_delete=models.CASCADE, null=True, blank=True)
+    percentage = models.FloatField(null=True, blank=True, default=0)
+    department = models.CharField(null=True, blank=True, max_length=1000)
+
+    is_active = models.BooleanField(default=False, null=True, blank=True)
+    created = models.DateTimeField(auto_now_add=True)
+    updated = models.DateTimeField(auto_now_add=True)
 
 
 class AddToCart(models.Model):

@@ -42,6 +42,17 @@ class InitiatePayment(APIView):
 			total_price=total_price,
 			is_subscribed=False
 		)
+		if billing_id:
+			billing = BillingDetails.objects.filter(id=billing_id, user=request.user).last()
+			if billing:
+				order.company_name = billing.company_name
+				order.address = billing.address
+				order.billing_contact = billing.billing_contact
+				order.issuing_country = billing.issuing_country
+				order.legal_company_name = billing.legal_company_name
+				order.tax_id = billing.tax_id
+				order.save()
+
 		if modules_ids:
 			order.module.add(*request.data.get("modules_ids"))    
 		if bundle_ids:  
@@ -131,6 +142,8 @@ class StripePaymentWebhook(APIView):
 				if order.parchase_user_type !="User":
 					user = order.user
 					user.is_subscribed = True
+					user.free_subscribed = False
+					user.free_subscription_end_date = timezone.now().date()
 					user.save()
 					if SubscriptionDetails.objects.filter(user=order.user):
 						subscription = SubscriptionDetails.objects.filter(user=order.user).last()
