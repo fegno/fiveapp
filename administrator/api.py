@@ -1742,6 +1742,7 @@ class UserPurchaseHistory(APIView):
                 response_dict["status"] = True
             else:
                 response_dict["error"] = "No purchase details found for this user."
+                
         else:
             response_dict["error"] = "Access denied, Only Admin can access the list"
 
