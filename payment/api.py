@@ -265,19 +265,31 @@ class MockInitiatePayment(APIView):
 
 
 		if subscription:
-			total_days = subscription.subscription_end_date - timezone.now().date()
-			total_day = total_days.days
-			if subscription_type == "WEEK":
-				my_price = total_price/7
-				total_price = float(my_price) * float(total_day)
+			if subscription.subscription_end_date < timezone.now().date():
+				subscription.subscription_start_date = order.subscription_start_date
+				subscription.subscription_end_date = order.subscription_end_date
+				subscription.is_subscribed = True
+				subscription.module.clear()
+				subscription.bundle.clear()
+				if order.module:
+					subscription.module.add(list(order.module.values_list("id", flat=True)))      
+				if order.bundle:
+					subscription.bundle.add(list(order.bundle.values_list("id", flat=True)))    
+				subscription.save()
+			else:
+				total_days = subscription.subscription_end_date - timezone.now().date()
+				total_day = total_days.days
+				if subscription_type == "WEEK":
+					my_price = total_price/7
+					total_price = float(my_price) * float(total_day)
 
-			elif subscription_type == "MONTH":
-				my_price = total_price/30
-				total_price = float(my_price) * float(total_day)
-			
-			elif subscription_type == "YEAR":
-				my_price = total_price/365
-				total_price = float(my_price) * float(total_day)
+				elif subscription_type == "MONTH":
+					my_price = total_price/30
+					total_price = float(my_price) * float(total_day)
+				
+				elif subscription_type == "YEAR":
+					my_price = total_price/365
+					total_price = float(my_price) * float(total_day)
 
 		if subscription_type == "WEEK":
 			order.subscription_start_date =  timezone.now().date()
@@ -326,5 +338,11 @@ class MockInitiatePayment(APIView):
 			if bundle_ids:
 				for bundle_id in bundle_ids:
 					subscription.bundle.add(bundle_id)
+		with transaction.atomic():
+			payment_attempt=PaymentAttempt.objects.create(parchase_user_type="Subscription",parchase=order,user=request.user,currency='gbp',amount=order.total_price,
+				status='Initiated',last_attempt_date=timezone.now())
+		
+			response_dict['purchase-id']=payment_attempt.id
+			response_dict['status']=True
 
 		return Response(response_dict,status.HTTP_200_OK)
