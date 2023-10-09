@@ -1165,6 +1165,7 @@ class AnalyticsReport(APIView):
                 v_chain=Value("A"),
                 cost_of_employee=Sum("total_pay"),
                 weightage=Subquery(weightage_data),
+                status=Value("Overloaded")
             ).annotate(
                 revenue_contribution=monthly_revenue_cal*F("weightage"),
                 cost_contribution=(F("cost_of_employee")/total_my_cost)*100
@@ -1183,9 +1184,10 @@ class AnalyticsReport(APIView):
                 "revenue_contribution",
                 "cost_contribution",
                 "rc_coe",
-                "score"
+                "score",
+                "status"
             )
-            response_dict["report"] = log.values("department", "score", "rc_coe","cost_contribution", "revenue_contribution", "employee_count", "v_chain", "cost_of_employee", "weightage")
+            response_dict["report"] = log.values("department", "status", "score", "rc_coe","cost_contribution", "revenue_contribution", "employee_count", "v_chain", "cost_of_employee", "weightage")
 
         response_dict["status"] = True
         return Response(response_dict, status=status.HTTP_200_OK)
