@@ -260,6 +260,8 @@ class MockInitiatePayment(APIView):
 			user=order.user, 
 			is_subscribed=True
 		).last()
+		request.user.is_subscribed = True
+		subscription.save()
 
 		
 
@@ -269,6 +271,7 @@ class MockInitiatePayment(APIView):
 				subscription.subscription_start_date = order.subscription_start_date
 				subscription.subscription_end_date = order.subscription_end_date
 				subscription.is_subscribed = True
+				subscription.user.is_subscribed = True
 				subscription.module.clear()
 				subscription.bundle.clear()
 				if order.module:
@@ -332,6 +335,7 @@ class MockInitiatePayment(APIView):
 				is_subscribed=True,
 				subscription_type=subscription_type
 			)
+			request.user.is_subscribed = True
 			if modules_ids:
 				for module_id in modules_ids:
 					subscription.module.add(module_id)
@@ -344,5 +348,6 @@ class MockInitiatePayment(APIView):
 
 			response_dict['purchase-id']=payment_attempt.id
 			response_dict['status']=True
+			response_dict["user-data"] = request.user.is_subscribed
 
 		return Response(response_dict,status.HTTP_200_OK)
