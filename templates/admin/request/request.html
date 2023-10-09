@@ -1,0 +1,151 @@
+{% extends "dashboard/base.html" %}
+{% block content %}
+{% load static %}
+<div class="page_body">
+{% include '../general/header.html' %}
+
+<div class="card-group">
+  <div class="row">
+    <div class="col-12">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-0 bg-white">
+          <li class="breadcrumb-item">
+            <a>Request</a>
+          </li>
+          <li class="breadcrumb-item">
+            <a>
+              <b>Request</b>
+            </a>
+          </li>
+        </ol>
+      </nav>
+    </div>
+  </div>
+  <div class="row">
+    <div class="col-12">
+      <div class="card rounded-t-s">
+        <div class="card-header bg-transparent pt-0">
+          <div class="row align-items-center">
+            <div class="col-md-4">
+              <h5 class="card-title font-bold">Request</h5>
+            </div>
+            <div class="col-md-8 text-md-end">
+            
+            </div>
+          </div> 
+        </div>
+        <div class="card-sub-header mt-15">
+          <div class="row">
+            <div class="col-md-8">
+              <div class="search-form d-inline-block me-15">
+                <form>
+                  {% for key,value in request.GET.items %}
+                      {% if key != 'search' %}
+                      <input hidden name="{{key}}" value="{{value}}">
+                      {%endif%}
+                  {%endfor%}
+                  <input class="form-control" type="search" name="search" value="{{search|default_if_none:""}}" placeholder="Search">
+                  <button class="btn" type="submit">
+                      <img src="{% static 'general/images/icons/light-grey-search.png' %}">
+                  </button>
+              </form>
+              </div>
+            </div>
+            <div class="col-md-4 text-md-end">
+              <div class="btn-group btn-group-export">
+                <button class="btn" type="button" onclick="printThis('.print_data')">Print</button>
+          
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="card-body ">
+          <div class="table-default bg-tr-even">
+            <div class="table-responsive print_data">
+              <table class="table text-center">
+                <thead>
+                  <tr>
+                    <th class="xs-tcol">#</th>
+                    <th class="s-tcol">Name</th>
+                    <th class="s-tcol">Email</th>
+                    <th class="s-tcol">Phone</th>
+                    <th class="s-tcol">Status</th>
+                    <th class="s-tcol">Action</th>
+
+                  </tr>
+                </thead>
+                <tbody>    
+                  {%for i in custom%} 
+                  <tr>
+                      <td>{{forloop.counter}}</td>
+                      
+                      <td class="xs-tcol">{{i.name|default_if_none:''}}</td>
+                      <td class="s-tcol">{{i.email|default_if_none:""}}</td>
+                      <td class="s-tcol">{{i.phone|default_if_none:""}}</td>
+                      <td class="s-tcol"> {{i.status|default_if_none:""}}</td>
+
+                      <td class="s-tcol"> 
+                          {%if i.status == "Pending"%}
+                        <button class="btn" type="button" data-url="{% url 'superadmin:edit-request' i.id %}" onclick="load_popup_async(this,'modal_update');">
+                          <i class="fa fa-pencil" aria-hidden="true"></i>
+                        </button>
+                        {%else%}
+                        {%endif%}
+                      </td>   
+                  </tr>
+
+                  
+                  {%endfor%}
+                </tbody>
+              </table>
+            </div>
+           
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<div class="offcanvas offcanvas-lg offcanvas-end" tabindex="-1" id="modal_update">
+  <div class="offcanvas-header">
+    <h5 class="offcanvas-title font-bold">Update</h5>
+    <button type="button" class="btn-icon btn-offcanvas-close" data-bs-dismiss="offcanvas" aria-label="Close">
+      <img src="{% static 'general/images/icons/arrow-right.png' %}">
+    </button>
+  </div>  
+  <div class="offcanvas-body">
+
+  </div>
+</div>
+
+</div><!-- page_body -->
+{% endblock %}
+
+{%block javascript%}
+<script>
+
+
+function load_popup_async(source, modal_id) {
+    $(".pre-loader").fadeIn("fast");
+    const after_show_fn = eval($(source).data('after-show'));
+    const fetch_params_fn = eval($(source).data('fetch-params'));
+    let params = {};
+    if (fetch_params_fn)
+        params = fetch_params_fn(source);
+    $.ajax({
+        url: $(source).data('url'), type: 'get', data: params,
+        success: (data) => {
+       
+            $('#' + modal_id + ' .offcanvas-body').html(data);
+            const modal = $('#' + modal_id).first();
+            modal.offcanvas('show');
+            if (after_show_fn) after_show_fn(source, modal);
+        },
+        error: function () { alert('connection problem'); },
+        complete: function () { $(".pre-loader").fadeOut("fast"); }
+    });
+  }
+</script>
+{% endblock %}

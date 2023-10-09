@@ -7,4 +7,6 @@ urlpatterns = [
     re_path(r'^payment-webhook/', api.StripePaymentWebhook.as_view(), name='payment-webhook'),
     re_path(r'^initiate-user-payment/', api.InitiateUserPayment.as_view(), name='initiate-user-payment'),
 
+    re_path(r'^mock-initiate-payment/', api.MockInitiatePayment.as_view(), name='mock-initiate-payment'),
+
 ]
