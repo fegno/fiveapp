@@ -391,8 +391,8 @@ class BillingDetailsListView(APIView):
                 response_dict["status"] = True
                 return Response(response_dict, status=status.HTTP_200_OK)
             else:
-                response_dict["error"] = "No billing details"
-                return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
+                response_dict["billing_list"] = BillingDetailsSerializer(billing_list, context={'request':request}, many=True).data
+                return Response(response_dict, status=status.HTTP_200_OK)
         else:
             response_dict["error"] = "Access Denied"
             return Response(response_dict,status=status.HTTP_403_FORBIDDEN)
@@ -497,8 +497,8 @@ class CardDetailsListView(APIView):
                 response_dict["status"] = True
                 return Response(response_dict, status=status.HTTP_200_OK)
             else:
-                response_dict["error"] = "No card details are found"
-                return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
+                response_dict["card_list"] = CardDetailsSerializer(card_list, context={'reqiest':request}, many=True).data
+                return Response(response_dict, status=status.HTTP_200_OK)
         else:
             response_dict["error"] = "Access Denied"
             return Response(response_dict,status=status.HTTP_403_FORBIDDEN)
