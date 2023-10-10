@@ -273,11 +273,13 @@ class MockInitiatePayment(APIView):
 			user=order.user, 
 			is_subscribed=True
 		).last()
-		request.user.is_subscribed = True
-		subscription.save()
 
 		
-
+		user = order.user
+		user.is_subscribed = True
+		user.free_subscribed = False
+		user.free_subscription_end_date = timezone.now().date()
+		user.save()
 
 		if subscription:
 			if subscription.subscription_end_date < timezone.now().date():
@@ -348,7 +350,7 @@ class MockInitiatePayment(APIView):
 				is_subscribed=True,
 				subscription_type=subscription_type
 			)
-			request.user.is_subscribed = True
+			
 			if modules_ids:
 				for module_id in modules_ids:
 					subscription.module.add(module_id)
