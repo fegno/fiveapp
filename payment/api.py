@@ -42,6 +42,17 @@ class InitiatePayment(APIView):
 			total_price=total_price,
 			is_subscribed=False
 		)
+		if billing_id:
+			billing = BillingDetails.objects.filter(id=billing_id, user=request.user).last()
+			if billing:
+				order.company_name = billing.company_name
+				order.address = billing.address
+				order.billing_contact = billing.billing_contact
+				order.issuing_country = billing.issuing_country
+				order.legal_company_name = billing.legal_company_name
+				order.tax_id = billing.tax_id
+				order.save()
+
 		if modules_ids:
 			order.module.add(*request.data.get("modules_ids"))    
 		if bundle_ids:  
@@ -131,6 +142,8 @@ class StripePaymentWebhook(APIView):
 				if order.parchase_user_type !="User":
 					user = order.user
 					user.is_subscribed = True
+					user.free_subscribed = False
+					user.free_subscription_end_date = timezone.now().date()
 					user.save()
 					if SubscriptionDetails.objects.filter(user=order.user):
 						subscription = SubscriptionDetails.objects.filter(user=order.user).last()
@@ -262,13 +275,18 @@ class MockInitiatePayment(APIView):
 		).last()
 
 		
-
+		user = order.user
+		user.is_subscribed = True
+		user.free_subscribed = False
+		user.free_subscription_end_date = timezone.now().date()
+		user.save()
 
 		if subscription:
 			if subscription.subscription_end_date < timezone.now().date():
 				subscription.subscription_start_date = order.subscription_start_date
 				subscription.subscription_end_date = order.subscription_end_date
 				subscription.is_subscribed = True
+				subscription.user.is_subscribed = True
 				subscription.module.clear()
 				subscription.bundle.clear()
 				if order.module:
@@ -332,6 +350,7 @@ class MockInitiatePayment(APIView):
 				is_subscribed=True,
 				subscription_type=subscription_type
 			)
+			
 			if modules_ids:
 				for module_id in modules_ids:
 					subscription.module.add(module_id)
@@ -344,5 +363,6 @@ class MockInitiatePayment(APIView):
 
 			response_dict['purchase-id']=payment_attempt.id
 			response_dict['status']=True
+			response_dict["user-data"] = request.user.is_subscribed
 
 		return Response(response_dict,status.HTTP_200_OK)

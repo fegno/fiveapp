@@ -29,11 +29,13 @@ from django.db.models import (
     FloatField,
     Func,
     DecimalField,
-    ExpressionWrapper
+    ExpressionWrapper,
+    Subquery,
+    OuterRef
 )
 from fiveapp.utils import PageSerializer
 
-from administrator.models import PurchaseDetails, SubscriptionDetails,  CsvLogDetails, UploadedCsvFiles, AddToCart, CustomRequest
+from administrator.models import PurchaseDetails, SubscriptionDetails,  CsvLogDetails, UploadedCsvFiles, AddToCart, CustomRequest, DepartmentWeightage
 from administrator.serializers import (
     DeletedUserLogSerializers,
     ModuleDetailsSerializer, 
@@ -460,9 +462,10 @@ class UploadCsv(APIView):
         if not csv_file:
             response_dict["error"] = "File Not Found"
             return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
-        if not working_type:
-            response_dict["error"] = "Type Required"
-            return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
+        if module.module_identifier == 1 or  module.module_identifier == 2:
+            if not working_type:
+                response_dict["error"] = "Type Required"
+                return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
         to_save = []
         decoded_file = csv_file.read().decode('utf-8').splitlines()
         reader = csv.DictReader(decoded_file)
@@ -497,6 +500,24 @@ class UploadCsv(APIView):
                         designation=row.get("DESIGNATION"),
                         department=row.get("DEPARTMENTS"),
                         working_hour=row.get("WORKING HOUR")
+                    )
+                )
+
+        elif module.module_identifier == 3:
+            for row in reader:
+                to_save.append(
+                    CsvLogDetails(
+                        uploaded_file=upload_log,
+                        sl_no=row.get("S.NO"),
+                        employee_id=row.get("EMPLOYEE ID"),
+                        employee_name=row.get("EMPLOYEE NAME"),
+                        team=row.get("TEAM"),
+                        designation=row.get("DESIGNATION"),
+                        department=row.get("DEPARTMENTS") if row.get("DEPARTMENTS") else row.get("DEPARTMENT"),
+                        working_hour=row.get("WORKING HOURS/MONTHLY"),
+                        hourly_rate=row.get("HOURLY RATE"),
+                        total_pay=round(float(row.get("WORKING HOURS/MONTHLY", 0)) * float(row.get("HOURLY RATE", 0)), 2)
+
                     )
                 )
         CsvLogDetails.objects.bulk_create(to_save)
@@ -593,6 +614,10 @@ class GenerateReport(APIView):
     def post(self, request, pk):
         response_dict = {"status": False}
         week_working_hour = request.data.get("week_working_hour", 0)
+
+        monthly_revenue = request.data.get("monthly_revenue", 0)
+
+
         csv_file = UploadedCsvFiles.objects.filter(
             id=pk
         ).first()
@@ -653,6 +678,22 @@ class GenerateReport(APIView):
                 response_dict["message"] = "Generated"
             except Exception as e:
                 response_dict["error"] = str(e)
+        elif csv_file.modules.module_identifier == 3:
+            try:
+                departments = list(set(DepartmentWeightage.objects.filter(uploaded_file__id=pk).values_list("id", flat=True)))
+                for i in departments:
+                    dep_value = request.data.get(str(i), 0)
+                    DepartmentWeightage.objects.filter(
+                        id=i,
+                    ).update(percentage=dep_value)
+                csv_file.is_report_generated = True
+                csv_file.monthly_revenue = monthly_revenue
+                csv_file.save()
+                response_dict["status"] = True
+                response_dict["message"] = "Generated"
+            except Exception as e:
+                response_dict["error"] = str(e)
+
         else:
             response_dict["error"] = "Module not Valid"
         return Response(response_dict, status=status.HTTP_200_OK)
@@ -730,6 +771,26 @@ class ViewReport(APIView):
                 "department",
                 "designation",
                 "extra_hour"
+            ).order_by("id"))
+            
+            response_dict["report"] = log
+
+        elif csv_file.modules.module_identifier == 3:
+            log  = tuple(CsvLogDetails.objects.filter(
+                uploaded_file__id=pk,
+                is_active=True
+            ).filter(
+                Q(uploaded_file__uploaded_by=request.user)|
+                Q(uploaded_file__uploaded_by__created_admin=request.user)
+            ).values(
+                "sl_no", 
+                "employee_id",
+                "employee_name",
+                "department",
+                "designation",
+                "hourly_rate",
+                "working_hour",
+                "total_pay",
             ).order_by("id"))
             
             response_dict["report"] = log
@@ -1070,7 +1131,64 @@ class AnalyticsReport(APIView):
                     response_dict["extra_hr_status"] = "Standard"
                 else:
                     response_dict["extra_hr_status"] = "Underloaded"
-        
+
+        elif csv_file.modules.module_identifier == 3:
+            monthly_revenue = csv_file.monthly_revenue
+            monthly_revenue_cal = monthly_revenue/100
+            weightage_data = DepartmentWeightage.objects.filter(
+                uploaded_file=csv_file,
+                department=OuterRef("department")
+            ).values("percentage")
+            my_log_cost  = CsvLogDetails.objects.filter(
+                uploaded_file__id=pk
+            ).filter(
+                Q(uploaded_file__uploaded_by=request.user)|
+                Q(uploaded_file__uploaded_by__created_admin=request.user)
+            ).aggregate(total_cost=Sum("total_pay"))
+            total_my_cost = 0
+            if my_log_cost:
+                total_my_cost = my_log_cost.get("total_cost")
+
+            status_list = [
+                When(rc_coe__gte=0, rc_coe__lte=3, then=Value("Low")),
+                When(rc_coe__gt=3, rc_coe__lte=4, then=Value("Medium")),
+                When(rc_coe__gt=5,then=Value("High")),
+            ]
+
+            log  = CsvLogDetails.objects.filter(
+                uploaded_file__id=pk
+            ).filter(
+                Q(uploaded_file__uploaded_by=request.user)|
+                Q(uploaded_file__uploaded_by__created_admin=request.user)
+            ).values("department").annotate(
+                employee_count=Count("id"),
+                v_chain=Value("A"),
+                cost_of_employee=Sum("total_pay"),
+                weightage=Subquery(weightage_data),
+                status=Value("Overloaded")
+            ).annotate(
+                revenue_contribution=monthly_revenue_cal*F("weightage"),
+                cost_contribution=(F("cost_of_employee")/total_my_cost)*100
+            ).annotate(
+                rc_coe=F("revenue_contribution")/F("cost_of_employee")
+            ).annotate(
+                score=Case(
+                    *status_list, default=Value(""), output_field=CharField()
+                ),
+            ).values(
+                "department", 
+                "employee_count",
+                "v_chain",
+                "cost_of_employee",
+                "weightage",
+                "revenue_contribution",
+                "cost_contribution",
+                "rc_coe",
+                "score",
+                "status"
+            )
+            response_dict["report"] = log.values("department", "status", "score", "rc_coe","cost_contribution", "revenue_contribution", "employee_count", "v_chain", "cost_of_employee", "weightage")
+
         response_dict["status"] = True
         return Response(response_dict, status=status.HTTP_200_OK)
 
@@ -1080,17 +1198,51 @@ class GetDepartment(APIView):
     def get(self, request, pk):
         response_dict={"status":False}
 
+        csv_file = UploadedCsvFiles.objects.filter(
+            id=pk
+        ).first()
+        
+
         departments = list(set(CsvLogDetails.objects.filter(uploaded_file__id=pk).values_list("department", flat=True)))
         departments_dict = []
         for i in departments:
-            team_list = list(set(CsvLogDetails.objects.filter(
-            uploaded_file__id=pk, department=i).values_list("team", flat=True)))
-            departments_dict.append(
-                {
-                    "department":i,
-                    "team":team_list
-                }
-            )
+            if csv_file.modules.module_identifier == 3:
+                if DepartmentWeightage.objects.filter(
+                    uploaded_file=csv_file,
+                    department=i
+                ):
+                    dep = DepartmentWeightage.objects.filter(
+                        uploaded_file=csv_file,
+                        department=i
+                    ).last()
+                    departments_dict.append(
+                        {
+                            "department":i,
+                            "team":[],
+                            "id":dep.id
+                        }
+                    )
+                else:
+                    dep = DepartmentWeightage.objects.create(
+                        uploaded_file=csv_file,
+                        department=i
+                    )
+                    departments_dict.append(
+                        {
+                            "department":i,
+                            "team":[],
+                            "id":dep.id
+                        }
+                    )
+            else:
+                team_list = list(set(CsvLogDetails.objects.filter(
+                uploaded_file__id=pk, department=i).values_list("team", flat=True)))
+                departments_dict.append(
+                    {
+                        "department":i,
+                        "team":team_list
+                    }
+                )
         response_dict["departments"] = departments_dict
         response_dict["status"] = True
         return Response(response_dict, status=status.HTTP_200_OK)
