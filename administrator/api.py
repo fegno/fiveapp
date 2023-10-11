@@ -469,7 +469,14 @@ class UploadCsv(APIView):
         to_save = []
         decoded_file = csv_file.read().decode('utf-8').splitlines()
         reader = csv.DictReader(decoded_file)
-
+        flag = True
+        for i in reader:
+            if i.get("EMPLOYEE ID") == "":
+                flag = False
+            break
+        if not flag:
+            response_dict["error"] = "CSV should contain atleast one entry"
+            return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
         upload_log = UploadedCsvFiles.objects.create(
             uploaded_by=request.user,
             modules=module,
@@ -478,16 +485,23 @@ class UploadCsv(APIView):
         )
         if module.module_identifier == 1:
             for row in reader:
-                to_save.append(
-                    CsvLogDetails(
-                        uploaded_file=upload_log,
-                        sl_no=row.get("S.NO"),
-                        employee_id=row.get("EMPLOYEE ID"),
-                        employee_name=row.get("EMPLOYEE NAME"),
-                        team=row.get("TEAM"),
-                        working_hour=row.get("WORKING HOURS/WEEK/ MONTHLY")
+                if "S.NO"in row and "EMPLOYEE ID" in row and  "EMPLOYEE NAME"  in row and "TEAM" in row and "WORKING HOURS/WEEK/ MONTHLY":
+
+                    to_save.append(
+                        CsvLogDetails(
+                            uploaded_file=upload_log,
+                            sl_no=row.get("S.NO"),
+                            employee_id=row.get("EMPLOYEE ID"),
+                            employee_name=row.get("EMPLOYEE NAME"),
+                            team=row.get("TEAM"),
+                            working_hour=row.get("WORKING HOURS/WEEK/ MONTHLY")
+                        )
                     )
-                )
+                else:
+                    upload_log.delete()
+                    response_dict["error"] = "Field Mismatch"
+                    return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
+                    
         elif module.module_identifier == 2:
             for row in reader:
                 to_save.append(
@@ -505,21 +519,25 @@ class UploadCsv(APIView):
 
         elif module.module_identifier == 3:
             for row in reader:
-                to_save.append(
-                    CsvLogDetails(
-                        uploaded_file=upload_log,
-                        sl_no=row.get("S.NO"),
-                        employee_id=row.get("EMPLOYEE ID"),
-                        employee_name=row.get("EMPLOYEE NAME"),
-                        team=row.get("TEAM"),
-                        designation=row.get("DESIGNATION"),
-                        department=row.get("DEPARTMENTS") if row.get("DEPARTMENTS") else row.get("DEPARTMENT"),
-                        working_hour=row.get("WORKING HOURS/MONTHLY"),
-                        hourly_rate=row.get("HOURLY RATE"),
-                        total_pay=round(float(row.get("WORKING HOURS/MONTHLY", 0)) * float(row.get("HOURLY RATE", 0)), 2)
+                if "S.NO" in row and "EMPLOYEE ID" in row and  "EMPLOYEE NAME" in row and "DESIGNATION" in row and "DEPARTMENTS" in row and "WORKING HOURS/MONTHLY" in row:
+                    to_save.append(
+                        CsvLogDetails(
+                            uploaded_file=upload_log,
+                            sl_no=row.get("S.NO"),
+                            employee_id=row.get("EMPLOYEE ID"),
+                            employee_name=row.get("EMPLOYEE NAME"),
+                            designation=row.get("DESIGNATION"),
+                            department=row.get("DEPARTMENTS") if row.get("DEPARTMENTS") else row.get("DEPARTMENT"),
+                            working_hour=row.get("WORKING HOURS/MONTHLY"),
+                            hourly_rate=row.get("HOURLY RATE"),
+                            total_pay=round(float(row.get("WORKING HOURS/MONTHLY", 0)) * float(row.get("HOURLY RATE", 0)), 2)
 
+                        )
                     )
-                )
+                else:
+                    upload_log.delete()
+                    response_dict["error"] = "Field Mismatch"
+                    return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
         CsvLogDetails.objects.bulk_create(to_save)
         response_dict["csv_id"] = upload_log.id
         response_dict["message"] = "Successfully uploaded"
