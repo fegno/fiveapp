@@ -934,7 +934,7 @@ class AnalyticsReport(APIView):
                     "status",
                     "resource_required"
                 )
-                response_dict["working_hour_report"] = log.values(
+                response_dict["working_hours_report"] = log.values(
                     "department", "team_actual_working_hr",
                     "team_working_hr", "total_extra_hour",
                     "status"
@@ -1008,7 +1008,7 @@ class AnalyticsReport(APIView):
                     "status",
                     "resource_required"
                 )
-                response_dict["working_hour_report"] = log.values(
+                response_dict["working_hours_report"] = log.values(
                     "team", "team_actual_working_hr",
                     "team_working_hr", "total_extra_hour",
                     "status"
@@ -1085,7 +1085,7 @@ class AnalyticsReport(APIView):
                     "status",
                     "resource_required"
                 )
-                response_dict["working_hour_report"] = log.values(
+                response_dict["working_hours_report"] = log.values(
                     "designation", "team_actual_working_hr",
                     "team_working_hr", "total_extra_hour",
                     "status"

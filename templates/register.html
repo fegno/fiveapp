@@ -1,16 +1,22 @@
 {% autoescape off %}
-<div style="width: 700px; margin: 0 auto;border: 1px solid #d0cccc; padding-bottom: 10px; font-family: Arial,Helvetica,sans-serif;">
+
+<div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 20px; border-radius: 10px; box-shadow: 0px 0px 10px 0px rgba(0, 0, 0, 0.1);border: 1px gray solid;">
 
   <div style="text-align: center;">
-   <h1 style="color:#f3a326;padding:15px 10px 20px;font-size: 28px;">OTP</h1>
-   <h3 style="font-weight: normal;">Hi, <b>{% if user.name %}{{ user.name }}{% endif %}</b> Welcome</h3>
-   <h3 style="font-weight: normal;margin-bottom: 0;margin-top: 22px;">OTP for Registration is <b style="color: #f3a326;">{{ otp }}</b></h3>
-   <p style="margin-top: 7px;color: #7b7b7b;font-size: 16px;">Do not share the OTP with anyone.</p>
+      <h1 style="color: #f3a326; font-size: 28px;">Welcome to Our Platform!</h1>
+      <p style="font-size: 16px;">Dear{% if user.name %} <b>{{ user.name }}</b> {% endif %} <b> Customer </b>,</p>
+      <div style="background-color: #f3a326; color: white; padding: 10px; border-radius: 5px; margin: 10px 0; border: 1px rgb(231, 231, 231) solid;">
+          <h2 style="font-size: 22px; margin: 0;">Your OTP for Registration</h2>
+          <p style="font-size: 18px; margin: 0;">{{ otp }}</p>
+      </div><br>
+      <p style="font-size: 16px; color: #7b7b7b;">Please do not share this OTP with anyone.</p>
 
-   <br><br><br>
+      <p style="margin-top: 40px;font-size: 14px;">If you didn't request this OTP, please ignore this message.</p>
 
-   <p style="padding-top: 40px;font-size: 14px;">Regards,</p>
-   
+      <p style="margin-top: 10px; font-size: 14px;">Best regards</p>
   </div>
- </div> 
+
+
+
+</div>
 {% endautoescape %}
