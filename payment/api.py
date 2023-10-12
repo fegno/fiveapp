@@ -15,6 +15,7 @@ from datetime import timedelta, date, datetime
 from superadmin.models import ModuleDetails, FeatureDetails,  BundleDetails
 from payment.models import PaymentAttempt
 from administrator.models import PurchaseDetails, SubscriptionDetails, AddToCart
+from user.models import CardDetails, BillingDetails
 
 import json
 import stripe
@@ -45,12 +46,23 @@ class InitiatePayment(APIView):
 		if billing_id:
 			billing = BillingDetails.objects.filter(id=billing_id, user=request.user).last()
 			if billing:
+				order.bill = billing
 				order.company_name = billing.company_name
 				order.address = billing.address
 				order.billing_contact = billing.billing_contact
 				order.issuing_country = billing.issuing_country
 				order.legal_company_name = billing.legal_company_name
 				order.tax_id = billing.tax_id
+				order.save()
+
+		if card_id:
+			card = CardDetails.objects.filter(id=card_id, user=request.user).last()
+			if card:
+				order.card = card
+				order.holder_name = billing.holder_name
+				order.card_number = billing.card_number
+				order.expiration_date = billing.expiration_date
+				order.ccv = billing.ccv
 				order.save()
 
 		if modules_ids:
@@ -359,7 +371,7 @@ class MockInitiatePayment(APIView):
 					subscription.bundle.add(bundle_id)
 		with transaction.atomic():
 			payment_attempt=PaymentAttempt.objects.create(parchase_user_type="Subscription",parchase=order,user=request.user,currency='gbp',amount=order.total_price,
-				status='Initiated',last_attempt_date=timezone.now())
+				status='succeeded',last_attempt_date=timezone.now())
 
 			response_dict['purchase-id']=payment_attempt.id
 			response_dict['status']=True
