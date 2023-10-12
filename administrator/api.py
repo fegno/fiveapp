@@ -1924,6 +1924,7 @@ class PurchaseDetailsView(APIView):
     authentication_classes = (CustomTokenAuthentication,)
 
     def get(self, request, pk):
+        print(pk)
         response_dict = {'status': False}
         admin_user = request.user
 

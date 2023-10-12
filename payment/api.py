@@ -371,7 +371,7 @@ class MockInitiatePayment(APIView):
 					subscription.bundle.add(bundle_id)
 		with transaction.atomic():
 			payment_attempt=PaymentAttempt.objects.create(parchase_user_type="Subscription",parchase=order,user=request.user,currency='gbp',amount=order.total_price,
-				status='Initiated',last_attempt_date=timezone.now())
+				status='succeeded',last_attempt_date=timezone.now())
 
 			response_dict['purchase-id']=payment_attempt.id
 			response_dict['status']=True
