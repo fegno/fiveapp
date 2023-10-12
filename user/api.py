@@ -80,7 +80,8 @@ class Applogin(APIView):
             }
             response_dict["token"] = token.key
             response_dict["status"] = True
-        return Response(response_dict, HTTP_200_OK)
+            return Response(response_dict, HTTP_200_OK)
+        return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
 
 class VerifyEmail(APIView):
     permission_classes = (AllowAny,)
