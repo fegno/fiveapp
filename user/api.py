@@ -289,16 +289,19 @@ class ChangeEmail(APIView):
         response_dict ={"status":False}
         email = request.data.get('email')
         user = request.user
-        email_exist = UserProfile.objects.filter(email=email).exists()
+        email_exist = UserProfile.objects.filter(username=email).exists()
         if email_exist:
             response_dict["error"] = "The email already in use"
             return Response(response_dict, HTTP_200_OK)
         elif user.username == email:
             response_dict["error"] = "The email already used as username"
             return Response(response_dict, HTTP_200_OK)
+        old_email = user.email
+        LoginOTP.objects.filter(email=old_email).update(email=email)
         user.email = email
         user.username = email
         user.save()
+        
         response_dict["message"] = "The email was successfully updated"
         response_dict["status"] = True
         return Response(response_dict, HTTP_200_OK)

@@ -166,15 +166,15 @@ class StripePaymentWebhook(APIView):
 							subscription.module.clear()
 							subscription.bundle.clear()
 							if order.module:
-								subscription.module.add(list(order.module.values_list("id", flat=True)))      
+								subscription.module.add(*list(order.module.values_list("id", flat=True)))      
 							if order.bundle:
-								subscription.bundle.add(list(order.bundle.values_list("id", flat=True)))    
+								subscription.bundle.add(*list(order.bundle.values_list("id", flat=True)))    
 							subscription.save()
 						else:
 							if order.module:
-								subscription.module.add(order.module.values_list("id", flat=True))      
+								subscription.module.add(*list(order.module.values_list("id", flat=True)))      
 							if order.bundle:
-								subscription.bundle.add(order.bundle.values_list("id", flat=True))    
+								subscription.bundle.add(*list(order.bundle.values_list("id", flat=True)))    
 							subscription.save()
 					else:
 						subscription = SubscriptionDetails.objects.create(
@@ -185,9 +185,9 @@ class StripePaymentWebhook(APIView):
 							subscription_type=order.subscription_type,
 						)
 						if order.module:
-							subscription.module.add(list(order.module.values_list("id", flat=True)))      
+							subscription.module.add(*list(order.module.values_list("id", flat=True)))      
 						if order.bundle:
-							subscription.bundle.add(list(order.bundle.values_list("id", flat=True)))     
+							subscription.bundle.add(*list(order.bundle.values_list("id", flat=True)))     
 						subscription.save()
 				else:
 					user = order.user
@@ -279,47 +279,26 @@ class MockInitiatePayment(APIView):
 		if bundle_ids:
 			for bundle_id in bundle_ids:
 				order.bundle.add(bundle_id)
-		# order.module.add(modules_ids)      
-		# order.bundle.add(*request.POST.getlist("bundle_ids"))    
+   
 		subscription = SubscriptionDetails.objects.filter(
 			user=order.user, 
 			is_subscribed=True
 		).last()
 
-		
-		user = order.user
-		user.is_subscribed = True
-		user.free_subscribed = False
-		user.free_subscription_end_date = timezone.now().date()
-		user.save()
-
 		if subscription:
-			if subscription.subscription_end_date < timezone.now().date():
-				subscription.subscription_start_date = order.subscription_start_date
-				subscription.subscription_end_date = order.subscription_end_date
-				subscription.is_subscribed = True
-				subscription.user.is_subscribed = True
-				subscription.module.clear()
-				subscription.bundle.clear()
-				if order.module:
-					subscription.module.add(list(order.module.values_list("id", flat=True)))      
-				if order.bundle:
-					subscription.bundle.add(list(order.bundle.values_list("id", flat=True)))    
-				subscription.save()
-			else:
-				total_days = subscription.subscription_end_date - timezone.now().date()
-				total_day = total_days.days
-				if subscription_type == "WEEK":
-					my_price = total_price/7
-					total_price = float(my_price) * float(total_day)
+			total_days = subscription.subscription_end_date - timezone.now().date()
+			total_day = total_days.days
+			if subscription_type == "WEEK":
+				my_price = total_price/7
+				total_price = float(my_price) * float(total_day)
 
-				elif subscription_type == "MONTH":
-					my_price = total_price/30
-					total_price = float(my_price) * float(total_day)
-				
-				elif subscription_type == "YEAR":
-					my_price = total_price/365
-					total_price = float(my_price) * float(total_day)
+			elif subscription_type == "MONTH":
+				my_price = total_price/30
+				total_price = float(my_price) * float(total_day)
+			
+			elif subscription_type == "YEAR":
+				my_price = total_price/365
+				total_price = float(my_price) * float(total_day)
 
 		if subscription_type == "WEEK":
 			order.subscription_start_date =  timezone.now().date()
@@ -344,35 +323,47 @@ class MockInitiatePayment(APIView):
 			order.subscription_end_date =  end_date
 		order.save()
 
-		if subscription:
-			if modules_ids:
-				for module_id in modules_ids:
-					subscription.module.add(module_id)
-			if bundle_ids:
-				for bundle_id in bundle_ids:
-					subscription.bundle.add(bundle_id)
-			subscription.subscription_start_date = timezone.now().date()
-			subscription.subscription_end_date = end_date
-			subscription.save()
+		user = order.user
+		user.is_subscribed = True
+		if user.free_subscribed:
+			user.free_subscription_end_date = timezone.now().date()
+		user.free_subscribed = False
+		user.save()
+
+		if SubscriptionDetails.objects.filter(user=order.user):
+			subscription = SubscriptionDetails.objects.filter(user=order.user).last()
+			if subscription.subscription_end_date < timezone.now().date():
+				subscription.subscription_start_date = order.subscription_start_date
+				subscription.subscription_end_date = order.subscription_end_date
+				subscription.is_subscribed = True
+				subscription.user.is_subscribed = True
+				subscription.module.clear()
+				subscription.bundle.clear()
+				if order.module:
+					subscription.module.add(*list(order.module.values_list("id", flat=True)))      
+				if order.bundle:
+					subscription.bundle.add(*list(order.bundle.values_list("id", flat=True)))    
+				subscription.save()
+			else:
+				if modules_ids:
+					subscription.module.add(*list(order.module.values_list("id", flat=True)))      
+				if bundle_ids:
+					subscription.bundle.add(*list(order.bundle.values_list("id", flat=True)))    
 		else:
 			subscription = SubscriptionDetails.objects.create(
-				user=request.user,
-				subscription_start_date=timezone.now().date(),
-				subscription_end_date=end_date,
+				user=order.user,
+				subscription_start_date=order.subscription_start_date,
+				subscription_end_date=order.subscription_end_date,
 				is_subscribed=True,
 				subscription_type=subscription_type
 			)
-			
 			if modules_ids:
-				for module_id in modules_ids:
-					subscription.module.add(module_id)
-			if bundle_ids:
-				for bundle_id in bundle_ids:
-					subscription.bundle.add(bundle_id)
+				subscription.module.add(*list(order.module.values_list("id", flat=True))) 
+			if bundle_ids:				subscription.bundle.add(*list(order.bundle.values_list("id", flat=True)))
+
 		with transaction.atomic():
 			payment_attempt=PaymentAttempt.objects.create(parchase_user_type="Subscription",parchase=order,user=request.user,currency='gbp',amount=order.total_price,
 				status='succeeded',last_attempt_date=timezone.now())
-
 			response_dict['purchase-id']=payment_attempt.id
 			response_dict['status']=True
 			response_dict["user-data"] = request.user.is_subscribed
