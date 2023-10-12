@@ -139,8 +139,8 @@ class UploadedCsvFilesSerializer(CustomSerializer):
         model = UploadedCsvFiles
         fields = "__all__"
         extra_kwargs = {
-            "created": {"format": "%d/%m/%Y %H:%M"},
-            "updated": {"format": "%d/%m/%Y %H:%M"},
+            "created": {"format": "%d/%m/%Y %I:%M %p"},
+            "updated": {"format": "%d/%m/%Y %I:%M %p"},
         }
     def to_representation(self, obj, *args, **kwargs):
         cd = super(UploadedCsvFilesSerializer, self).to_representation(
@@ -154,8 +154,8 @@ class CsvSerializers(serializers.ModelSerializer):
         model = CsvLogDetails
         fields = "__all__"
         extra_kwargs = {
-            "created": {"format": "%d/%m/%Y %H:%M"},
-            "updated": {"format": "%d/%m/%Y %H:%M"},
+            "created": {"format": "%d/%m/%Y %I:%M %p"},
+            "updated": {"format": "%d/%m/%Y %I:%M %p"},
         }
     def to_representation(self, obj, *args, **kwargs):
         cd = super(CsvSerializers, self).to_representation(
