@@ -259,113 +259,119 @@ class MockInitiatePayment(APIView):
 
 	def post(self,request):
 		response_dict={'status':False}
-		billing_id = request.data.get("billing_id")
-		card_id = request.data.get("card_id")
-		bundle_ids = request.data.get("bundle_ids")
-		modules_ids = request.data.get("modules_ids")
-		total_price = request.data.get("total_price")
-		subscription_type = request.data.get("subscription_type")
+		try:
+			billing_id = request.data.get("billing_id")
+			card_id = request.data.get("card_id")
+			bundle_ids = request.data.get("bundle_ids")
+			modules_ids = request.data.get("modules_ids")
+			total_price = request.data.get("total_price")
+			subscription_type = request.data.get("subscription_type")
 
-		order = PurchaseDetails.objects.create(
-			user=request.user,
-			status="Placed",
-			subscription_type=subscription_type,
-			total_price=total_price,
-			is_subscribed=True
-		)
-		if modules_ids:
-			for module_id in modules_ids:
-				order.module.add(module_id)
-		if bundle_ids:
-			for bundle_id in bundle_ids:
-				order.bundle.add(bundle_id)
-   
-		subscription = SubscriptionDetails.objects.filter(
-			user=order.user, 
-			is_subscribed=True
-		).last()
-
-		if subscription:
-			total_days = subscription.subscription_end_date - timezone.now().date()
-			total_day = total_days.days
-			if subscription_type == "WEEK":
-				my_price = total_price/7
-				total_price = float(my_price) * float(total_day)
-
-			elif subscription_type == "MONTH":
-				my_price = total_price/30
-				total_price = float(my_price) * float(total_day)
-			
-			elif subscription_type == "YEAR":
-				my_price = total_price/365
-				total_price = float(my_price) * float(total_day)
-
-		if subscription_type == "WEEK":
-			order.subscription_start_date =  timezone.now().date()
-			if subscription:
-				end_date = subscription.subscription_end_date
-			else:
-				end_date = timezone.now().date()  + timedelta(days=7)
-			order.subscription_end_date =  end_date
-		elif  subscription_type == "MONTH":
-			order.subscription_start_date =  timezone.now().date()
-			if subscription:
-				end_date = subscription.subscription_end_date
-			else:
-				end_date = timezone.now().date()  + timedelta(days=30)
-			order.subscription_end_date =  end_date
-		elif subscription_type == "YEAR":
-			order.subscription_start_date =  timezone.now().date() 
-			if subscription:
-				end_date = subscription.subscription_end_date
-			else:  
-				end_date = timezone.now().date()  + timedelta(days=365)
-			order.subscription_end_date =  end_date
-		order.save()
-
-		user = order.user
-		user.is_subscribed = True
-		if user.free_subscribed:
-			user.free_subscription_end_date = timezone.now().date()
-		user.free_subscribed = False
-		user.save()
-
-		if SubscriptionDetails.objects.filter(user=order.user):
-			subscription = SubscriptionDetails.objects.filter(user=order.user).last()
-			if subscription.subscription_end_date < timezone.now().date():
-				subscription.subscription_start_date = order.subscription_start_date
-				subscription.subscription_end_date = order.subscription_end_date
-				subscription.is_subscribed = True
-				subscription.user.is_subscribed = True
-				subscription.module.clear()
-				subscription.bundle.clear()
-				if order.module:
-					subscription.module.add(*list(order.module.values_list("id", flat=True)))      
-				if order.bundle:
-					subscription.bundle.add(*list(order.bundle.values_list("id", flat=True)))    
-				subscription.save()
-			else:
-				if modules_ids:
-					subscription.module.add(*list(order.module.values_list("id", flat=True)))      
-				if bundle_ids:
-					subscription.bundle.add(*list(order.bundle.values_list("id", flat=True)))    
-		else:
-			subscription = SubscriptionDetails.objects.create(
-				user=order.user,
-				subscription_start_date=order.subscription_start_date,
-				subscription_end_date=order.subscription_end_date,
-				is_subscribed=True,
-				subscription_type=subscription_type
+			order = PurchaseDetails.objects.create(
+				user=request.user,
+				status="Placed",
+				subscription_type=subscription_type,
+				total_price=total_price,
+				is_subscribed=True
 			)
 			if modules_ids:
-				subscription.module.add(*list(order.module.values_list("id", flat=True))) 
-			if bundle_ids:				subscription.bundle.add(*list(order.bundle.values_list("id", flat=True)))
+				for module_id in modules_ids:
+					order.module.add(module_id)
+			if bundle_ids:
+				for bundle_id in bundle_ids:
+					order.bundle.add(bundle_id)
+   
+			subscription = SubscriptionDetails.objects.filter(
+				user=order.user, 
+				is_subscribed=True
+			).last()
 
-		with transaction.atomic():
-			payment_attempt=PaymentAttempt.objects.create(parchase_user_type="Subscription",parchase=order,user=request.user,currency='gbp',amount=order.total_price,
-				status='succeeded',last_attempt_date=timezone.now())
-			response_dict['purchase-id']=payment_attempt.id
-			response_dict['status']=True
-			response_dict["user-data"] = request.user.is_subscribed
+			if subscription:
+				total_days = subscription.subscription_end_date - timezone.now().date()
+				total_day = total_days.days
+				if subscription_type == "WEEK":
+					my_price = total_price/7
+					total_price = float(my_price) * float(total_day)
 
-		return Response(response_dict,status.HTTP_200_OK)
+				elif subscription_type == "MONTH":
+					my_price = total_price/30
+					total_price = float(my_price) * float(total_day)
+			
+				elif subscription_type == "YEAR":
+					my_price = total_price/365
+					total_price = float(my_price) * float(total_day)
+
+			if subscription_type == "WEEK":
+				order.subscription_start_date =  timezone.now().date()
+				if subscription:
+					end_date = subscription.subscription_end_date
+				else:
+					end_date = timezone.now().date()  + timedelta(days=7)
+				order.subscription_end_date =  end_date
+			elif  subscription_type == "MONTH":
+				order.subscription_start_date =  timezone.now().date()
+				if subscription:
+					end_date = subscription.subscription_end_date
+				else:
+					end_date = timezone.now().date()  + timedelta(days=30)
+				order.subscription_end_date =  end_date
+			elif subscription_type == "YEAR":
+				order.subscription_start_date =  timezone.now().date() 
+				if subscription:
+					end_date = subscription.subscription_end_date
+				else:  
+					end_date = timezone.now().date()  + timedelta(days=365)
+				order.subscription_end_date =  end_date
+			order.save()
+
+			user = order.user
+			user.is_subscribed = True
+			if user.free_subscribed:
+				user.free_subscription_end_date = timezone.now().date()
+			user.free_subscribed = False
+			user.save()
+
+			if SubscriptionDetails.objects.filter(user=order.user):
+				subscription = SubscriptionDetails.objects.filter(user=order.user).last()
+				if subscription.subscription_end_date < timezone.now().date():
+					subscription.subscription_start_date = order.subscription_start_date
+					subscription.subscription_end_date = order.subscription_end_date
+					subscription.is_subscribed = True
+					subscription.user.is_subscribed = True
+					subscription.module.clear()
+					subscription.bundle.clear()
+					if order.module:
+						subscription.module.add(*list(order.module.values_list("id", flat=True)))      
+					if order.bundle:
+						subscription.bundle.add(*list(order.bundle.values_list("id", flat=True)))    
+					subscription.save()
+				else:
+					if modules_ids:
+						subscription.module.add(*list(order.module.values_list("id", flat=True)))      
+					if bundle_ids:
+						subscription.bundle.add(*list(order.bundle.values_list("id", flat=True)))    
+			else:
+				subscription = SubscriptionDetails.objects.create(
+					user=order.user,
+					subscription_start_date=order.subscription_start_date,
+					subscription_end_date=order.subscription_end_date,
+					is_subscribed=True,
+					subscription_type=subscription_type
+				)
+				if modules_ids:
+					subscription.module.add(*list(order.module.values_list("id", flat=True))) 
+				if bundle_ids:				
+					subscription.bundle.add(*list(order.bundle.values_list("id", flat=True)))
+
+			with transaction.atomic():
+				payment_attempt=PaymentAttempt.objects.create(parchase_user_type="Subscription",parchase=order,user=request.user,currency='gbp',amount=order.total_price,
+					status='succeeded',last_attempt_date=timezone.now())
+				response_dict['purchase-id']=payment_attempt.id
+				response_dict['status']=True
+				response_dict["user-data"] = request.user.is_subscribed
+				return Response(response_dict,status.HTTP_200_OK)
+		except Exception as e:
+			response_dict['error'] = str(e)
+			return Response(response_dict, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+		
