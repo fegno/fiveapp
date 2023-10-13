@@ -296,15 +296,59 @@ class ChangeEmail(APIView):
         elif user.username == email:
             response_dict["error"] = "The email already used as username"
             return Response(response_dict, HTTP_200_OK)
+        
+        otp = random_otp_generator()
+        LoginOTP.objects.create(
+            email=request.data.get("email"),
+            otp=otp,
+            user_type=user.user_type
+        )
+
+        html_message = render_to_string('email-change.html', {"otp": otp})
+
+        email = EmailMessage("OTP for email change", html_message, to=[email])
+        email.content_subtype = "html"
+        email.send()
+
+        # old_email = user.email
+        # LoginOTP.objects.filter(email=old_email).update(email=email)
+        # user.email = email
+        # user.username = email
+        # user.save()
+        
+        response_dict["message"] = "OTP send to email"
+        response_dict["status"] = True
+        return Response(response_dict, HTTP_200_OK)
+    
+
+
+class UpdateEmail(APIView):
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (CustomTokenAuthentication,)
+
+    def post(self, request):
+        response_dict ={"status":False}
+        email = request.data.get('email')
+        user = request.user
+        email_exist = UserProfile.objects.filter(username=email).exists()
+        if email_exist:
+            response_dict["error"] = "The email already in use"
+            return Response(response_dict, HTTP_200_OK)
+        elif user.username == email:
+            response_dict["error"] = "The email already used as username"
+            return Response(response_dict, HTTP_200_OK)
+        
+
         old_email = user.email
-        LoginOTP.objects.filter(email=old_email).update(email=email)
+        LoginOTP.objects.filter(email=old_email, is_verified=True).update(email=email)
         user.email = email
         user.username = email
         user.save()
         
-        response_dict["message"] = "The email was successfully updated"
+        response_dict["message"] = "Email Updated"
         response_dict["status"] = True
-        return Response(response_dict, HTTP_200_OK)
+        return Response(response_dict, HTTP_200_OK) 
+
 
 
 class UserDetail(APIView):

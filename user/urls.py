@@ -18,7 +18,7 @@ urlpatterns = [
     path("change-name/", api.ChangeName.as_view(), name="change-name"),
     path("change-company-name/", api.ChangeComapnyName.as_view(), name="change-company-name"),
     path("change-email/", api.ChangeEmail.as_view(), name="change-email"),
-
+    path("update-email/", api.UpdateEmail.as_view(), name='update-email'),
 
     path("billing-details-create/", api.BillingDetailsCreateView.as_view(), name="billing-details-create"),
     path("billing-details-list/", api.BillingDetailsListView.as_view(), name="billing-details-list"),
