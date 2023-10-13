@@ -292,10 +292,10 @@ class ChangeEmail(APIView):
         email_exist = UserProfile.objects.filter(username=email).exists()
         if email_exist:
             response_dict["error"] = "The email already in use"
-            return Response(response_dict, HTTP_200_OK)
+            return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
         elif user.username == email:
             response_dict["error"] = "The email already used as username"
-            return Response(response_dict, HTTP_200_OK)
+            return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
         
         otp = random_otp_generator()
         LoginOTP.objects.create(
