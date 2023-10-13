@@ -60,7 +60,7 @@ class Applogin(APIView):
                 flag = 1
             else:
                 response_dict["message"] = "Username or password incorrect"
-                return Response(response_dict, HTTP_200_OK)
+                return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
         else:
             response_dict["message"] = "Login Method DoesNotExist"
             return Response(response_dict, HTTP_200_OK)
