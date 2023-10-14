@@ -276,7 +276,7 @@ class ListBundleModules(APIView):
                     id__in=subscription.module.all().values_list("id", flat=True)
                 ).filter(id__in=user_assigned_modules.module.all().values_list("id", flat=True))            
                 response_dict["modules"] = ModuleDetailsSerializer(
-                    subscribed_modules,context={"request": request, "from_module":True}, many=True,).data
+                    subscribed_modules,context={"request": request, "from_module":True, 'admin':request.user}, many=True,).data
         
         
         response_dict["status"] = True
