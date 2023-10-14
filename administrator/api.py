@@ -140,7 +140,7 @@ class Homepage(APIView):
                 return Response(response_dict, status=status.HTTP_200_OK)
             else:
                 response_dict["error"] = "Not started your any subscription"
-                return Response(response_dict, status=status.HTTP_403_FORBIDDEN)
+                return Response(response_dict, status=status.HTTP_200_OK)
         elif user.user_type == "USER":
             user_assigned_modules = UserAssignedModules.objects.filter(
                 user=request.user
@@ -185,7 +185,7 @@ class Homepage(APIView):
                 return Response(response_dict, status=status.HTTP_200_OK)
             else:
                 response_dict["error"] = "Not started your any subscription"
-                return Response(response_dict, status=status.HTTP_403_FORBIDDEN)
+                return Response(response_dict, status=status.HTTP_200_OK)
 
         else:
             response_dict["error"] = "Access denied, Only Admin can access the module list"
