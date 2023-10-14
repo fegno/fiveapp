@@ -10,6 +10,7 @@ from superadmin.models import (
     UserAssignedModules,
   
 )
+from user.models import UserProfile
 from administrator.models import  CsvLogDetails, PurchaseDetails, SubscriptionDetails,UploadedCsvFiles
 from fiveapp.custom_serializer import CustomSerializer
 from user.serializers import UserSerializer
@@ -39,10 +40,13 @@ class ModuleDetailsSerializer(serializers.ModelSerializer):
             is_active=True, modules=obj
         ).values("id","benifit","feature"))
         cd["feature_benifit"] = feature_benifit
-        if self.context.get("from_module"):
-            cd["users_count"] = UserAssignedModules.objects.filter(
-                is_active=True, module=obj
-            ).count()
+        if self.context.get("from_module") and self.context.get("admin"):
+            user_c = list(UserAssignedModules.objects.filter(
+                is_active=True, 
+                module=obj, 
+                user__created_admin=self.context.get("admin")
+            ).values_list("user__id", flat=True))
+            cd["users_count"] = UserProfile.objects.filter(id__in=user_c).count()
         return cd
 
 
