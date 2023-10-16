@@ -306,7 +306,7 @@ class ListParchasedModules(APIView):
                     id__in=subscription.module.all().values_list("id", flat=True)
                 )            
                 response_dict["modules"] = ModuleDetailsSerializer(
-                    subscribed_modules,context={"request": request, "from_module":True}, many=True,).data
+                    subscribed_modules,context={"request": request, "from_module":True, "admin":request.user}, many=True,).data
         else:
             user_assigned_modules = UserAssignedModules.objects.filter(
                 user=request.user
@@ -321,7 +321,7 @@ class ListParchasedModules(APIView):
                     id__in=subscription.module.all().values_list("id", flat=True)
                 ).filter(id__in=user_assigned_modules.module.all().values_list("id", flat=True))            
                 response_dict["modules"] = ModuleDetailsSerializer(
-                    subscribed_modules,context={"request": request, "from_module":True}, many=True,).data
+                    subscribed_modules,context={"request": request, "from_module":True, "admin":request.user.created_admin}, many=True,).data
         
         
         response_dict["status"] = True
@@ -349,7 +349,7 @@ class ListModules(APIView):
             
         response_dict["unsubscribed_modules"] = ModuleDetailsSerializer(modules,context={"request": request}, many=True,).data
         response_dict["subscribed_modules"] = ModuleDetailsSerializer(
-            subscribed_modules,context={"request": request, "from_module":True}, many=True,).data
+            subscribed_modules,context={"request": request, "from_module":True, "admin":request.user}, many=True,).data
         response_dict["status"] = True
         return Response(response_dict, status=status.HTTP_200_OK)
 
@@ -1707,7 +1707,7 @@ class AssignModulesToUser(APIView):
                     assigned_user.module.add(module)
                     response_dict["message"] = f"User with ID {assign_user.id} added to the module id{module.id}"
         else:
-            response_dict["error"] = "Access denied, Only Admin can access the module list"
+            response_dict["error"] = "Access denied, Only Admin can access the module list."
             return Response(response_dict, status=status.HTTP_403_FORBIDDEN)
 
         return Response(response_dict, status=status.HTTP_200_OK)
