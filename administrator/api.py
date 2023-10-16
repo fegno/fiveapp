@@ -731,6 +731,34 @@ class GenerateReport(APIView):
                 response_dict["message"] = "Generated"
             except Exception as e:
                 response_dict["error"] = str(e)
+        elif csv_file.modules.module_identifier == 4:
+
+            total_working_days = request.data.get("total_working_days", 0)
+            total_working_hours = request.data.get("total_working_hours", 0)
+            company_target_achieved = request.data.get("company_target_achieved", 0)
+            department_target_achieved = request.data.get("department_target_achieved", 0)
+            company_varriable_pay_wgt = request.data.get("company_varriable_pay_wgt", 0)
+            department_varriable_pay_wgt = request.data.get("department_varriable_pay_wgt", 0)
+            
+            try:
+                for i in log:
+                    i.overtime_pay = i.extra_hour * i.hourly_rate
+                    i.no_of_holiday = (float(total_working_hours) - float(i.working_hour))/8
+                    i.holiday_hours = float(total_working_hours) - float(i.working_hour)
+                    i.holiday_pay = i.holiday_hours * i.hourly_rate
+                    i.save()
+                csv_file.is_report_generated = True
+                csv_file.total_working_days = total_working_days
+                csv_file.standard_working_hour = standard_working_hour
+                csv_file.company_target_achieved = company_target_achieved
+                csv_file.department_target_achieved = department_target_achieved
+                csv_file.company_varriable_pay_wgt = company_varriable_pay_wgt
+                csv_file.department_varriable_pay_wgt = department_varriable_pay_wgt
+                csv_file.save()
+                response_dict["status"] = True
+                response_dict["message"] = "Generated"
+            except Exception as e:
+                response_dict["error"] = str(e)
 
         else:
             response_dict["error"] = "Module not Valid"

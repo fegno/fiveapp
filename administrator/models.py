@@ -129,7 +129,7 @@ class CsvLogDetails(models.Model):
     hourly_rate = models.FloatField(null=True, blank=True, default=0)
     total_pay = models.FloatField(null=True, blank=True, default=0)
     fixed_pay = models.FloatField(null=True, blank=True, default=0)
-    indivisual_ach_in = models.FloatField(null=True, blank=True, default=0)
+    individual_ach_in = models.FloatField(null=True, blank=True, default=0)
     gross_pay = models.FloatField(null=True, blank=True, default=0)
     varriable_pay = models.FloatField(null=True, blank=True, default=0)
     overtime_pay = models.FloatField(null=True, blank=True, default=0)
