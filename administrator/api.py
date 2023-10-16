@@ -1607,12 +1607,12 @@ class UserModuleList(APIView):
     authentication_classes = (CustomTokenAuthentication,)
 
     def get(self, request, pk):
-        response_dict = {"satatus": False}
-        user_obj = UserAssignedModules.objects.filter(user_id=pk).first()
+        response_dict = {"status": False}
+        user_obj = UserAssignedModules.objects.filter(user__id=pk, module__isnull=False).last()
 
         if user_obj:
             serializer = UserAssignedModuleSerializers(user_obj)
-            response_dict["satatus"] = True
+            response_dict["status"] = True
             response_dict["modules"] = serializer.data
         else:
             response_dict["error"] = f"User with ID {pk} has no assigned modules"
@@ -1627,7 +1627,7 @@ class DeleteModule(APIView):
         response_dict = {"status": False}
 
         try :
-            user_to_delete = UserAssignedModules.objects.get(user__id=user_id)
+            user_to_delete = UserAssignedModules.objects.filter(user__id=user_id).last()
             module_to_delete = ModuleDetails.objects.get(id=module_id)
         except UserAssignedModules.DoesNotExist:
             response_dict["error"] = f"User with the id  does not exists"
