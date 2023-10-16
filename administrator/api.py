@@ -306,7 +306,7 @@ class ListParchasedModules(APIView):
                     id__in=subscription.module.all().values_list("id", flat=True)
                 )            
                 response_dict["modules"] = ModuleDetailsSerializer(
-                    subscribed_modules,context={"request": request, "from_module":True}, many=True,).data
+                    subscribed_modules,context={"request": request, "from_module":True, "admin":request.user}, many=True,).data
         else:
             user_assigned_modules = UserAssignedModules.objects.filter(
                 user=request.user
@@ -321,7 +321,7 @@ class ListParchasedModules(APIView):
                     id__in=subscription.module.all().values_list("id", flat=True)
                 ).filter(id__in=user_assigned_modules.module.all().values_list("id", flat=True))            
                 response_dict["modules"] = ModuleDetailsSerializer(
-                    subscribed_modules,context={"request": request, "from_module":True}, many=True,).data
+                    subscribed_modules,context={"request": request, "from_module":True, "admin":request.user.created_admin}, many=True,).data
         
         
         response_dict["status"] = True
@@ -348,9 +348,8 @@ class ListModules(APIView):
             modules = modules.exclude(id__in=subscription.module.all().values_list("id", flat=True))
             
         response_dict["unsubscribed_modules"] = ModuleDetailsSerializer(modules,context={"request": request}, many=True,).data
-        
         response_dict["subscribed_modules"] = ModuleDetailsSerializer(
-            subscribed_modules,context={"request": request, "from_module":True}, many=True,).data
+            subscribed_modules,context={"request": request, "from_module":True, "admin":request.user}, many=True,).data
         response_dict["status"] = True
         return Response(response_dict, status=status.HTTP_200_OK)
 
