@@ -538,6 +538,26 @@ class UploadCsv(APIView):
                     upload_log.delete()
                     response_dict["error"] = "Field Mismatch"
                     return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
+        
+        elif module.module_identifier == 4:
+            for row in reader:
+                to_save.append(
+                    CsvLogDetails(
+                        uploaded_file=upload_log,
+                        sl_no=row.get("S.NO"),
+                        employee_id=row.get("EMPLOYEE ID"),
+                        employee_name=row.get("EMPLOYEE NAME"),
+                        designation=row.get("DESIGNATION"),
+                        department=row.get("Department") if row.get("Department") else row.get("DEPARTMENT"),
+                        working_hour=row.get("WORKING HOURS/MONTH"),
+                        hourly_rate=row.get("HOURLY RATE"),
+                        extra_hour = row.get("EXTRA WORKING HOURS", 0),
+                        fixed_pay =row.get("FIXED PAY", 0),
+                        indivisual_ach_in =row.get("INDIVIDUAL  ACH. IN %")
+                    )
+                )
+
+
         CsvLogDetails.objects.bulk_create(to_save)
         response_dict["csv_id"] = upload_log.id
         response_dict["message"] = "Successfully uploaded"

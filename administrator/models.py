@@ -97,6 +97,12 @@ class UploadedCsvFiles(models.Model):
     is_report_generated = models.BooleanField(null=False, blank=True, default=False)
     working_type = models.CharField(null=True, blank=True, max_length=1000)
     monthly_revenue = models.FloatField(null=True, blank=True, default=0)
+    total_working_days = models.FloatField(null=True, blank=True, default=0)
+
+    company_target_achieved = models.FloatField(null=True, blank=True, default=0)
+    department_target_achieved = models.FloatField(null=True, blank=True, default=0)
+    company_varriable_pay_wgt = models.FloatField(null=True, blank=True, default=0)
+    department_varriable_pay_wgt = models.FloatField(null=True, blank=True, default=0)
 
     is_active = models.BooleanField(null=False, blank=True, default=True)
     created = models.DateTimeField(auto_now_add=True)
@@ -122,6 +128,17 @@ class CsvLogDetails(models.Model):
 
     hourly_rate = models.FloatField(null=True, blank=True, default=0)
     total_pay = models.FloatField(null=True, blank=True, default=0)
+    fixed_pay = models.FloatField(null=True, blank=True, default=0)
+    indivisual_ach_in = models.FloatField(null=True, blank=True, default=0)
+    gross_pay = models.FloatField(null=True, blank=True, default=0)
+    varriable_pay = models.FloatField(null=True, blank=True, default=0)
+    overtime_pay = models.FloatField(null=True, blank=True, default=0)
+    no_of_holiday = models.FloatField(null=True, blank=True, default=0)
+    holiday_hours = models.FloatField(null=True, blank=True, default=0)
+    holiday_pay = models.FloatField(null=True, blank=True, default=0)
+    individual_varriable_pay = models.FloatField(null=True, blank=True, default=0)
+    department_varriable_pay = models.FloatField(null=True, blank=True, default=0)
+    company_varriable_pay = models.FloatField(null=True, blank=True, default=0)
 
     is_active = models.BooleanField(null=False, blank=True, default=True)
     created = models.DateTimeField(auto_now_add=True)
