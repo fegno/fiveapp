@@ -348,6 +348,7 @@ class ListModules(APIView):
             modules = modules.exclude(id__in=subscription.module.all().values_list("id", flat=True))
             
         response_dict["unsubscribed_modules"] = ModuleDetailsSerializer(modules,context={"request": request}, many=True,).data
+        
         response_dict["subscribed_modules"] = ModuleDetailsSerializer(
             subscribed_modules,context={"request": request, "from_module":True, 'admin':request.user}, many=True,).data
         response_dict["status"] = True
