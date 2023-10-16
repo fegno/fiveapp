@@ -140,6 +140,10 @@ class VerifyOtp(APIView):
         created_otp = LoginOTP.objects.filter(
             email=email,
         ).order_by("-id").first()
+        if created_otp and created_otp.is_verified:
+            response_dict["error"] = "OTP already Verfied"
+            response_dict["status"] = False
+            return Response(response_dict, HTTP_200_OK)
         if created_otp and str(created_otp.otp) == str(otp):
             created_otp.is_verified = True
             created_otp.save()
