@@ -559,6 +559,10 @@ class UploadCsv(APIView):
                 )
 
 
+        if (len(to_save)) < 1:
+            upload_log.delete()
+            response_dict["error"] = "CSV should contain atleast one entry"
+            return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
         CsvLogDetails.objects.bulk_create(to_save)
         response_dict["csv_id"] = upload_log.id
         response_dict["message"] = "Successfully uploaded"
