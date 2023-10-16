@@ -1701,12 +1701,9 @@ class AssignModulesToUser(APIView):
                     response_dict["error"] = f"Module with the ID {module_id} does not exsts"
 
                 if UserAssignedModules.objects.filter(user=assign_user).exists():
-                    if UserAssignedModules.objects.filter(user=assign_user, module=module).exists():
-                        response_dict["message"] = "User  is already assigned to module"
-                    else:
-                        user_assign_object = UserAssignedModules.objects.filter(user=assign_user).first()
-                        user_assign_object.module.add(module)
-                        response_dict["message"] = "Mdule assigned for the user"
+                    user_assign_object = UserAssignedModules.objects.filter(user=assign_user).first()
+                    user_assign_object.module.add(module)
+                    response_dict["message"] = "Mdule assigned for the user"
                 else:
                     assigned_user = UserAssignedModules.objects.create(user=assign_user)
                     assigned_user.module.add(module)
