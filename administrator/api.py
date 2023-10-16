@@ -1701,7 +1701,7 @@ class AssignModulesToUser(APIView):
                     response_dict["error"] = f"Module with the ID {module_id} does not exsts"
 
                 if UserAssignedModules.objects.filter(user=assign_user).exists():
-                    if UserAssignedModules.objects.filter(user=assign_user).exists():
+                    if UserAssignedModules.objects.filter(user=assign_user, module=module).exists():
                         response_dict["message"] = "User  is already assigned to module"
                     else:
                         user_assign_object = UserAssignedModules.objects.filter(user=assign_user).first()
@@ -1712,7 +1712,7 @@ class AssignModulesToUser(APIView):
                     assigned_user.module.add(module)
                     response_dict["message"] = f"User with ID {assign_user.id} added to the module id{module.id}"
         else:
-            response_dict["error"] = "Access denied, Only Admin can access the module list."
+            response_dict["error"] = "Access denied, Only Admin can access the module list"
             return Response(response_dict, status=status.HTTP_403_FORBIDDEN)
 
         return Response(response_dict, status=status.HTTP_200_OK)
