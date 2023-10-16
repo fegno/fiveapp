@@ -1707,7 +1707,7 @@ class AssignModulesToUser(APIView):
                     assigned_user.module.add(module)
                     response_dict["message"] = f"User with ID {assign_user.id} added to the module id{module.id}"
         else:
-            response_dict["error"] = "Access denied, Only Admin can access the module list"
+            response_dict["error"] = "Access denied, Only Admin can access the module list."
             return Response(response_dict, status=status.HTTP_403_FORBIDDEN)
 
         return Response(response_dict, status=status.HTTP_200_OK)
