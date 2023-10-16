@@ -261,7 +261,7 @@ class ListBundleModules(APIView):
                     id__in=subscription.module.all().values_list("id", flat=True)
                 )            
                 response_dict["modules"] = ModuleDetailsSerializer(
-                    subscribed_modules,context={"request": request, "from_module":True}, many=True,).data
+                    subscribed_modules,context={"request": request, "from_module":True, 'admin':request.user}, many=True,).data
         else:
             user_assigned_modules = UserAssignedModules.objects.filter(
                 user=request.user
@@ -276,7 +276,7 @@ class ListBundleModules(APIView):
                     id__in=subscription.module.all().values_list("id", flat=True)
                 ).filter(id__in=user_assigned_modules.module.all().values_list("id", flat=True))            
                 response_dict["modules"] = ModuleDetailsSerializer(
-                    subscribed_modules,context={"request": request, "from_module":True}, many=True,).data
+                    subscribed_modules,context={"request": request, "from_module":True, 'admin':request.user.created_admin}, many=True,).data
         
         
         response_dict["status"] = True
@@ -538,6 +538,26 @@ class UploadCsv(APIView):
                     upload_log.delete()
                     response_dict["error"] = "Field Mismatch"
                     return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
+        
+        elif module.module_identifier == 4:
+            for row in reader:
+                to_save.append(
+                    CsvLogDetails(
+                        uploaded_file=upload_log,
+                        sl_no=row.get("S.NO"),
+                        employee_id=row.get("EMPLOYEE ID"),
+                        employee_name=row.get("EMPLOYEE NAME"),
+                        designation=row.get("DESIGNATION"),
+                        department=row.get("Department") if row.get("Department") else row.get("DEPARTMENT"),
+                        working_hour=row.get("WORKING HOURS/MONTH"),
+                        hourly_rate=row.get("HOURLY RATE"),
+                        extra_hour = row.get("EXTRA WORKING HOURS", 0),
+                        fixed_pay =row.get("FIXED PAY", 0),
+                        indivisual_ach_in =row.get("INDIVIDUAL  ACH. IN %")
+                    )
+                )
+
+
         CsvLogDetails.objects.bulk_create(to_save)
         response_dict["csv_id"] = upload_log.id
         response_dict["message"] = "Successfully uploaded"
@@ -706,6 +726,34 @@ class GenerateReport(APIView):
                     ).update(percentage=dep_value)
                 csv_file.is_report_generated = True
                 csv_file.monthly_revenue = monthly_revenue
+                csv_file.save()
+                response_dict["status"] = True
+                response_dict["message"] = "Generated"
+            except Exception as e:
+                response_dict["error"] = str(e)
+        elif csv_file.modules.module_identifier == 4:
+
+            total_working_days = request.data.get("total_working_days", 0)
+            total_working_hours = request.data.get("total_working_hours", 0)
+            company_target_achieved = request.data.get("company_target_achieved", 0)
+            department_target_achieved = request.data.get("department_target_achieved", 0)
+            company_varriable_pay_wgt = request.data.get("company_varriable_pay_wgt", 0)
+            department_varriable_pay_wgt = request.data.get("department_varriable_pay_wgt", 0)
+            
+            try:
+                for i in log:
+                    i.overtime_pay = i.extra_hour * i.hourly_rate
+                    i.no_of_holiday = (float(total_working_hours) - float(i.working_hour))/8
+                    i.holiday_hours = float(total_working_hours) - float(i.working_hour)
+                    i.holiday_pay = i.holiday_hours * i.hourly_rate
+                    i.save()
+                csv_file.is_report_generated = True
+                csv_file.total_working_days = total_working_days
+                csv_file.standard_working_hour = standard_working_hour
+                csv_file.company_target_achieved = company_target_achieved
+                csv_file.department_target_achieved = department_target_achieved
+                csv_file.company_varriable_pay_wgt = company_varriable_pay_wgt
+                csv_file.department_varriable_pay_wgt = department_varriable_pay_wgt
                 csv_file.save()
                 response_dict["status"] = True
                 response_dict["message"] = "Generated"

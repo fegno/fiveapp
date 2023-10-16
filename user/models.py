@@ -18,7 +18,7 @@ class UserProfile(AbstractUser):
     # password
     # first_name
     user_type = models.CharField(
-        max_length=50, null=False, blank=True, choices=USER_TYPE_CHOICES
+        max_length=50, null=False, blank=True, choices=USER_TYPE_CHOICES, default="SUPER_ADMIN"
     )
     mobile_no = models.CharField(
         max_length=30, verbose_name="Mobile number", null=True, blank=True
