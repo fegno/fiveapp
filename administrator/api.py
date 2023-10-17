@@ -614,40 +614,22 @@ class ViewCsv(APIView):
     authentication_classes = (CustomTokenAuthentication,)
 
     def get(self, request, pk):
-        response_dict = {"status": False}
-
-        csv_file = UploadedCsvFiles.objects.filter(
-            id=pk
-        ).first()
-        response_dict["module"] = {
-            "id":csv_file.modules.id,
-            "name":csv_file.modules.title,
-            "department":csv_file.modules.department,
-            "module_identifier":csv_file.modules.module_identifier
-        }
-        csvlog = CsvLogDetails.objects.filter(
-            uploaded_file__id=pk
-        ).filter(
-            Q(uploaded_file__uploaded_by=request.user)|
-            Q(uploaded_file__uploaded_by__created_admin=request.user)
-        ).order_by("id")
-        if not csvlog:
-            response_dict["error"] = "Log Not Found"
+        response_dict = {}
+        
+        csv_file = UploadedCsvFiles.objects.filter(id=pk).first()
+        if csv_file:
+            csv_files = csv_file.modules.csv_file
+            decoded_file = csv_files.read().decode('utf-8').splitlines()
+            reader = csv.DictReader(decoded_file)
+            data_list = [reader.fieldnames]
+            for row in reader:
+                data_list.append(list(row.values()))
+            response_dict["data"] = data_list
+            return Response(response_dict, status=status.HTTP_200_OK)
+        else:
+            response_dict["error"] = "CSV file not found."
             return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
-        items_per_page = 100
-        paginator = Paginator(csvlog, items_per_page)
-        page = request.GET.get("page")
-        try:
-            items = paginator.page(page)
-        except PageNotAnInteger:
-            items = paginator.page(1)
-        except EmptyPage:
-            items = paginator.page(paginator.num_pages)
-        serialized = CsvSerializers(items, many=True, context={"request":self.request}).data
-        items.object_list = serialized
-        response_dict["page"] = PageSerializer(items, serialize=False).data
-        response_dict["status"] = True
-        return Response(response_dict, status=status.HTTP_200_OK)
+    
 
 
 class GenerateReport(APIView):
