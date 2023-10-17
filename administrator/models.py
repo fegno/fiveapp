@@ -103,6 +103,7 @@ class UploadedCsvFiles(models.Model):
     department_target_achieved = models.FloatField(null=True, blank=True, default=0)
     company_varriable_pay_wgt = models.FloatField(null=True, blank=True, default=0)
     department_varriable_pay_wgt = models.FloatField(null=True, blank=True, default=0)
+    individual_varriable_pay_wgt = models.FloatField(null=True, blank=True, default=0)
 
     is_active = models.BooleanField(null=False, blank=True, default=True)
     created = models.DateTimeField(auto_now_add=True)

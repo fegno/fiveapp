@@ -389,7 +389,7 @@ class CheckLoginMethod(APIView):
                 response_dict["user_type"] = "USER"
         elif not user:
             if LoginOTP.objects.filter(email=email, is_verified=True):
-                otp_user = LoginOTP.objects.filter(email=email)
+                otp_user = LoginOTP.objects.filter(email=email).order_by('id').last()
                 response_dict["password_set"] = False
                 response_dict["user_type"] = otp_user.user_type
             else:

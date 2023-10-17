@@ -470,14 +470,7 @@ class UploadCsv(APIView):
         to_save = []
         decoded_file = csv_file.read().decode('utf-8').splitlines()
         reader = csv.DictReader(decoded_file)
-        flag = True
-        for i in reader:
-            if i.get("EMPLOYEE ID") == "":
-                flag = False
-            break
-        if not flag:
-            response_dict["error"] = "CSV should contain atleast one entry"
-            return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
+
         upload_log = UploadedCsvFiles.objects.create(
             uploaded_by=request.user,
             modules=module,
@@ -542,21 +535,26 @@ class UploadCsv(APIView):
         
         elif module.module_identifier == 4:
             for row in reader:
-                to_save.append(
-                    CsvLogDetails(
-                        uploaded_file=upload_log,
-                        sl_no=row.get("S.NO"),
-                        employee_id=row.get("EMPLOYEE ID"),
-                        employee_name=row.get("EMPLOYEE NAME"),
-                        designation=row.get("DESIGNATION"),
-                        department=row.get("Department") if row.get("Department") else row.get("DEPARTMENT"),
-                        working_hour=row.get("WORKING HOURS/MONTH"),
-                        hourly_rate=row.get("HOURLY RATE"),
-                        extra_hour = row.get("EXTRA WORKING HOURS", 0),
-                        fixed_pay =row.get("FIXED PAY", 0),
-                        indivisual_ach_in =row.get("INDIVIDUAL  ACH. IN %")
+                if row.get("S.NO") and row.get("S.NO") != "":
+                    individual_ach_in = 0
+                    if row.get("INDIVIDUAL ACH. IN %") and "%" in row.get("INDIVIDUAL ACH. IN %"):
+                        individual_ach_in = str(row.get("INDIVIDUAL ACH. IN %")).replace("%","")
+                        individual_ach_in = float(individual_ach_in)
+                    to_save.append(
+                        CsvLogDetails(
+                            uploaded_file=upload_log,
+                            sl_no=row.get("S.NO"),
+                            employee_id=row.get("EMPLOYEE ID"),
+                            employee_name=row.get("EMPLOYEE NAME"),
+                            designation=row.get("DESIGNATION"),
+                            department=row.get("Department") if row.get("Department") else row.get("DEPARTMENT"),
+                            working_hour=row.get("WORKING HOURS/MONTH", 0),
+                            hourly_rate=row.get("HOURLY RATE"),
+                            extra_hour = row.get("EXTRA WORKING HOURS", 0),
+                            fixed_pay =row.get("FIXED PAY", 0),
+                            individual_ach_in =individual_ach_in
+                        )
                     )
-                )
 
 
         if (len(to_save)) < 1:
@@ -719,6 +717,40 @@ class GenerateReport(APIView):
             except Exception as e:
                 response_dict["error"] = str(e)
 
+        elif csv_file.modules.module_identifier == 4:
+            total_working_days = request.data.get("total_working_days", 0)
+            total_working_hours = request.data.get("total_working_hours", 0)
+            company_target_achieved = request.data.get("company_target_achieved", 0)
+            department_target_achieved = request.data.get("department_target_achieved", 0)
+            company_varriable_pay_wgt = request.data.get("company_varriable_pay_wgt", 0)
+            department_varriable_pay_wgt = request.data.get("department_varriable_pay_wgt", 0)
+            individual_varriable_pay_wgt = request.data.get("individual_varriable_pay_wgt", 0)
+            try:
+                for i in log:
+                    i.overtime_pay = i.extra_hour * i.hourly_rate
+                    i.no_of_holiday = (float(total_working_hours) - float(i.working_hour))/8
+                    i.holiday_hours = float(i.working_hour) - float(total_working_hours)
+                    i.holiday_pay = i.holiday_hours * i.hourly_rate
+                    i.individual_varriable_pay = float(individual_varriable_pay_wgt) * i.fixed_pay * 0.5 * i.individual_ach_in
+                    i.department_varriable_pay = (float(individual_varriable_pay_wgt) * i.fixed_pay * 0.5 * float(department_varriable_pay_wgt)) - float(department_target_achieved)
+                    i.company_varriable_pay = (float(individual_varriable_pay_wgt) * i.fixed_pay * 0.5 * float(company_varriable_pay_wgt)) - float(company_target_achieved)
+                    i.varriable_pay = i.department_varriable_pay + i.individual_varriable_pay + i.individual_ach_in
+                    i.gross_pay = i.varriable_pay + i.overtime_pay + i.fixed_pay + i.holiday_pay
+                    i.save()
+
+                csv_file.is_report_generated = True
+                csv_file.total_working_days = total_working_days
+                csv_file.total_working_hours = total_working_hours
+                csv_file.company_target_achieved = company_target_achieved
+                csv_file.department_target_achieved = department_target_achieved
+                csv_file.company_varriable_pay_wgt = company_varriable_pay_wgt
+                csv_file.department_varriable_pay_wgt = department_varriable_pay_wgt
+                csv_file.individual_varriable_pay_wgt = individual_varriable_pay_wgt
+                csv_file.save()
+                response_dict["status"] = True
+                response_dict["message"] = "Generated"
+            except Exception as e:
+                response_dict["error"] = str(e)
         else:
             response_dict["error"] = "Module not Valid"
         return Response(response_dict, status=status.HTTP_200_OK)
