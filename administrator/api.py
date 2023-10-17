@@ -663,6 +663,7 @@ class GenerateReport(APIView):
         
         if csv_file.modules.module_identifier == 1 or csv_file.modules.module_identifier == 2:
             try:
+                week_working_hour = float(week_working_hour) * 5.0
                 if csv_file.working_type == "WEEK":
                     for i in log:
                         working_hr = float(i.working_hour)
