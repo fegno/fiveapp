@@ -308,7 +308,7 @@ class ChangeEmail(APIView):
             user_type=user.user_type
         )
 
-        html_message = render_to_string('email-change.html', {"otp": otp})
+        html_message = render_to_string('email-change.html', {"otp": otp,"user":user})
 
         email = EmailMessage("OTP for email change", html_message, to=[email])
         email.content_subtype = "html"

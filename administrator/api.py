@@ -613,20 +613,22 @@ class ViewCsv(APIView):
 
     def get(self, request, pk):
         response_dict = {}
-        
+
         csv_file = UploadedCsvFiles.objects.filter(id=pk).first()
         if csv_file:
             csv_files = csv_file.modules.csv_file
             decoded_file = csv_files.read().decode('utf-8').splitlines()
             reader = csv.DictReader(decoded_file)
-            data_list = [reader.fieldnames]
-            for row in reader:
-                data_list.append(list(row.values()))
+
+            # Convert the reader to a list of dictionaries
+            data_list = [row for row in reader]
+
             response_dict["data"] = data_list
             return Response(response_dict, status=status.HTTP_200_OK)
         else:
             response_dict["error"] = "CSV file not found."
             return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
+
     
 
 
@@ -1444,7 +1446,7 @@ class UserInviteModule(APIView):
                 )
                 
                 html_message = render_to_string(
-                    'register.html', {"otp":otp}
+                    'register.html', {"otp":otp, "user":user}
                 )
                 email = EmailMessage("OTP for Registration", html_message, to=[email])
                 email.content_subtype = "html"
@@ -1747,8 +1749,9 @@ class PermanentDeleteUserFromAdmin(APIView):
             admin_user.available_free_users += 1
         else:
             admin_user.available_paid_users += 1
-        admin_user.total_users +=1
-        admin_user.save()
+
+            
+        
 
         try:
             deleted_user_module = UserAssignedModules.objects.get(user=deleted_user)
