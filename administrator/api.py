@@ -615,16 +615,25 @@ class ViewCsv(APIView):
         response_dict = {}
 
         csv_file = UploadedCsvFiles.objects.filter(id=pk).first()
+        print(csv_file)
+
         if csv_file:
+            # Assuming that 'csv_file.modules.csv_file' contains the file
             csv_files = csv_file.modules.csv_file
-            decoded_file = csv_files.read().decode('utf-8').splitlines()
-            reader = csv.DictReader(decoded_file)
 
-            # Convert the reader to a list of dictionaries
-            data_list = [row for row in reader]
+            try:
+                decoded_file = csv_files.read().decode('utf-8')
+                reader = csv.DictReader(decoded_file.splitlines())
+                data_list = [reader.fieldnames]
 
-            response_dict["data"] = data_list
-            return Response(response_dict, status=status.HTTP_200_OK)
+                for row in reader:
+                    data_list.append(list(row.values()))
+
+                response_dict["data"] = data_list
+                return Response(response_dict, status=status.HTTP_200_OK)
+            except Exception as e:
+                response_dict["error"] = str(e)
+                return Response(response_dict, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         else:
             response_dict["error"] = "CSV file not found."
             return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
@@ -1750,8 +1759,6 @@ class PermanentDeleteUserFromAdmin(APIView):
         else:
             admin_user.available_paid_users += 1
 
-            
-        
 
         try:
             deleted_user_module = UserAssignedModules.objects.get(user=deleted_user)
