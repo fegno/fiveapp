@@ -1444,7 +1444,7 @@ class UserInviteModule(APIView):
                 )
                 
                 html_message = render_to_string(
-                    'register.html', {"otp":otp}
+                    'register.html', {"otp":otp, "user":user}
                 )
                 email = EmailMessage("OTP for Registration", html_message, to=[email])
                 email.content_subtype = "html"
