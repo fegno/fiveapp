@@ -619,21 +619,16 @@ class ViewCsv(APIView):
 
         if csv_file:
             # Assuming that 'csv_file.modules.csv_file' contains the file
-            csv_files = csv_file.modules.csv_file
+            csv_files = csv_file.csv_file
+            decoded_file = csv_files.read().decode('utf-8')
+            reader = csv.DictReader(decoded_file.splitlines())
+            data_list = [reader.fieldnames]
 
-            try:
-                decoded_file = csv_files.read().decode('utf-8')
-                reader = csv.DictReader(decoded_file.splitlines())
-                data_list = [reader.fieldnames]
+            for row in reader:
+                data_list.append(list(row.values()))
 
-                for row in reader:
-                    data_list.append(list(row.values()))
-
-                response_dict["data"] = data_list
-                return Response(response_dict, status=status.HTTP_200_OK)
-            except Exception as e:
-                response_dict["error"] = str(e)
-                return Response(response_dict, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            response_dict["data"] = data_list
+            return Response(response_dict, status=status.HTTP_200_OK)
         else:
             response_dict["error"] = "CSV file not found."
             return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
