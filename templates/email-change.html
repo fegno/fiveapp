@@ -1,22 +1,22 @@
+
+
 {% autoescape off %}
 
-<div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 20px; border-radius: 10px; box-shadow: 0px 0px 10px 0px rgba(0, 0, 0, 0.1);border: 1px gray solid;">
+---------- <br><br>
 
-  <div style="text-align: center;">
-      <h1 style="color: #f3a326; font-size: 28px;">Welcome to Our Platform!</h1>
-      <p style="font-size: 16px;">Dear{% if user.name %} <b>{{ user.name }}</b> {% endif %} <b> Customer </b>,</p>
-      <div style="background-color: #f3a326; color: white; padding: 10px; border-radius: 5px; margin: 10px 0; border: 1px rgb(231, 231, 231) solid;">
-          <h2 style="font-size: 22px; margin: 0;">Your OTP for Email Change</h2>
-          <p style="font-size: 18px; margin: 0;">{{ otp }}</p>
-      </div><br>
-      <p style="font-size: 16px; color: #7b7b7b;">Please do not share this OTP with anyone.</p>
+Welcome to Five App! <br><br>
 
-      <p style="margin-top: 40px;font-size: 14px;">If you didn't request this OTP, please ignore this message.</p>
+Dear{% if user.first_name %} {{ user.first_name }} {% else %} Customer {% endif %}, <br><br>
 
-      <p style="margin-top: 10px; font-size: 14px;">Best regards</p>
-  </div>
+Here is your OTP for Email Change: {{ otp }} <br><br>
 
+Please do not share this OTP with anyone. <br><br>
 
+If you didn't request this OTP, please ignore this message. <br><br>
 
-</div>
+Best regards,<br>
+Team - Five App <br><br>  
+
+----------
+
 {% endautoescape %}
