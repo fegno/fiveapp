@@ -615,7 +615,6 @@ class ViewCsv(APIView):
         response_dict = {}
 
         csv_file = UploadedCsvFiles.objects.filter(id=pk).first()
-        print(csv_file)
 
         if csv_file:
             # Assuming that 'csv_file.modules.csv_file' contains the file
