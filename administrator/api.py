@@ -613,20 +613,22 @@ class ViewCsv(APIView):
 
     def get(self, request, pk):
         response_dict = {}
-        
+
         csv_file = UploadedCsvFiles.objects.filter(id=pk).first()
         if csv_file:
             csv_files = csv_file.modules.csv_file
             decoded_file = csv_files.read().decode('utf-8').splitlines()
             reader = csv.DictReader(decoded_file)
-            data_list = [reader.fieldnames]
-            for row in reader:
-                data_list.append(list(row.values()))
+
+            # Convert the reader to a list of dictionaries
+            data_list = [row for row in reader]
+
             response_dict["data"] = data_list
             return Response(response_dict, status=status.HTTP_200_OK)
         else:
             response_dict["error"] = "CSV file not found."
             return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
+
     
 
 
