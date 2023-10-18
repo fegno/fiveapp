@@ -1749,8 +1749,9 @@ class PermanentDeleteUserFromAdmin(APIView):
             admin_user.available_free_users += 1
         else:
             admin_user.available_paid_users += 1
-        admin_user.total_users +=1
-        admin_user.save()
+
+            
+        
 
         try:
             deleted_user_module = UserAssignedModules.objects.get(user=deleted_user)
