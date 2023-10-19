@@ -33,7 +33,7 @@ from django.db.models import (
     Subquery,
     OuterRef
 )
-from fiveapp.utils import PageSerializer
+from fiveapp.utils import PageSerializer, localtime
 
 from administrator.models import PurchaseDetails, SubscriptionDetails,  CsvLogDetails, UploadedCsvFiles, AddToCart, CustomRequest, DepartmentWeightage
 from administrator.serializers import (
@@ -782,12 +782,12 @@ class ViewReport(APIView):
             "department":csv_file.modules.department,
             "module_identifier":csv_file.modules.module_identifier
         }
+        con_to_local = localtime(csv_file.created, request)
         response_dict["csv_file"] = {
             "name":csv_file.csv_file.name,
-            "created":csv_file.created.strftime("%d/%m/%Y %I:%M %p"),
+            "created":con_to_local.strftime("%d/%m/%Y %I:%M %p"),
             "uploaded_by":csv_file.uploaded_by.first_name,
         }
-
         status_list = [
             When(extra_hour__gt=0, then=Value("Overloaded")),
             When(extra_hour__lt=0, then=Value("Underloaded")),
@@ -912,9 +912,11 @@ class AnalyticsReport(APIView):
             "department":csv_file.modules.department,
             "module_identifier":csv_file.modules.module_identifier
         }
+        
+        con_to_local = localtime(csv_file.created, request)
         response_dict["csv_file"] = {
             "name":csv_file.csv_file.name,
-            "created":csv_file.created.strftime("%d/%m/%Y %I:%M %p"),
+            "created":con_to_local.strftime("%d/%m/%Y %I:%M %p"),
             "uploaded_by":csv_file.uploaded_by.first_name,
         }
 
@@ -1002,8 +1004,8 @@ class AnalyticsReport(APIView):
         elif csv_file.modules.module_identifier == 2:
 
             resource_status_list = [
-                When(diff_res__gt=0, then=Value("Overloaded")),
-                When(diff_res__lt=0, then=Value("Underloaded")),
+                When(diff_res__gte=0.5, then=Value("Overloaded")),
+                When(diff_res__lt=0.5, then=Value("Underloaded")),
                 When(diff_res=0, then=Value("Standard")),
             ]
 
