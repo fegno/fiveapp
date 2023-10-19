@@ -1047,11 +1047,14 @@ class AnalyticsReport(APIView):
                     "team_working_hr", "total_extra_hour",
                     "status"
                 )
-                response_dict["resource_status_report"] = log.annotate(status=F("resource_status")).values(
+                res_report = tuple(log.annotate(status=F("resource_status")).values(
                     "department", "employee_count",
                     "resource_required",
                     "status"
-                )
+                ))
+                for i in res_report:
+                    i["resource_required"] = round(i["resource_required"])
+                response_dict["resource_status_report"] = res_report
 
                 total_extra_hr = log.aggregate(total=Sum("total_extra_hour"))
                 response_dict["total_extra_hr"] = total_extra_hr.get("total") if total_extra_hr else 0
@@ -1126,11 +1129,16 @@ class AnalyticsReport(APIView):
                     "team_working_hr", "total_extra_hour",
                     "status"
                 )
-                response_dict["resource_status_report"] = log.annotate(status=F("resource_status")).values(
+
+                res_report = log.annotate(status=F("resource_status")).values(
                     "team", "employee_count",
                     "resource_required",
                     "status"
                 )
+                for i in res_report:
+                    i["resource_required"] = round(i["resource_required"])
+
+                response_dict["resource_status_report"] = res_report
 
                 total_extra_hr = log.aggregate(total=Sum("total_extra_hour"))
                 response_dict["total_extra_hr"] = total_extra_hr.get("total") if total_extra_hr else 0
@@ -1208,11 +1216,16 @@ class AnalyticsReport(APIView):
                     "team_working_hr", "total_extra_hour",
                     "status"
                 )
-                response_dict["resource_status_report"] = log.annotate(status=F("resource_status")).values(
+
+                res_report = log.annotate(status=F("resource_status")).values(
                     "designation", "employee_count",
                     "resource_required",
                     "status"
                 )
+                for i in res_report:
+                    i["resource_required"] = round(i["resource_required"])
+
+                response_dict["resource_status_report"] = res_report
 
                 total_extra_hr = log.aggregate(total=Sum("total_extra_hour"))
                 response_dict["total_extra_hr"] = total_extra_hr.get("total") if total_extra_hr else 0
