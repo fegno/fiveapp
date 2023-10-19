@@ -737,10 +737,11 @@ class GenerateReport(APIView):
                     i.no_of_holiday = (float(total_working_hours) - float(i.working_hour))/8
                     i.holiday_hours = float(i.working_hour) - float(total_working_hours)
                     i.holiday_pay = i.holiday_hours * i.hourly_rate
-                    i.individual_varriable_pay = float(individual_varriable_pay_wgt) * i.fixed_pay * 0.5 * i.individual_ach_in
-                    i.department_varriable_pay = (float(individual_varriable_pay_wgt) * i.fixed_pay * 0.5 * float(department_varriable_pay_wgt)) - float(department_target_achieved)
-                    i.company_varriable_pay = (float(individual_varriable_pay_wgt) * i.fixed_pay * 0.5 * float(company_varriable_pay_wgt)) - float(company_target_achieved)
-                    i.varriable_pay = i.department_varriable_pay + i.individual_varriable_pay + i.individual_ach_in
+                    ind_cal = (i.fixed_pay * float(individual_varriable_pay_wgt))/100
+                    i.individual_varriable_pay = (ind_cal * 0.5 * i.individual_ach_in)/100
+                    i.department_varriable_pay = (ind_cal *0.5)*float(department_varriable_pay_wgt)/100
+                    i.company_varriable_pay = (ind_cal * 0.5) * float(company_varriable_pay_wgt)/100
+                    i.varriable_pay = (i.department_varriable_pay + i.individual_varriable_pay) + float(i.individual_ach_in)/100
                     i.gross_pay = i.varriable_pay + i.overtime_pay + i.fixed_pay + i.holiday_pay
                     i.save()
 
@@ -857,6 +858,37 @@ class ViewReport(APIView):
             ).order_by("id"))
             
             response_dict["report"] = log
+
+        elif csv_file.modules.module_identifier == 4:
+            log  = tuple(CsvLogDetails.objects.filter(
+                uploaded_file__id=pk,
+                is_active=True
+            ).filter(
+                Q(uploaded_file__uploaded_by=request.user)|
+                Q(uploaded_file__uploaded_by__created_admin=request.user)
+            ).values(
+                "sl_no", 
+                "employee_id",
+                "employee_name",
+                "department",
+                "designation",
+                "hourly_rate",
+                "working_hour",
+                "extra_hour",
+                "gross_pay",
+                "fixed_pay",
+                "varriable_pay",
+                "overtime_pay",
+                "no_of_holiday",
+                "holiday_hours",
+                "holiday_pay",
+                "individual_ach_in",
+                "individual_varriable_pay",
+                "department_varriable_pay",
+                "company_varriable_pay"
+            ).order_by("id"))
+            
+            response_dict["report"] = log
         
         response_dict["status"] = True
         return Response(response_dict, status=status.HTTP_200_OK)
@@ -891,6 +923,7 @@ class AnalyticsReport(APIView):
             When(total_extra_hour__lt=0, then=Value("Underloaded")),
             When(total_extra_hour=0, then=Value("Standard")),
         ]
+        
         absent_status_list = [
             When(team_absent_days__gte=3, then=Value("Overloaded")),
             When(team_absent_days__gt=1,team_absent_days__lt=3 , then=Value("Underloaded")),
@@ -967,6 +1000,13 @@ class AnalyticsReport(APIView):
 
 
         elif csv_file.modules.module_identifier == 2:
+
+            resource_status_list = [
+                When(diff_res__gt=2, then=Value("Additional Resources")),
+                When(diff_res__gt=0,diff_res__lte=2, then=Value("Optimised")),
+                When(diff_res=0, then=Value("Standard")),
+            ]
+
             standard_working_hour = csv_file.standard_working_hour
             if csv_file.working_type == "MONTH":
                 standard_working_hour = standard_working_hour * 4
@@ -984,25 +1024,30 @@ class AnalyticsReport(APIView):
                     total_extra_hour=Sum("extra_hour"),
                     team_actual_working_hr=F("employee_count")*standard_working_hour
                 ).annotate(
-                    status=Case(
-                        *status_list, default=Value(""), output_field=CharField()
-                    ),
                     resource_required=F("team_working_hr")/standard_working_hour
+                ).annotate(
+                    diff_res=F("resource_required") - F("employee_count"),
+                ).annotate(
+                    resource_status=Case(
+                        *resource_status_list, default=Value(""), output_field=CharField()
+                    ),
                 ).values(
                     "department", 
                     "employee_count",
                     "team_working_hr",
                     "total_extra_hour",
                     "team_actual_working_hr",
-                    "status",
-                    "resource_required"
+                    "resource_required",
+                    "resource_status"
                 )
-                response_dict["working_hours_report"] = log.values(
+                response_dict["working_hours_report"] = log.annotate(status=Case(
+                        *status_list, default=Value(""), output_field=CharField()
+                    )).values(
                     "department", "team_actual_working_hr",
                     "team_working_hr", "total_extra_hour",
                     "status"
                 )
-                response_dict["resource_status_report"] = log.values(
+                response_dict["resource_status_report"] = log.annotate(status=F("resource_status")).values(
                     "department", "employee_count",
                     "resource_required",
                     "status"
@@ -1058,25 +1103,30 @@ class AnalyticsReport(APIView):
                     total_extra_hour=Sum("extra_hour"),
                     team_actual_working_hr=F("employee_count")*standard_working_hour
                 ).annotate(
-                    status=Case(
-                        *status_list, default=Value(""), output_field=CharField()
-                    ),
                     resource_required=F("team_working_hr")/standard_working_hour
+                ).annotate(
+                    diff_res=F("resource_required") - F("employee_count"),
+                ).annotate(
+                    resource_status=Case(
+                        *resource_status_list, default=Value(""), output_field=CharField()
+                    ),
                 ).values(
                     "team", 
                     "employee_count",
                     "team_working_hr",
                     "total_extra_hour",
                     "team_actual_working_hr",
-                    "status",
-                    "resource_required"
+                    "resource_required",
+                    "resource_status"
                 )
-                response_dict["working_hours_report"] = log.values(
+                response_dict["working_hours_report"] = log.annotate(status=Case(
+                        *status_list, default=Value(""), output_field=CharField()
+                    )).values(
                     "team", "team_actual_working_hr",
                     "team_working_hr", "total_extra_hour",
                     "status"
                 )
-                response_dict["resource_status_report"] = log.values(
+                response_dict["resource_status_report"] = log.annotate(status=F("resource_status")).values(
                     "team", "employee_count",
                     "resource_required",
                     "status"
@@ -1135,25 +1185,30 @@ class AnalyticsReport(APIView):
                     total_extra_hour=Sum("extra_hour"),
                     team_actual_working_hr=F("employee_count")*standard_working_hour
                 ).annotate(
-                    status=Case(
-                        *status_list, default=Value(""), output_field=CharField()
-                    ),
                     resource_required=F("team_working_hr")/standard_working_hour
+                ).annotate(
+                    diff_res=F("resource_required") - F("employee_count"),
+                ).annotate(
+                    resource_status=Case(
+                        *resource_status_list, default=Value(""), output_field=CharField()
+                    ),
                 ).values(
                     "designation", 
                     "employee_count",
                     "team_working_hr",
                     "total_extra_hour",
                     "team_actual_working_hr",
-                    "status",
                     "resource_required"
                 )
-                response_dict["working_hours_report"] = log.values(
+
+                response_dict["working_hours_report"] = log.annotate(status=Case(
+                        *status_list, default=Value(""), output_field=CharField()
+                    )).values(
                     "designation", "team_actual_working_hr",
                     "team_working_hr", "total_extra_hour",
                     "status"
                 )
-                response_dict["resource_status_report"] = log.values(
+                response_dict["resource_status_report"] = log.annotate(status=F("resource_status")).values(
                     "designation", "employee_count",
                     "resource_required",
                     "status"
@@ -1252,6 +1307,35 @@ class AnalyticsReport(APIView):
             )
             response_dict["report"] = log.values("department", "status", "score", "rc_coe","cost_contribution", "revenue_contribution", "employee_count", "v_chain", "cost_of_employee", "weightage")
 
+        elif csv_file.modules.module_identifier == 4:
+            log  = CsvLogDetails.objects.filter(
+                uploaded_file__id=pk
+            ).filter(
+                Q(uploaded_file__uploaded_by=request.user)|
+                Q(uploaded_file__uploaded_by__created_admin=request.user)
+            ).values("department").annotate(
+                employee_count=Count("id"),
+                total_gross_pay=Sum("gross_pay"),
+                total_fixed_pay=Sum("fixed_pay"),
+                total_varriable_pay=Sum("varriable_pay"),
+                total_overtime_pay=Sum("overtime_pay"),
+                total_varriable=Sum("varriable_pay"),
+                total_holidays=Sum("no_of_holiday"),
+                avg_rate=Avg("hourly_rate")
+            ).annotate(
+                additional_cost=(F("total_varriable")/F("total_fixed_pay"))*100,
+                total_holiday_pay=F("total_holidays")*F("avg_rate")
+            ).values(
+                "department", 
+                "employee_count",
+                "total_gross_pay",
+                "total_fixed_pay",
+                "total_varriable_pay",
+                "total_overtime_pay",
+                "total_holiday_pay",
+                "additional_cost"
+            )
+            response_dict["report"] = tuple(log)
         response_dict["status"] = True
         return Response(response_dict, status=status.HTTP_200_OK)
 
