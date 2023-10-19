@@ -783,7 +783,7 @@ class ViewReport(APIView):
         }
         response_dict["csv_file"] = {
             "name":csv_file.csv_file.name,
-            "created":csv_file.created,
+            "created":csv_file.created.strftime("%d/%m/%Y %I:%M %p"),
             "uploaded_by":csv_file.uploaded_by.first_name,
         }
 
@@ -882,7 +882,7 @@ class AnalyticsReport(APIView):
         }
         response_dict["csv_file"] = {
             "name":csv_file.csv_file.name,
-            "created":csv_file.created,
+            "created":csv_file.created.strftime("%d/%m/%Y %I:%M %p"),
             "uploaded_by":csv_file.uploaded_by.first_name,
         }
 
