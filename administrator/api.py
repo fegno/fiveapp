@@ -741,8 +741,7 @@ class GenerateReport(APIView):
                     i.individual_varriable_pay = (ind_cal * 0.5 * i.individual_ach_in)/100
                     i.department_varriable_pay = (ind_cal *0.5)*float(department_varriable_pay_wgt)/100
                     i.company_varriable_pay = (ind_cal * 0.5) * float(company_varriable_pay_wgt)/100
-                    
-                    i.varriable_pay = i.department_varriable_pay + i.individual_varriable_pay + i.individual_ach_in
+                    i.varriable_pay = (i.department_varriable_pay + i.individual_varriable_pay) + float(i.individual_ach_in)/100
                     i.gross_pay = i.varriable_pay + i.overtime_pay + i.fixed_pay + i.holiday_pay
                     i.save()
 
