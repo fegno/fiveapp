@@ -923,6 +923,7 @@ class AnalyticsReport(APIView):
             When(total_extra_hour__lt=0, then=Value("Underloaded")),
             When(total_extra_hour=0, then=Value("Standard")),
         ]
+        
         absent_status_list = [
             When(team_absent_days__gte=3, then=Value("Overloaded")),
             When(team_absent_days__gt=1,team_absent_days__lt=3 , then=Value("Underloaded")),
@@ -999,6 +1000,13 @@ class AnalyticsReport(APIView):
 
 
         elif csv_file.modules.module_identifier == 2:
+
+            resource_status_list = [
+                When(diff_res__gt=2, then=Value("Additional Resources")),
+                When(diff_res__gt=0,diff_res__lte=2, then=Value("Optimised")),
+                When(diff_res=0, then=Value("Standard")),
+            ]
+
             standard_working_hour = csv_file.standard_working_hour
             if csv_file.working_type == "MONTH":
                 standard_working_hour = standard_working_hour * 4
@@ -1016,25 +1024,30 @@ class AnalyticsReport(APIView):
                     total_extra_hour=Sum("extra_hour"),
                     team_actual_working_hr=F("employee_count")*standard_working_hour
                 ).annotate(
-                    status=Case(
-                        *status_list, default=Value(""), output_field=CharField()
-                    ),
                     resource_required=F("team_working_hr")/standard_working_hour
+                ).annotate(
+                    diff_res=F("resource_required") - F("employee_count"),
+                ).annotate(
+                    resource_status=Case(
+                        *resource_status_list, default=Value(""), output_field=CharField()
+                    ),
                 ).values(
                     "department", 
                     "employee_count",
                     "team_working_hr",
                     "total_extra_hour",
                     "team_actual_working_hr",
-                    "status",
-                    "resource_required"
+                    "resource_required",
+                    "resource_status"
                 )
-                response_dict["working_hours_report"] = log.values(
+                response_dict["working_hours_report"] = log.annotate(status=Case(
+                        *status_list, default=Value(""), output_field=CharField()
+                    )).values(
                     "department", "team_actual_working_hr",
                     "team_working_hr", "total_extra_hour",
                     "status"
                 )
-                response_dict["resource_status_report"] = log.values(
+                response_dict["resource_status_report"] = log.annotate(status=F("resource_status")).values(
                     "department", "employee_count",
                     "resource_required",
                     "status"
@@ -1090,25 +1103,30 @@ class AnalyticsReport(APIView):
                     total_extra_hour=Sum("extra_hour"),
                     team_actual_working_hr=F("employee_count")*standard_working_hour
                 ).annotate(
-                    status=Case(
-                        *status_list, default=Value(""), output_field=CharField()
-                    ),
                     resource_required=F("team_working_hr")/standard_working_hour
+                ).annotate(
+                    diff_res=F("resource_required") - F("employee_count"),
+                ).annotate(
+                    resource_status=Case(
+                        *resource_status_list, default=Value(""), output_field=CharField()
+                    ),
                 ).values(
                     "team", 
                     "employee_count",
                     "team_working_hr",
                     "total_extra_hour",
                     "team_actual_working_hr",
-                    "status",
-                    "resource_required"
+                    "resource_required",
+                    "resource_status"
                 )
-                response_dict["working_hours_report"] = log.values(
+                response_dict["working_hours_report"] = log.annotate(status=Case(
+                        *status_list, default=Value(""), output_field=CharField()
+                    )).values(
                     "team", "team_actual_working_hr",
                     "team_working_hr", "total_extra_hour",
                     "status"
                 )
-                response_dict["resource_status_report"] = log.values(
+                response_dict["resource_status_report"] = log.annotate(status=F("resource_status")).values(
                     "team", "employee_count",
                     "resource_required",
                     "status"
@@ -1167,25 +1185,30 @@ class AnalyticsReport(APIView):
                     total_extra_hour=Sum("extra_hour"),
                     team_actual_working_hr=F("employee_count")*standard_working_hour
                 ).annotate(
-                    status=Case(
-                        *status_list, default=Value(""), output_field=CharField()
-                    ),
                     resource_required=F("team_working_hr")/standard_working_hour
+                ).annotate(
+                    diff_res=F("resource_required") - F("employee_count"),
+                ).annotate(
+                    resource_status=Case(
+                        *resource_status_list, default=Value(""), output_field=CharField()
+                    ),
                 ).values(
                     "designation", 
                     "employee_count",
                     "team_working_hr",
                     "total_extra_hour",
                     "team_actual_working_hr",
-                    "status",
                     "resource_required"
                 )
-                response_dict["working_hours_report"] = log.values(
+
+                response_dict["working_hours_report"] = log.annotate(status=Case(
+                        *status_list, default=Value(""), output_field=CharField()
+                    )).values(
                     "designation", "team_actual_working_hr",
                     "team_working_hr", "total_extra_hour",
                     "status"
                 )
-                response_dict["resource_status_report"] = log.values(
+                response_dict["resource_status_report"] = log.annotate(status=F("resource_status")).values(
                     "designation", "employee_count",
                     "resource_required",
                     "status"
