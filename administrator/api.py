@@ -1002,8 +1002,8 @@ class AnalyticsReport(APIView):
         elif csv_file.modules.module_identifier == 2:
 
             resource_status_list = [
-                When(diff_res__gt=2, then=Value("Additional Resources")),
-                When(diff_res__gt=0,diff_res__lte=2, then=Value("Optimised")),
+                When(diff_res__gt=0, then=Value("Additional Resources")),
+                When(diff_res__lt=0, then=Value("Optimised")),
                 When(diff_res=0, then=Value("Standard")),
             ]
 
