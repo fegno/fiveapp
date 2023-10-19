@@ -1005,7 +1005,7 @@ class AnalyticsReport(APIView):
 
             resource_status_list = [
                 When(diff_res__gte=0.5, then=Value("Overloaded")),
-                When(diff_res__lt=0.5, then=Value("Underloaded")),
+                When(diff_res__gt=0, diff_res__lt=0.5, then=Value("Underloaded")),
                 When(diff_res=0, then=Value("Standard")),
             ]
 
