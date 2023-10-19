@@ -102,7 +102,7 @@ class Homepage(APIView):
             if subscription:
                 modules = ModuleDetails.objects.filter(is_active=True).filter(
                     id__in=subscription.module.all().values_list("id", flat=True)
-                )
+                ).order_by("module_identifier")
                 bundles = BundleDetails.objects.filter(is_active=True, id__in=subscription.bundle.all().values_list("id", flat=True))
                 assigned_user = UserAssignedModules.objects.filter(
                     user__created_admin=request.user,
@@ -124,7 +124,7 @@ class Homepage(APIView):
             elif user.take_free_subscription:
                 response_dict["free_subscription"] = True
                 if user.free_subscription_end_date and user.free_subscription_end_date > current_date:
-                    modules = ModuleDetails.objects.filter(is_active=True)
+                    modules = ModuleDetails.objects.filter(is_active=True).order_by("module_identifier")
                     bundles = BundleDetails.objects.filter(is_active=True)
                     assigned_user = UserAssignedModules.objects.filter(
                         user__created_admin=request.user,
@@ -164,7 +164,7 @@ class Homepage(APIView):
             if subscription:
                 modules = ModuleDetails.objects.filter(is_active=True, id__in=modules_list).filter(
                     id__in=subscription.module.all().values_list("id", flat=True)
-                )
+                ).order_by("module_identifier")
                 response_dict["modules"] = ModuleDetailsSerializer(modules,context={"request": request}, many=True,).data
                 response_dict["status"] = True
                 response_dict["take_subscription"] = True
@@ -177,7 +177,7 @@ class Homepage(APIView):
             elif admin.take_free_subscription:
                 response_dict["free_subscription"] = True
                 if admin.free_subscription_end_date and admin.free_subscription_end_date > current_date:
-                    modules = ModuleDetails.objects.filter(is_active=True, id__in=modules_list)
+                    modules = ModuleDetails.objects.filter(is_active=True, id__in=modules_list).order_by("module_identifier")
                     response_dict["modules"] = ModuleDetailsSerializer(modules,context={"request": request}, many=True,).data
                 else:
                     response_dict["message"] = "Free Subscription Expired"
@@ -250,7 +250,7 @@ class ListBundleModules(APIView):
         ).last()
         if bundle_modules:
             bundle_mod = bundle_modules.modules.all().values_list("id", flat=True)
-        modules = ModuleDetails.objects.filter(is_active=True, id__in=bundle_mod)
+        modules = ModuleDetails.objects.filter(is_active=True, id__in=bundle_mod).order_by("module_identifier")
         if request.user.user_type == "ADMIN":
             subscription = SubscriptionDetails.objects.filter(
                 user=request.user, 
@@ -293,7 +293,7 @@ class ListParchasedModules(APIView):
         response_dict = {"status": False}
         response_dict["modules"] = []
         current_date = timezone.now().date()
-        modules = ModuleDetails.objects.filter(is_active=True)
+        modules = ModuleDetails.objects.filter(is_active=True).order_by("module_identifier")
         subscribed_modules = []
         
         if request.user.user_type == "ADMIN":
@@ -335,7 +335,7 @@ class ListModules(APIView):
     def get(self, request):
         response_dict = {"status": False}
         current_date = timezone.now().date()
-        modules = ModuleDetails.objects.filter(is_active=True)
+        modules = ModuleDetails.objects.filter(is_active=True).order_by("module_identifier")
         subscription = SubscriptionDetails.objects.filter(
             user=request.user, 
             is_subscribed=True,
@@ -1333,7 +1333,7 @@ class AdminModules(APIView):
 
         if logined_user.user_type == 'ADMIN':
             if logined_user.free_subscribed == True:
-                free_modules = ModuleDetails.objects.all()
+                free_modules = ModuleDetails.objects.all().order_by("module_identifier")
                 response_dict["modules"] = ModuleDetailsSerializer(free_modules, context={'request':request}, many=True).data
                 response_dict["additional_users"] = self.get_users_with_password()
                 response_dict["invited_users"] = self.get_users_without_password()
