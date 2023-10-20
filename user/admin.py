@@ -4,7 +4,8 @@ from user.models import (
     CardDetails,
     UserProfile,
     Token,
-    LoginOTP
+    LoginOTP,
+    ForgotOTP
 )
 from django.contrib.auth.forms import UserCreationForm, UserChangeForm
 from django.contrib.auth.admin import UserAdmin
@@ -75,3 +76,4 @@ admin.site.register(Token)
 admin.site.register(LoginOTP)
 admin.site.register(BillingDetails)
 admin.site.register(CardDetails)
+admin.site.register(ForgotOTP)
