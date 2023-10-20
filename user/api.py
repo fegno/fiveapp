@@ -23,7 +23,7 @@ import subprocess
 from background_task import background
 from fiveapp.utils import get_error
 
-from user.models import BillingDetails, CardDetails, UserProfile, Token, LoginOTP
+from user.models import BillingDetails, CardDetails, UserProfile, Token, LoginOTP, ForgotOTP
 from user.serializers import BillingDetailsSerializer, CardDetailsSerializer, RegisterSerializer, UserSerializer
 from user.task import send_mail
 from rest_framework import status
@@ -228,6 +228,89 @@ class SetUserPassword(APIView):
         response_dict["message"] = "Password created"
         return Response(response_dict, HTTP_200_OK)
 
+class ForgotPasswordOtp(APIView):
+    permission_classes = (AllowAny,)
+    authentication_classes = tuple()
+
+    def post(self, request):
+        response_dict = {"status": False}
+        email = request.data.get("email") 
+        user = UserProfile.objects.filter(
+            username=email
+        ).last()
+        if not user:
+            response_dict["error"] = "user does not exists"
+            return Response(response_dict, HTTP_200_OK)
+
+        otp = random_otp_generator()
+        ForgotOTP.objects.create(
+            email=request.data.get("email"),
+            otp=otp,
+        )
+        html_message = render_to_string('forgot-password.html', {"otp": otp})
+        email = EmailMessage("OTP for forgot password", html_message, to=[email])
+        email.content_subtype = "html"
+        email.send()
+        response_dict["status"] = True
+        response_dict["message"] = "otp sent to the email"
+        return Response(response_dict, HTTP_200_OK)
+
+class ForgotVerifyOtp(APIView):
+    permission_classes = (AllowAny,)
+    authentication_classes = tuple()
+
+    def post(self, request):
+        response_dict = {"status": False}
+        email = request.data.get("email")
+        otp = request.data.get("otp")
+        created_otp = ForgotOTP.objects.filter(
+            email=email,
+        ).order_by("-id").first()
+        if created_otp and created_otp.is_verified:
+            response_dict["error"] = "OTP already Verfied"
+            response_dict["status"] = False
+            return Response(response_dict, HTTP_200_OK)
+        if created_otp and str(created_otp.otp) == str(otp):
+            created_otp.is_verified = True
+            created_otp.save()
+            response_dict["message"] = "Success"
+            response_dict["status"] = True
+        else:
+            response_dict["error"] = "OTP incorrect"
+            response_dict["status"] = False
+        return Response(response_dict, HTTP_200_OK)
+
+class ForgotPassword(APIView):
+    permission_classes = (AllowAny,)
+    authentication_classes = tuple()
+
+    def post(self, request):
+        response_dict = {"status": False}
+        email = request.data.get("email") 
+        new_password = request.data.get("new_password") 
+        confirm_password  = request.data.get("confirm_password") 
+
+        created_otp = ForgotOTP.objects.filter(
+            email=email,
+        ).order_by("-id").first()
+        if created_otp and not created_otp.is_verified:
+            response_dict["error"] = "Otp not verified"
+            return Response(response_dict, HTTP_200_OK)
+
+        user = UserProfile.objects.filter(
+            username=email
+        ).last()
+        if not user:
+            response_dict["error"] = "user does not exists"
+            return Response(response_dict, HTTP_200_OK)
+        if new_password != confirm_password:
+            response_dict["error"] = "Password does not match"
+            return Response(response_dict, HTTP_200_OK)
+        user.set_password(new_password)
+        user.save()
+        response_dict["status"] = True
+        response_dict["message"] = "Password changed"
+        return Response(response_dict, HTTP_200_OK)
 
 class ChangePassword(APIView):
     permission_classes = (IsAuthenticated,)

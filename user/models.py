@@ -169,7 +169,11 @@ class CardDetails(models.Model):
     ccv = models.CharField(max_length=3, null=True, blank=True)
 
 
-    
-
+class ForgotOTP(models.Model):
+    email = models.EmailField(max_length=100, null=True, blank=True)
+    otp = models.IntegerField()
+    is_verified = models.BooleanField(null=False, blank=True, default=False)
+    def __str__(self):
+        return self.email
 
 
