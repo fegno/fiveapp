@@ -142,12 +142,23 @@ class StripePaymentWebhook(APIView):
 					last_payment_json=json.dumps(event)
 				)
 				payment_attempt.status='succeeded'
-				payment_attempt.charges_json=json.dumps(intent['charges'])
-				payment_attempt.total_charge=sum(i['amount'] for i in intent['charges']['data'])
+				
+				try:
+					if intent.get('charges'):
+						payment_attempt.charges_json=json.dumps(intent.get('charges'))
+						payment_attempt.total_charge=sum(i['amount'] for i in intent.get('charges').get('data'))
+				except:
+					pass
 				order=payment_attempt.parchase
 				payment_attempt.save()
 				order.status='Placed'
-				order.received_amounts=intent['amount_received']/100
+
+				try:
+					if intent.get('amount_received'):
+						order.received_amounts=intent.get('amount_received')/100
+				except:
+					pass
+
 				order.payment_dates=timezone.now()
 				order.save()
 				
