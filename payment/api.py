@@ -130,14 +130,14 @@ class StripePaymentWebhook(APIView):
 			event = stripe.Event.construct_from(request.data,stripe.api_key)
 		except ValueError as e:
 			return HttpResponse(status=400)
-		
+
 		if event.type == 'payment_intent.succeeded':
 			intent = event.data.object # contains a stripe.PaymentIntent
 			payment_attempt=PaymentAttempt.objects.filter(payment_intent_id=intent['id'],is_active=True).first()
 			if not payment_attempt:
 				return HttpResponse(status=404)
 
-			if order.status != "Placed":
+			if payment_attempt.status != "Placed":
 				PaymentAttempt.objects.filter(payment_intent_id=intent['id']).update(
 					last_payment_json=json.dumps(event)
 				)
