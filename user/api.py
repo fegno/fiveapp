@@ -581,7 +581,7 @@ class BillingDetailsDelete(APIView):
                 billing_obj.delete()
                 response_dict["message"] = "Successfully delete address"
                 response_dict["status"] = True
-                return Response(response_dict, status=status.HTTP_404_NOT_FOUND)
+                return Response(response_dict, status=status.HTTP_200_OK)
             else:
                 response_dict["error"] = "Billing details not found for this user"
                 response_dict["status"] = False
