@@ -137,7 +137,7 @@ class StripePaymentWebhook(APIView):
 			if not payment_attempt:
 				return HttpResponse(status=404)
 
-			if payment_attempt.status != "Placed":
+			if payment_attempt.status != "succeeded":
 				PaymentAttempt.objects.filter(payment_intent_id=intent['id']).update(
 					last_payment_json=json.dumps(event)
 				)
