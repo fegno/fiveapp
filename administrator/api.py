@@ -1848,10 +1848,7 @@ class PermanentDeleteUserFromAdmin(APIView):
         except UserProfile.DoesNotExist:
             return Response({"message": "User not found or access denied", "status": False}, status=status.HTTP_404_NOT_FOUND)
         
-        if deleted_user.is_free_user:
-            admin_user.available_free_users += 1
-        else:
-            admin_user.available_paid_users += 1
+        
 
 
         try:
@@ -1880,6 +1877,12 @@ class PermanentDeleteUserFromAdmin(APIView):
         
         deleted_user.is_active = False
         deleted_user.save()
+        if deleted_user.is_free_user:
+            admin_user.available_free_users += 1
+            admin_user.save()
+        else:
+            admin_user.available_paid_users += 1
+            admin_user.save()
 
         response_dict["message"] = "Permanently marked the user as deleted and deleted all assigned modules."
         response_dict["status"] = True
