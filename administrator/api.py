@@ -1484,43 +1484,80 @@ class UserInviteModule(APIView):
 
     def post(self, request):
         response_dict = {"status": False}
-        user_login =  request.user
+        admin_login =  request.user
 
-        if user_login.user_type == 'ADMIN':
+        if admin_login.user_type == 'ADMIN':
             data = request.data
             serializer = UserInviteSerializer(data=data)
-            
-            if UserProfile.objects.filter(email=data.get("email")).exists():
+
+            user_exists = UserProfile.objects.filter(email=data.get("email")).exists()
+            deleted_user = UserProfile.objects.filter(email=data.get("email"), is_active=False).first()
+
+            if user_exists and not deleted_user:
                 response_dict["error"] = "User already exists"
                 return Response(response_dict, status=status.HTTP_200_OK)
 
-            admin_user = request.user 
-            
-            availble_free_user = admin_user.available_free_users
-            available_paid_user = admin_user.available_paid_users
+            available_free_user = admin_login.available_free_users
+            available_paid_user = admin_login.available_paid_users
 
+            selected_modules = data.get("selected_modules")
+            assigned_module_names = []
 
-            if availble_free_user>0:
+            if available_free_user>0:
+                if deleted_user:
+                    if deleted_user and deleted_user.is_free_user == True:
 
-                user = UserProfile.objects.create(
-                    user_type="USER",
-                    username=data.get("email"),
-                    email=data.get("email"),
-                    first_name=data.get("first_name"),
-                    created_admin=admin_user,
-                )
-                user.is_free_user = True
-                user.save()
+                        if selected_modules:
+                            existing_assign_delete_user = UserAssignedModules.objects.filter(user=deleted_user).first()
+                            if existing_assign_delete_user:
+                                existing_assign_delete_user.module.clear()
+                                for module_id in selected_modules:
+                                    try:
+                                        module = ModuleDetails.objects.get(id=module_id)
+                                    except ModuleDetails.DoesNotExist:
+                                        response_dict["error"] = f"Module with ID {module_id} doesn't exist"
+                                        return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
 
-                # Assign the user to selected modules
-                selected_modules = data.get("selected_modules")
-                assigned_module_names = []
-                if selected_modules:
-                        
-                        existing_assign_user = UserAssignedModules.objects.filter(user=user).first()
+                                    existing_assign_delete_user.module.add(module)
+                                    assigned_module_names.append(module.title)
+                            else:  
+                                existing_assign_delete_user = UserAssignedModules.objects.create(user=deleted_user)
+                                for module_id in selected_modules:
+                                    try:
+                                        module = ModuleDetails.objects.get(id=module_id)
+                                    except ModuleDetails.DoesNotExist:
+                                        response_dict["error"] = f"Module with ID {module_id} doesn't exist"
+                                        return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
 
-                        if existing_assign_user:
+                                    existing_assign_delete_user.module.add(module)
+                                    assigned_module_names.append(module.title)
                             
+                        else:
+                            response_dict["error"] = "No module selected"
+                        deleted_user.is_active = True
+                        deleted_user.save()
+                        admin_login.available_free_users -= 1
+                        admin_login.save()
+                        response_dict["status"] = True
+                        response_dict['message'] = "Reinvited the deleteed user"
+                    else:
+                        response_dict["error"] = "The deleted user is not a free user"  
+                        return Response(response_dict, status=status.HTTP_200_OK)
+
+                elif not deleted_user:
+                    user = UserProfile.objects.create(
+                        user_type="USER",
+                        username=data.get("email"),
+                        email=data.get("email"),
+                        first_name=data.get("first_name"),
+                        created_admin=admin_login,
+                    )
+                    user.is_free_user = True
+                    user.save()
+
+                    if selected_modules: 
+                        existing_assign_user = UserAssignedModules.objects.filter(user=user).first()
+                        if existing_assign_user:
                             existing_assign_user.module.clear()
                         else:  
                             existing_assign_user = UserAssignedModules.objects.create(user=user)
@@ -1534,64 +1571,98 @@ class UserInviteModule(APIView):
 
                             existing_assign_user.module.add(module)
                             assigned_module_names.append(module.title)
+                    else:
+                        response_dict["error"] = "No module seleceted"                 
 
-                admin_user.available_free_users -= 1
-                admin_user.save()
+                    admin_login.available_free_users -= 1
+                    admin_login.save()
 
-                # send otp to mail
-                email = request.data.get('email')
-                mail_subject = 'OTP for registration'
-                otp = random_otp_generator()
-                LoginOTP.objects.create(
-                    email=request.data.get("email"),
-                    otp=otp,
-                    user_type="USER"
-                )
-                
-                html_message = render_to_string(
-                    'register.html', {"otp":otp, "user":user}
-                )
-                email = EmailMessage("OTP for Registration", html_message, to=[email])
-                email.content_subtype = "html"
-                email.send() 
+                    # send otp to mail
+                    email = request.data.get('email')
+                    mail_subject = 'OTP for registration'
+                    otp = random_otp_generator()
+                    LoginOTP.objects.create(
+                        email=request.data.get("email"),
+                        otp=otp,
+                        user_type="USER"
+                    )
+                    
+                    html_message = render_to_string(
+                        'register.html', {"otp":otp, "user":user}
+                    )
+                    email = EmailMessage("OTP for Registration", html_message, to=[email])
+                    email.content_subtype = "html"
+                    email.send() 
 
-                response_dict["session_data"] = {
-                    "id": user.id,
-                    "name": user.first_name,
-                    "username": user.username,
-                    "email": user.email,
-                    "id": user.id,
-                    "user_type": user.user_type,
-                    "created_admin": user.created_admin.id,
-                    "assigned_module_names":assigned_module_names
-                }
-                response_dict["status"] = True
-                response_dict["message"] = "Invite OTP Send to mail"
-            else:
-                if available_paid_user>0:
+                    response_dict["session_data"] = {
+                        "id": user.id,
+                        "name": user.first_name,
+                        "username": user.username,
+                        "email": user.email,
+                        "id": user.id,
+                        "user_type": user.user_type,
+                        "created_admin": user.created_admin.id,
+                        "assigned_module_names":assigned_module_names
+                    }
+                    response_dict["status"] = True
+                    response_dict["message"] = "Invite OTP Send to mail"
+                else:
+                    response_dict["error"] = "Not a user"
+            elif available_paid_user>0:
+                if deleted_user:
+                    if deleted_user and deleted_user.is_free_user == False:
+
+                        if selected_modules:
+                            existing_assign_delete_user = UserAssignedModules.objects.filter(user=deleted_user).first()
+                            if existing_assign_delete_user:
+                                existing_assign_delete_user.module.clear()
+                                for module_id in selected_modules:
+                                    try:
+                                        module = ModuleDetails.objects.get(id=module_id)
+                                    except ModuleDetails.DoesNotExist:
+                                        response_dict["error"] = f"Module with ID {module_id} doesn't exist"
+                                        return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
+
+                                    existing_assign_delete_user.module.add(module)
+                                    assigned_module_names.append(module.title)
+                            else:  
+                                existing_assign_delete_user = UserAssignedModules.objects.create(user=deleted_user)
+                                for module_id in selected_modules:
+                                    try:
+                                        module = ModuleDetails.objects.get(id=module_id)
+                                    except ModuleDetails.DoesNotExist:
+                                        response_dict["error"] = f"Module with ID {module_id} doesn't exist"
+                                        return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
+
+                                    existing_assign_delete_user.module.add(module)
+                                    assigned_module_names.append(module.title)
+                        else:
+                            response_dict["error"] = "No module selected"
+                        deleted_user.is_active = True
+                        deleted_user.save()
+                        admin_login.available_paid_users -= 1
+                        admin_login.save()
+                        response_dict["status"] = True
+                        response_dict['message'] = "Reinvited the deleteed user"
+                    else:
+                        response_dict["error"] = "The deleted user is not a free user"  
+                        return Response(response_dict, status=status.HTTP_200_OK)
+                elif not deleted_user:
                     # Create a new UserProfile instance for the invited user
                     user = UserProfile.objects.create(
                         user_type="USER",
                         username=data.get("email"),
                         email=data.get("email"),
                         first_name=data.get("first_name"),
-                        created_admin=admin_user, 
+                        created_admin=admin_login, 
                     )
                     user.save()
 
-                    
-                    selected_modules = data.get("selected_modules")
-                    assigned_module_names = []
-
                     if selected_modules:
-                        
                         existing_assign_user = UserAssignedModules.objects.filter(user=user).first()
-
                         if existing_assign_user:
-                            
                             existing_assign_user.module.clear() 
                         else:
-                            
                             existing_assign_user = UserAssignedModules.objects.create(user=user)
 
                         for module_id in selected_modules:
@@ -1603,9 +1674,11 @@ class UserInviteModule(APIView):
 
                             existing_assign_user.module.add(module)
                             assigned_module_names.append(module.title)
+                    else:
+                        response_dict["error"] = "No module selected"
 
-                    admin_user.available_paid_users -= 1
-                    admin_user.save()
+                    admin_login.available_paid_users -= 1
+                    admin_login.save()
 
                     # send otp to mail
                     email=request.data.get('email')
@@ -1637,8 +1710,12 @@ class UserInviteModule(APIView):
                     response_dict["status"] = True
                     response_dict["message"] = "Invite OTP Send to mail"
                 else:
-                    response_dict["error"] = "No paid or free users are available"  
+                    response_dict["error"] = "Not a user"  
                     return Response(response_dict, status=status.HTTP_200_OK)
+                
+            else:
+                response_dict["error"] = "No paid or free users are available"  
+                return Response(response_dict, status=status.HTTP_200_OK)
 
         else:
             response_dict["error"] = "Access denied, Only Admin can access the module list"
@@ -1844,7 +1921,7 @@ class PermanentDeleteUserFromAdmin(APIView):
         admin_user = request.user
 
         try:
-            deleted_user = UserProfile.objects.get(id=pk, created_admin=admin_user)
+            deleted_user = UserProfile.objects.get(id=pk, created_admin=admin_user, is_active=True)
         except UserProfile.DoesNotExist:
             return Response({"message": "User not found or access denied", "status": False}, status=status.HTTP_404_NOT_FOUND)
         
@@ -1874,18 +1951,21 @@ class PermanentDeleteUserFromAdmin(APIView):
         else:
             modules_assigned = []
 
-        
-        deleted_user.is_active = False
-        deleted_user.save()
-        if deleted_user.is_free_user:
-            admin_user.available_free_users += 1
-            admin_user.save()
+        if deleted_user:
+            deleted_user.is_active = False
+            deleted_user.save()
+            if deleted_user.is_free_user:
+                admin_user.available_free_users += 1
+                admin_user.save()
+            else:
+                admin_user.available_paid_users += 1
+                admin_user.save()
+            response_dict["message"] = "Permanently marked the user as deleted and deleted all assigned modules."
+            response_dict["status"] = True
         else:
-            admin_user.available_paid_users += 1
-            admin_user.save()
-
-        response_dict["message"] = "Permanently marked the user as deleted and deleted all assigned modules."
-        response_dict["status"] = True
+            response_dict["message"] = "Already Deleted"
+            response_dict["status"] = True
+        
         return Response(response_dict, status=status.HTTP_200_OK)
 
 
