@@ -42,13 +42,14 @@ from administrator.serializers import (
     BundleDetailsSerializer,
     BundleDetailsLiteSerializer,
     ModuleSToUserserializer,
-    PaymentAttemptsSerializer,
     PurchaseHistorySerializer,
     SubscriptionModuleSerilzer,
+    SubscriptionPaymentAttemptsSerializer,
     UserAssignedModuleSerializers,
     CsvSerializers,
     UploadedCsvFilesSerializer,
     UserInviteSerializer,
+    UserPaymentAttemptsSerializer,
     UserPurchaseHistorySerializer
 )
 from superadmin.models import (
@@ -2156,9 +2157,21 @@ class PurchaseDetailsView(APIView):
             payment_details = PaymentAttempt.objects.get(parchase__id=pk, user=admin_user, status='succeeded')
 
 
-            if payment_details:
-                all_payment_details = PaymentAttemptsSerializer(payment_details, context = {'request':request}).data
+            if payment_details.parchase_user_type == 'Subscription':
+                all_payment_details = SubscriptionPaymentAttemptsSerializer(payment_details, context = {'request':request}).data
                 response_dict["invoice-details"] = all_payment_details
+                response_dict["billing-details"] = {
+                    'company_name':payment_details.parchase.bill.company_name,
+                    'address':payment_details.parchase.bill.address,
+                    'billing_contact':payment_details.parchase.bill.billing_contact,
+                    'issuing_country':payment_details.parchase.bill.issuing_country,
+                    'legal_company_name':payment_details.parchase.bill.legal_company_name,
+                    'tax_id':payment_details.parchase.bill.tax_id
+                }
+                return Response(response_dict, status=status.HTTP_200_OK)
+            
+            elif payment_details.parchase_user_type == 'User':
+                all_payment_details = UserPaymentAttemptsSerializer(payment_details, context = {'request':request}).data
                 response_dict["invoice-details"] = all_payment_details
                 response_dict["billing-details"] = {
                     'company_name':payment_details.parchase.bill.company_name,
