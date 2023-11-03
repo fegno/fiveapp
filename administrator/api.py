@@ -1985,6 +1985,14 @@ class CartHome(APIView):
 
         users_with_password_count = UserProfile.objects.filter(created_admin=admin_user).exclude(password='').count()
     
+        # assigned_users = UserAssignedModules.objects.filter(
+        #     user_created_admin=request.user,
+        #     module__id__in=subscribed_module.module.all().values_list("id", flat=True)
+        #         ).values_list("user__id", flat=True)
+        # user_c  = UserProfile.objects.filter(id__in=assigned_users).count()
+
+        # print(user_c)
+
         response_dict["subscribed_module"] = SubscriptionModuleSerilzer(subscribed_module, context={'request':request}, many=True).data
         response_dict["module_count"] = module_count['total_modules']
         response_dict["total_user_count"] = total_user_count
@@ -1996,12 +2004,12 @@ class UserPurchasePrice(APIView):
     permission_classes = (IsAuthenticated,)
     authentication_classes = (CustomTokenAuthentication,)
 
-    def post(self, request):
+    def get(self, request):
        
         response_dict = {"status":True}
         admin_user = request.user
 
-        admin_subscription = SubscriptionDetails.objects.filter(user=admin_user).first()
+        admin_subscription = SubscriptionDetails.objects.filter(user=admin_user, is_subscribed=True).first()
 
         if admin_subscription is None:
             return Response({"error": "Admin subscription not found"}, status=status.HTTP_404_NOT_FOUND)
@@ -2063,7 +2071,7 @@ class AddToCartView(APIView):
 
                 if AddToCart.objects.filter(added_by=admin_user, is_active=True).exists():
                     cart_obj = AddToCart.objects.filter(added_by=admin_user).last()
-                    cart_obj.count = user_count
+                    cart_obj.count = cart_obj.count + user_count
                     cart_obj.amount = amount
                     cart_obj.save()
                     response_dict["message"] = "Update the User count"

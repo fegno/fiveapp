@@ -10,7 +10,6 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from user.api_permissions import CustomTokenAuthentication, IsAdmin
 from rest_framework.views import APIView
 from rest_framework import status
-from datetime import timedelta, date, datetime
 
 from superadmin.models import ModuleDetails, FeatureDetails,  BundleDetails
 from payment.models import PaymentAttempt
@@ -21,6 +20,69 @@ import json
 import stripe
 import requests
 from fiveapp import settings
+from datetime import timedelta, date, datetime
+from django.views.decorators.csrf import csrf_exempt
+
+
+class ModuleBundlePurchaserice(APIView):
+	permission_classes = (IsAuthenticated,)
+	authentication_classes = (CustomTokenAuthentication,)
+
+	def post(self, request):
+		response_dict = {"status":True}
+
+		bundle_ids = request.data.get("bundle_ids", [])
+		modules_ids = request.data.get("modules_ids", [])
+
+		subscription = SubscriptionDetails.objects.filter(user=request.user, is_active=True).first()
+		if subscription is None:
+			return Response({"error": "Admin subscription not found"}, status=status.HTTP_404_NOT_FOUND)
+		if not hasattr(subscription, 'subscription_end_date'):
+			return Response({"error": "Admin subscription doesn't have a subscription_end_date"}, status=status.HTTP_400_BAD_REQUEST)
+
+		current_date = datetime.now().date()
+		subscription_end_date = subscription.subscription_end_date
+		remaining_days = (subscription_end_date - current_date).days
+
+		
+		final_price = 0
+
+		for module_id in modules_ids:
+			module_obj = ModuleDetails.objects.get(id=module_id)
+			remaining_price = 0
+
+			if subscription.subscription_type == "WEEK":
+				module_price = module_obj.weekly_price
+				remaining_price = (module_price / 7)* remaining_days
+			elif subscription.subscription_type == "MONTH":
+				module_price = module_obj.monthly_price
+				remaining_price = (module_price/30)* remaining_days
+			elif subscription.subscription_type == "YEAR":
+				module_price = module_obj.yearly_price
+				remaining_price = (module_price/365)* remaining_days
+
+			final_price = final_price + remaining_price
+		
+		for bundle_id in bundle_ids:
+			bundle_obj = BundleDetails.objects.get(id=bundle_ids)
+
+			if subscription.subscription_end_date == "WEEK":
+				bundle_price = bundle_obj.weekly_price
+				remaining_price = (bundle_price/7) * remaining_days
+			elif subscription.subscription_type == "MONTH":
+				bundle_price = bundle_obj.monthly_price
+				remaining_price = (bundle_price/30)* remaining_days
+			elif subscription.subscription_type == "YEAR":
+				bundle_price = bundle_obj.yearly_price
+				remaining_price = (bundle_price/365)* remaining_days
+
+
+		response_dict["final_price"] = final_price
+		response_dict["subscription_type"] = subscription.subscription_type
+		response_dict["subscription_end_date"] = subscription_end_date
+
+		return Response(response_dict, status=status.HTTP_200_OK)
+
 
 
 class InitiatePayment(APIView):
