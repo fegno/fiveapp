@@ -205,7 +205,7 @@ class PurchaseHistorySerializer(serializers.ModelSerializer):
     bundle = BundleDetailsSerializer(many=True)
     class Meta:
         model = PurchaseDetails
-        fields = ('id', 'user', 'module', 'bundle', 'total_price', 'subscription_start_date', 'subscription_end_date', 'subscription_type', 'status')
+        fields = ('id', 'user', 'module', 'bundle', 'total_price', 'subscription_start_date', 'subscription_end_date', 'subscription_type','received_amounts', 'payment_dates','parchase_user_type', 'status')
 
     def to_representation(self, instance):
         representation = super().to_representation(instance)
@@ -233,8 +233,29 @@ class UserPurchaseHistorySerializer(serializers.ModelSerializer):
         return representation
 
 
-class PaymentAttemptsSerializer(serializers.ModelSerializer):
+class SubscriptionPaymentAttemptsSerializer(serializers.ModelSerializer):
     parchase = PurchaseHistorySerializer()
     class Meta:
         model = PaymentAttempt
-        fields = ('parchase', 'user', 'payment_intent_id', 'amount', 'total_charge', 'client_secret', 'last_attempt_date')
+        fields = ('parchase', 'payment_intent_id', 'amount', 'total_charge', 'client_secret', 'last_attempt_date')
+
+
+class UserPurchaseHistorySerializers(serializers.ModelSerializer):
+    user = UserSerializer()
+    class Meta:
+        model = PurchaseDetails
+        fields = (
+            'user', 'bill', 
+            'card', 'subscription_start_date', 
+            'subscription_end_date', 'is_subscribed', 
+            'subscription_type', 'received_amounts', 
+            'payment_dates', 'parchase_user_type',
+            'user_count', 'status'
+            )
+
+
+class UserPaymentAttemptsSerializer(serializers.ModelSerializer):
+    parchase = UserPurchaseHistorySerializers()
+    class Meta:
+        model = PaymentAttempt
+        fields = ('parchase', 'payment_intent_id', 'amount', 'total_charge', 'client_secret', 'last_attempt_date')
