@@ -556,7 +556,28 @@ class UploadCsv(APIView):
                             individual_ach_in =individual_ach_in
                         )
                     )
+        elif module.module_identifier == 5:
+            for row in reader:
+                gender = ""
+                if row.get("Gender"):
+                    gender = row.get("Gender").replace(" ","")
+                to_save.append(
+                    CsvLogDetails(
+                        uploaded_file=upload_log,
+                        sl_no=row.get("S.NO"),
+                        employee_id=row.get("EMPLOYEE ID"),
+                        employee_name=row.get("EMPLOYEE NAME"),
+                        designation=row.get("DESIGNATION"),
+                        department=row.get("department"),
+                        working_hour=row.get("WORKING HOURS/ MONTH"),
+                        age=row.get("AGE"),
+                        fixed_pay =row.get("FIXED PAY", 0),
+                        experience=row.get("experience"),
+                        region=row.get("Region"),
+                        gender=gender,
 
+                    )
+                )
 
         if (len(to_save)) < 1:
             upload_log.delete()
@@ -759,6 +780,15 @@ class GenerateReport(APIView):
                 response_dict["message"] = "Generated"
             except Exception as e:
                 response_dict["error"] = str(e)
+        elif csv_file.modules.module_identifier == 5:
+            try:
+                csv_file.is_report_generated = True
+                csv_file.save()
+                response_dict["status"] = True
+                response_dict["message"] = "Generated"
+            except Exception as e:
+                response_dict["error"] = str(e)
+
         else:
             response_dict["error"] = "Module not Valid"
         return Response(response_dict, status=status.HTTP_200_OK)
@@ -888,6 +918,29 @@ class ViewReport(APIView):
                 "department_varriable_pay",
                 "company_varriable_pay"
             ).order_by("id"))
+            
+            response_dict["report"] = log
+
+        elif csv_file.modules.module_identifier == 5:
+            log  = tuple(CsvLogDetails.objects.filter(
+                uploaded_file__id=pk,
+                is_active=True
+            ).filter(
+                Q(uploaded_file__uploaded_by=request.user)|
+                Q(uploaded_file__uploaded_by__created_admin=request.user)
+            ).values(
+                "sl_no", 
+                "employee_id",
+                "employee_name",
+                "department",
+                "designation",
+                "fixed_pay",
+                "age",
+                "experience",
+                "gender",
+                "region"
+            ).order_by("id"))
+            print(log , "pppppppppppp")
             
             response_dict["report"] = log
         
@@ -1353,6 +1406,89 @@ class AnalyticsReport(APIView):
                 "additional_cost"
             )
             response_dict["report"] = tuple(log)
+
+        elif csv_file.modules.module_identifier == 5:
+            select_country = request.GET.get("select_country")
+            select_department = request.GET.get("select_department")
+            select_designation = request.GET.get("select_designation")
+            select_experience = request.GET.get("select_experience")
+
+            log  = CsvLogDetails.objects.filter(
+                uploaded_file__id=pk
+            ).filter(
+                Q(uploaded_file__uploaded_by=request.user)|
+                Q(uploaded_file__uploaded_by__created_admin=request.user)
+            ).values("region").annotate(
+                male_count=Count(Case(When(
+                    gender__in=["MALE", "Male", "male"],then=F("sl_no")
+                ))),
+                female_count=Count(Case(When(
+                    gender__in=["FEMALE", "Female", "female"], then=F("sl_no")
+                ))),
+                total_count=Count("sl_no")
+            ).annotate(
+                male=F("male_count")*100/F("total_count"),
+                female=F("female_count")*100/F("total_count")
+            ).values(
+                "region", 
+                "male",
+                "female",
+            )
+
+            individual_report = CsvLogDetails.objects.filter(
+                uploaded_file__id=pk
+            ).filter(
+                Q(uploaded_file__uploaded_by=request.user)|
+                Q(uploaded_file__uploaded_by__created_admin=request.user)
+            )
+            if select_country:
+                individual_report = individual_report.filter(region=select_country)
+            if select_department:
+                individual_report = individual_report.filter(department=select_department)
+            if select_designation:
+                individual_report = individual_report.filter(designation=select_designation)
+            if select_experience:
+                individual_report = individual_report.filter(experience=select_experience)
+
+            if select_country:
+                male_count = 0
+                female_count= 0
+                male_pay= 0
+                female_pay = 0
+                total_gap = 0
+                individual_report = individual_report.aggregate(
+                    male_count=Count(Case(When(gender__in=["MALE", "Male", "male"],then=F("sl_no")))),
+                    female_count=Count(Case(When(gender__in=["FEMALE", "Female", "female"],then=F("sl_no")))),
+                    male_pay=Avg(Case(When(gender__in=["MALE", "Male", "male"],then=F("fixed_pay")))),
+                    female_pay=Avg(Case(When(gender__in=["FEMALE", "Female", "female"],then=F("fixed_pay")))),
+                    total=Count("sl_no")
+                )
+                if individual_report:
+               
+                    male_count = individual_report["male_count"] or 0
+                    male_count = round(male_count*100/individual_report["total"], 1)
+
+                    female_count = individual_report["female_count"] or 0
+                    female_count = round(female_count*100/individual_report["total"], 1)
+
+                    female_pay = round(individual_report["female_pay"] or 0,1)
+                    male_pay = round(individual_report["male_pay"] or 0,1)
+
+                    total_gap = female_pay - male_pay
+                    if total_gap <0 :
+                        total_gap = total_gap * -1
+
+                individual_report_date = {
+                    "male":male_count,
+                    "female":female_count,
+                    "male_pay":male_pay,
+                    "female_pay":female_pay,
+                    "pay_gap":total_gap
+                }
+                response_dict["individual_report"] = individual_report_date
+
+            response_dict["region_report"] = tuple(log)
+
         response_dict["status"] = True
         return Response(response_dict, status=status.HTTP_200_OK)
 
