@@ -1,6 +1,7 @@
 import re
 import string
 import random
+from django.forms import ValidationError
 from django.shortcuts import render
 from django.shortcuts import get_object_or_404
 from django.contrib.auth import authenticate
@@ -209,6 +210,7 @@ class AppLogout(APIView):
         response_dict["message"] = "Logout successfully"
         return Response(response_dict, HTTP_200_OK)
 
+
 class SetUserPassword(APIView):
     permission_classes = (AllowAny,)
     authentication_classes = tuple()
@@ -218,9 +220,26 @@ class SetUserPassword(APIView):
         email = request.data.get("email") 
         new_password = request.data.get("new_password") 
         confirm_password  = request.data.get("confirm_password") 
+
+        errors = []
+
+        if len(new_password) < 8:
+            errors.append("Password must be at least 8 characters long.")
+        if not re.search("[a-z]", new_password):
+            errors.append("Password must contain at least one lowercase letter.")
+        if not re.search("[A-Z]", new_password):
+            errors.append("Password must contain at least one uppercase letter.")
+        if not re.search("[0-9]", new_password):
+            errors.append("Password must contain at least one number.")
+        if not re.search("[!@#$%^&*]", new_password):
+            errors.append("Password must contain at least one special character: !@#$%^&*")
         if new_password != confirm_password:
-            response_dict["error"] = "Password does not match"
-            return Response(response_dict, HTTP_200_OK)
+            errors.append("Passwords do not match.")
+
+        if errors:
+            response_dict["error"] = ", ".join(errors)
+            return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
+
         user = UserProfile.objects.filter(username=email).first()
         user.set_password(new_password)
         user.save()
@@ -297,6 +316,7 @@ class ForgotPassword(APIView):
             response_dict["error"] = "Otp not verified"
             return Response(response_dict, HTTP_200_OK)
 
+
         user = UserProfile.objects.filter(
             username=email
         ).last()
@@ -322,12 +342,30 @@ class ChangePassword(APIView):
         old_password = request.data.get("old_password") 
         new_password = request.data.get("new_password") 
         confirm_password  = request.data.get("confirm_password") 
-        if new_password != confirm_password:
-            response_dict["error"] = "Password does not match"
-            return Response(response_dict, HTTP_200_OK)
+
         if not user.check_password(old_password):
             response_dict["error"] = "Old Password is incorrect"
             return Response(response_dict, HTTP_200_OK)
+
+        errors = []
+
+        if len(new_password) < 8:
+            errors.append("Password must be at least 8 characters long.")
+        if not re.search("[a-z]", new_password):
+            errors.append("Password must contain at least one lowercase letter.")
+        if not re.search("[A-Z]", new_password):
+            errors.append("Password must contain at least one uppercase letter.")
+        if not re.search("[0-9]", new_password):
+            errors.append("Password must contain at least one number.")
+        if not re.search("[!@#$%^&*]", new_password):
+            errors.append("Password must contain at least one special character: !@#$%^&*")
+        if new_password != confirm_password:
+            errors.append("Passwords do not match.")
+
+        if errors:
+            response_dict["error"] = ", ".join(errors)
+            return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
+        
         user.set_password(new_password)
         user.save()
         response_dict["status"] = True
