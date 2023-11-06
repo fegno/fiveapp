@@ -209,8 +209,7 @@ class AppLogout(APIView):
         response_dict = {"status": True}
         response_dict["message"] = "Logout successfully"
         return Response(response_dict, HTTP_200_OK)
-import re
-from django.contrib.auth import get_user_model
+
 
 class SetUserPassword(APIView):
     permission_classes = (AllowAny,)
