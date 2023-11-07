@@ -99,6 +99,8 @@ class Homepage(APIView):
                 expired_subscription = SubscriptionDetails.objects.filter(
                     user=request.user
                 ).order_by("-id").first()
+                exp_modules = ModuleDetails.objects.filter(is_active=True).filter(id__in=expired_subscription.module.all().values_list("id", flat=True)).order_by("module_identifier")
+                exp_bundles = BundleDetails.objects.filter(is_active=True, id__in=expired_subscription.bundle.all().values_list("id", flat=True))
 
             if subscription:
                 modules = ModuleDetails.objects.filter(is_active=True).filter(
@@ -121,6 +123,8 @@ class Homepage(APIView):
                 response_dict["message"] = "Subscription Expired"
                 response_dict["status"] = True
                 response_dict["take_subscription"] = True
+                response_dict["expired_modules"] = ModuleDetailsSerializer(exp_modules, context={"request":request}, many=True).data
+                response_dict["expired_bundles"] = ModuleDetailsSerializer(exp_bundles, context={"request":request}, many=True).data
                 return Response(response_dict, status=status.HTTP_200_OK)
             elif user.take_free_subscription:
                 response_dict["free_subscription"] = True
@@ -136,7 +140,12 @@ class Homepage(APIView):
                     response_dict["bundles"] = BundleDetailsSerializer(bundles,context={"request": request}, many=True).data
                     response_dict["modules"] = ModuleDetailsSerializer(modules,context={"request": request}, many=True,).data
                 else:
-                    response_dict["message"] = "Free Subscription Expired"
+                    if user.free_subscription_end_date < current_date:
+                        exp_modules = ModuleDetails.objects.filter(is_active=True).order_by("module_identifier")
+                        exp_bundles = BundleDetails.objects.filter(is_active=True)
+                        response_dict["message"] = "Free Subscription Expired"
+                        response_dict["modules"] = ModuleDetailsSerializer(exp_modules,context={"request": request}, many=True,).data
+                        response_dict["bundles"] = BundleDetailsSerializer(exp_bundles,context={"request": request}, many=True).data
                 response_dict["take_subscription"] = True
                 response_dict["status"] = True
                 return Response(response_dict, status=status.HTTP_200_OK)
