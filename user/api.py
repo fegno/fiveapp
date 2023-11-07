@@ -98,7 +98,10 @@ class VerifyEmail(APIView):
             response_dict["message"] = "Verified"
             response_dict["status"] = True
         else:
-            response_dict["error"] = "Email already added"
+            response_dict["error"] = "Email already added by someone"
+            response_dict["User_type"] = created_otp.user_type
+            created_admin_email = created_otp.created_admin.email if created_otp.created_admin else None
+            response_dict["Created_by"] = created_admin_email
             response_dict["status"] = False
         return Response(response_dict, HTTP_200_OK)
 
