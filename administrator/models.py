@@ -126,6 +126,10 @@ class CsvLogDetails(models.Model):
     working_hour = models.FloatField(null=True, blank=True, default=0)
     extra_hour = models.FloatField(null=True, blank=True, default=0)
     absent_days = models.FloatField(null=True, blank=True, default=0)
+    gender = models.CharField(null=True, blank=True, max_length=1000)
+    region = models.CharField(null=True, blank=True, max_length=1000)
+    experience = models.CharField(null=True, blank=True, max_length=1000)
+    age = models.IntegerField(null=True, blank=True)
 
     hourly_rate = models.FloatField(null=True, blank=True, default=0)
     total_pay = models.FloatField(null=True, blank=True, default=0)
