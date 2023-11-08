@@ -99,16 +99,7 @@ class Homepage(APIView):
                 expired_subscription = SubscriptionDetails.objects.filter(
                     user=request.user
                 ).order_by("-id").first()
-                if expired_subscription:
-                    exp_modules = ModuleDetails.objects.filter(is_active=True).filter(id__in=expired_subscription.module.all().values_list("id", flat=True)).order_by("module_identifier")
-                    exp_bundles = BundleDetails.objects.filter(is_active=True, id__in=expired_subscription.bundle.all().values_list("id", flat=True))
-                    response_dict["message"] = "Subscription Expired"
-                    response_dict["expired_modules"] = ModuleDetailsSerializer(exp_modules, context={"request":request}, many=True).data
-                    response_dict["expired_bundles"] = ModuleDetailsSerializer(exp_bundles, context={"request":request}, many=True).data
-                    return Response(response_dict, status=status.HTTP_200_OK)
-                else:
-                    response_dict["error"] = "Not started your any subscription"
-                    return Response(response_dict, status=status.HTTP_200_OK)
+                
 
             if subscription:
                 modules = ModuleDetails.objects.filter(is_active=True).filter(
@@ -128,12 +119,16 @@ class Homepage(APIView):
                 response_dict["total_users"] = user.total_users
                 return Response(response_dict, status=status.HTTP_200_OK)
             elif expired_subscription:
-                response_dict["message"] = "Subscription Expired"
-                response_dict["status"] = True
-                response_dict["take_subscription"] = True
-                response_dict["expired_modules"] = ModuleDetailsSerializer(exp_modules, context={"request":request}, many=True).data
-                response_dict["expired_bundles"] = ModuleDetailsSerializer(exp_bundles, context={"request":request}, many=True).data
-                return Response(response_dict, status=status.HTTP_200_OK)
+                if expired_subscription:
+                    exp_modules = ModuleDetails.objects.filter(is_active=True).filter(id__in=expired_subscription.module.all().values_list("id", flat=True)).order_by("module_identifier")
+                    exp_bundles = BundleDetails.objects.filter(is_active=True, id__in=expired_subscription.bundle.all().values_list("id", flat=True))
+                    response_dict["message"] = "Subscription Expired"
+                    response_dict["expired_modules"] = ModuleDetailsSerializer(exp_modules, context={"request":request}, many=True).data
+                    response_dict["expired_bundles"] = ModuleDetailsSerializer(exp_bundles, context={"request":request}, many=True).data
+                    return Response(response_dict, status=status.HTTP_200_OK)
+                else:
+                    response_dict["error"] = "Not started your any subscription"
+                    return Response(response_dict, status=status.HTTP_200_OK)
             elif user.take_free_subscription:
                 response_dict["free_subscription"] = True
                 if user.free_subscription_end_date and user.free_subscription_end_date > current_date:
