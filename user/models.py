@@ -176,4 +176,12 @@ class ForgotOTP(models.Model):
     def __str__(self):
         return self.email
 
-
+class InviteDetails(models.Model):
+    user = models.ForeignKey(UserProfile, on_delete=models.CASCADE,  null=True, blank=True)
+    email = models.EmailField(max_length=100, null=True, blank=True)
+    name = models.CharField(max_length=100, blank=True, null=True)
+    
+    is_verified = models.BooleanField(null=False, blank=True, default=False)
+    is_reject = models.BooleanField(null=False, blank=True, default=False)
+    is_deleted = models.BooleanField(null=False, blank=True, default=False)
+   
