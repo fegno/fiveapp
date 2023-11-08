@@ -1475,10 +1475,10 @@ class AnalyticsReport(APIView):
                 if individual_report:
                
                     male_count = individual_report["male_count"] or 0
-                    male_count = round(male_count*100/individual_report["total"], 1)
+                    male_count = round(male_count*100/individual_report["total"], 1) if individual_report["total"] !=0 else 0
 
                     female_count = individual_report["female_count"] or 0
-                    female_count = round(female_count*100/individual_report["total"], 1)
+                    female_count = round(female_count*100/individual_report["total"], 1) if individual_report["total"] !=0 else 0
 
                     female_pay = round(individual_report["female_pay"] or 0,1)
                     male_pay = round(individual_report["male_pay"] or 0,1)
@@ -1511,48 +1511,79 @@ class GetDepartment(APIView):
             id=pk
         ).first()
         
-
-        departments = list(set(CsvLogDetails.objects.filter(uploaded_file__id=pk).values_list("department", flat=True)))
-        departments_dict = []
-        for i in departments:
-            if csv_file.modules.module_identifier == 3:
-                if DepartmentWeightage.objects.filter(
-                    uploaded_file=csv_file,
-                    department=i
-                ):
-                    dep = DepartmentWeightage.objects.filter(
-                        uploaded_file=csv_file,
-                        department=i
-                    ).last()
-                    departments_dict.append(
-                        {
-                            "department":i,
-                            "team":[],
-                            "id":dep.id
-                        }
-                    )
-                else:
-                    dep = DepartmentWeightage.objects.create(
-                        uploaded_file=csv_file,
-                        department=i
-                    )
-                    departments_dict.append(
-                        {
-                            "department":i,
-                            "team":[],
-                            "id":dep.id
-                        }
-                    )
-            else:
-                team_list = list(set(CsvLogDetails.objects.filter(
-                uploaded_file__id=pk, department=i).values_list("team", flat=True)))
-                departments_dict.append(
+        if csv_file.modules.module_identifier == 5:
+            total_countries = []
+            countries = list(set(CsvLogDetails.objects.filter(uploaded_file__id=pk).values_list("region", flat=True)))
+            for i in countries:
+                department_dict = []
+                total_countries.append(
                     {
-                        "department":i,
-                        "team":team_list
+                        "name":i,
+                        "department":department_dict,
                     }
                 )
-        response_dict["departments"] = departments_dict
+                department = list(set(CsvLogDetails.objects.filter(uploaded_file__id=pk, region=i).values_list("department", flat=True)))
+                for dep in department:
+                    designation_dict = []
+                    department_dict.append(
+                        {
+                            "name":dep,
+                            "designation":designation_dict,
+                        }
+                    )
+                    designation = list(set(CsvLogDetails.objects.filter(uploaded_file__id=pk, region=i, department=dep).values_list("designation", flat=True)))
+        
+                    for des in designation:
+                        exp_dict = []
+                        designation_dict.append(
+                            {
+                                "name":des,
+                                "experience":list(set(CsvLogDetails.objects.filter(uploaded_file__id=pk, designation=des, region=i, department=dep).values_list("experience", flat=True))),
+                            }
+                        )
+            response_dict["countries"] = total_countries
+        else:
+            departments = list(set(CsvLogDetails.objects.filter(uploaded_file__id=pk).values_list("department", flat=True)))
+            departments_dict = []
+            for i in departments:
+                if csv_file.modules.module_identifier == 3:
+                    if DepartmentWeightage.objects.filter(
+                        uploaded_file=csv_file,
+                        department=i
+                    ):
+                        dep = DepartmentWeightage.objects.filter(
+                            uploaded_file=csv_file,
+                            department=i
+                        ).last()
+                        departments_dict.append(
+                            {
+                                "department":i,
+                                "team":[],
+                                "id":dep.id
+                            }
+                        )
+                    else:
+                        dep = DepartmentWeightage.objects.create(
+                            uploaded_file=csv_file,
+                            department=i
+                        )
+                        departments_dict.append(
+                            {
+                                "department":i,
+                                "team":[],
+                                "id":dep.id
+                            }
+                        )
+                else:
+                    team_list = list(set(CsvLogDetails.objects.filter(
+                    uploaded_file__id=pk, department=i).values_list("team", flat=True)))
+                    departments_dict.append(
+                        {
+                            "department":i,
+                            "team":team_list
+                        }
+                    )
+            response_dict["departments"] = departments_dict
         response_dict["status"] = True
         return Response(response_dict, status=status.HTTP_200_OK)
 
