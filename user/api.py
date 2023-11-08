@@ -508,9 +508,13 @@ class CheckLoginMethod(APIView):
             if user.password:
                 response_dict["password_set"] = True
                 response_dict["user_type"] = "USER"
+                created_admin_email = user.created_admin.email if user.created_admin else None
+                response_dict["Created_by"] = created_admin_email
             else:
                 response_dict["password_set"] = False
                 response_dict["user_type"] = "USER"
+                created_admin_email = user.created_admin.email if user.created_admin else None
+                response_dict["Created_by"] = created_admin_email
         elif not user:
             if LoginOTP.objects.filter(email=email, is_verified=True):
                 otp_user = LoginOTP.objects.filter(email=email).order_by('id').last()
