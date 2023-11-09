@@ -20,6 +20,9 @@ urlpatterns = [
     re_path(r'^admin-modules/', api.AdminModules.as_view(), name='admin-modules'),
     re_path(r'^user-invite/', api.UserInviteModule.as_view(), name='users-invite-to-module'),
 
+    re_path(r'^link-verification/(?P<user_invite_id>\d+)/$', api.InviteLinkVerification.as_view(), name='link-verification'),
+    re_path(r'^accept-reject/(?P<user_invite_id>\d+)/$', api.AcceptReject.as_view(), name='accept-reject'),
+
     re_path(r'^user-module-list/(?P<pk>\d+)/$', api.UserModuleList.as_view(), name='user-module-list'),
     re_path(r'^remove-module/(?P<user_id>\d+)/(?P<module_id>\d+)/$', api.DeleteModule.as_view(), name='remove-module'),
     re_path(r'^unassign-module/(?P<pk>\d+)/$', api.UnassignedModule.as_view(), name= 'unassigned-module'),

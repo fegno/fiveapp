@@ -226,16 +226,12 @@ class SetUserPassword(APIView):
 
         errors = []
 
-        if len(new_password) < 8:
-            errors.append("Password must be at least 8 characters long.")
-        if not re.search("[a-z]", new_password):
-            errors.append("Password must contain at least one lowercase letter.")
-        if not re.search("[A-Z]", new_password):
-            errors.append("Password must contain at least one uppercase letter.")
+        if len(new_password) < 5:
+            errors.append("Password must have at least 5 characters.")
+        if not re.search("[a-zA-Z]", new_password):
+            errors.append("Password must contain at least one letter.")
         if not re.search("[0-9]", new_password):
             errors.append("Password must contain at least one number.")
-        if not re.search("[!@#$%^&*]", new_password):
-            errors.append("Password must contain at least one special character: !@#$%^&*")
         if new_password != confirm_password:
             errors.append("Passwords do not match.")
 
@@ -352,16 +348,12 @@ class ChangePassword(APIView):
 
         errors = []
 
-        if len(new_password) < 8:
-            errors.append("Password must be at least 8 characters long.")
-        if not re.search("[a-z]", new_password):
-            errors.append("Password must contain at least one lowercase letter.")
-        if not re.search("[A-Z]", new_password):
-            errors.append("Password must contain at least one uppercase letter.")
+        if len(new_password) < 5:
+            errors.append("Password must have at least 5 characters.")
+        if not re.search("[a-zA-Z]", new_password):
+            errors.append("Password must contain at least one letter.")
         if not re.search("[0-9]", new_password):
             errors.append("Password must contain at least one number.")
-        if not re.search("[!@#$%^&*]", new_password):
-            errors.append("Password must contain at least one special character: !@#$%^&*")
         if new_password != confirm_password:
             errors.append("Passwords do not match.")
 
