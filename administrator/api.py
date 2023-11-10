@@ -1439,8 +1439,8 @@ class AnalyticsReport(APIView):
                 ))),
                 total_count=Count("sl_no")
             ).annotate(
-                male=ExpressionWrapper(F("male_count")*100/F("total_count"), output_field=FloatField()),
-                female=ExpressionWrapper(F("female_count")*100/F("total_count"), output_field=FloatField())
+                male=ExpressionWrapper(F("male_count")*100.0/F("total_count")*1.0, output_field=FloatField()),
+                female=ExpressionWrapper(F("female_count")*100/F("total_count")*1.0, output_field=FloatField())
             ).values(
                 "region", 
                 "male",
