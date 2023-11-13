@@ -13,10 +13,10 @@ class SubscriptionMiddleware(object):
         if request.user.is_authenticated:
             if request.user.user_type == "ADMIN":
                 user = request.user
-                if user.free_subscribed:
-                    if user.free_subscription_end_date < timezone.now().date():
-                        user.free_subscribed = False
-                        user.save()
+                # if user.free_subscribed:
+                #     if user.free_subscription_end_date < timezone.now().date():
+                #         user.free_subscribed = False
+                #         user.save()
                 subscription = SubscriptionDetails.objects.filter(
                     user=user, 
                     is_subscribed=True

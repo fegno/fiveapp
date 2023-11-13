@@ -127,3 +127,12 @@ class InviteDetails(models.Model):
    
     module = models.ManyToManyField(ModuleDetails, blank=True)
     bundle = models.ManyToManyField(BundleDetails, blank=True)
+
+class FreeSubscriptionDetails(models.Model):
+    user = models.ForeignKey(UserProfile, on_delete=models.CASCADE,  null=True, blank=True)
+   
+    module = models.ManyToManyField(ModuleDetails, blank=True)
+    bundle = models.ManyToManyField(BundleDetails, blank=True)
+    free_subscription_start_date = models.DateField(null=True, blank=True)
+    free_subscription_end_date = models.DateField(null=True, blank=True)
+    is_active = models.BooleanField(default=True, null=True, blank=True)
