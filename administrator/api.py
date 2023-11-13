@@ -566,8 +566,38 @@ class UploadCsv(APIView):
         response_dict = {"status": False}
         csv_file = request.FILES.get("file")
         working_type = request.data.get("working_type")
-
         module = ModuleDetails.objects.filter(id=pk).last()
+        if user.user_type == "ADMIN":
+            current_date = timezone.now().date()
+            subscription_ext = SubscriptionDetails.objects.filter(
+                user=request.user, 
+                is_subscribed=True,
+                subscription_end_date__gte=current_date,
+                module__id=pk
+            ).order_by("-id").first()
+            if not subscription_ext:
+                if UploadedCsvFiles.objects.filter(
+                    uploaded_by=request.user,
+                    modules=module,
+                ).count() > 5:
+                    response_dict["error"] = "Module upload count exceed"
+                    return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            current_date = timezone.now().date()
+            subscription_ext = SubscriptionDetails.objects.filter(
+                user=request.user.created_admin, 
+                is_subscribed=True,
+                subscription_end_date__gte=current_date,
+                module__id=pk
+            ).order_by("-id").first()
+            if not subscription_ext:
+                if UploadedCsvFiles.objects.filter(
+                    uploaded_by=request.user,
+                    modules=module,
+                ).count() > 5:
+                    response_dict["error"] = "Module upload count exceed"
+                    return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
+
         if not module:
             response_dict["error"] = "Module Not Found"
             return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)

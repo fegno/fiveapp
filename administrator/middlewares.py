@@ -3,6 +3,7 @@ from datetime import date, datetime, timedelta
 from user.models import UserProfile
 from django.utils import timezone
 from administrator.models import PurchaseDetails, SubscriptionDetails
+from superadmin.models import FreeSubscriptionDetails
 
 class SubscriptionMiddleware(object):
     def __init__(self, get_response):
@@ -13,10 +14,13 @@ class SubscriptionMiddleware(object):
         if request.user.is_authenticated:
             if request.user.user_type == "ADMIN":
                 user = request.user
-                # if user.free_subscribed:
-                #     if user.free_subscription_end_date < timezone.now().date():
-                #         user.free_subscribed = False
-                #         user.save()
+                free_subscribed_modules = FreeSubscriptionDetails.objects.filter(
+                    user=request.user,
+                    free_subscription_end_date__gte=timezone.now().date()
+                )
+                if not free_subscribed_modules:
+                    user.free_subscribed = False
+                    user.save()
                 subscription = SubscriptionDetails.objects.filter(
                     user=user, 
                     is_subscribed=True
