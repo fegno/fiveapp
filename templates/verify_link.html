@@ -1,0 +1,23 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Password Set</title>
+</head>
+<body>
+    <h1>Set Password</h1>
+    
+    {% if message %}
+        <p>{{ message }}</p>
+    {% endif %}
+    
+    <form method="POST" id="passwordForm">
+        {% csrf_token %}
+        <label for="password">Password:</label>
+        <input type="password" id="password" name="password" >
+        <input type="c-password" id="c-password" name="c-password">
+        <button type="submit" name="set_password">Set Password</button>
+        <button type="submit" name="reject">Reject</button>
+    </form>
+</body>
+</html>

@@ -6,4 +6,5 @@ admin.site.register(FeatureDetails)
 admin.site.register(BundleDetails)
 admin.site.register(UserAssignedModules)
 admin.site.register(DeleteUsersLog)
+admin.site.register(InviteDetails)
 

@@ -112,3 +112,18 @@ class DeleteUsersLog(models.Model):
 
     is_active = models.BooleanField(default=True, null=True, blank=True)
     deleted_at = models.DateTimeField(auto_now_add=True)
+
+
+class InviteDetails(models.Model):
+    user = models.ForeignKey(UserProfile, on_delete=models.CASCADE,  null=True, blank=True)
+    email = models.EmailField(max_length=100, null=True, blank=True)
+    name = models.CharField(max_length=100, blank=True, null=True)
+    
+    is_verified = models.BooleanField(null=False, blank=True, default=False)
+    is_reject = models.BooleanField(null=False, blank=True, default=False)
+    is_deleted = models.BooleanField(null=False, blank=True, default=False)
+    is_free_user = models.BooleanField(null=True, blank=True, default=False)
+    
+   
+    module = models.ManyToManyField(ModuleDetails, blank=True)
+    bundle = models.ManyToManyField(BundleDetails, blank=True)
