@@ -2,7 +2,6 @@ from django.contrib import admin
 from user.models import (
     BillingDetails,
     CardDetails,
-    InviteDetails,
     UserProfile,
     Token,
     LoginOTP,
@@ -78,4 +77,3 @@ admin.site.register(LoginOTP)
 admin.site.register(BillingDetails)
 admin.site.register(CardDetails)
 admin.site.register(ForgotOTP)
-admin.site.register(InviteDetails)

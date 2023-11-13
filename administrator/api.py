@@ -54,6 +54,7 @@ from administrator.serializers import (
 )
 from superadmin.models import (
     DeleteUsersLog,
+    InviteDetails,
     ModuleDetails, 
     BundleDetails, 
     UserAssignedModules,
@@ -61,7 +62,7 @@ from superadmin.models import (
 )
 import csv
 
-from user.models import InviteDetails, LoginOTP, UserProfile
+from user.models import LoginOTP, UserProfile
 from django.db import transaction
 from fiveapp.utils import get_error
 from user.serializers import UserSerializer
@@ -1672,22 +1673,31 @@ class UserInviteModule(APIView):
 
             user_exists = UserProfile.objects.filter(email=data.get("email")).exists()
             deleted_user = UserProfile.objects.filter(email=data.get("email"), is_active=False).first()
-            existing_invite = InviteDetails.objects.filter(email=data.get("email")).exists()
+            print(deleted_user)
+            existing_invite = InviteDetails.objects.filter(email=data.get("email"), is_verified=True).exists()
 
-            if user_exists and not deleted_user:
-                response_dict["error"] = "User already exists"
-                return Response(response_dict, status=status.HTTP_200_OK)
+            # if user_exists and not deleted_user:
+            #     response_dict["error"] = "User already exists"
+            #     return Response(response_dict, status=status.HTTP_200_OK)
+            
+            if existing_invite:
+                response_dict["error"] = "User already invited"
+                return Response(response_dict, status=status.HTTP_403_FORBIDDEN)
 
             available_free_user = admin_login.available_free_users
+            print(available_free_user)
             available_paid_user = admin_login.available_paid_users
-
+            print(available_paid_user)
             selected_modules = data.get("selected_modules")
+            print(selected_modules)
+            selected_bundles = data.get("selected_bundles")
             assigned_module_names = []
 
             if available_free_user>0:
+                print("first")
                 if deleted_user:
                     if deleted_user and deleted_user.is_free_user == True:
-
+                        print("freeuser")
                         if selected_modules:
                             existing_assign_delete_user = UserAssignedModules.objects.filter(user=deleted_user).first()
                             if existing_assign_delete_user:
@@ -1757,148 +1767,108 @@ class UserInviteModule(APIView):
                         return Response(response_dict, status=status.HTTP_200_OK)
 
                 elif not deleted_user:
-                    invited_user = UserProfile.objects.create(
-                        user_type="USER",
-                        username=data.get("email"),
-                        email=data.get("email"),
-                        first_name=data.get("first_name"),
-                        created_admin=admin_login,
-                    )
-                    invited_user.is_active = False
-                    invited_user.save()
                     invite_details = InviteDetails.objects.create(
                         email=data.get("email"),
                         name=data.get("first_name"),
-                        user=invited_user
-                    )
-                    invite_details.save()
-
-                    if selected_modules: 
-                        existing_assign_user = UserAssignedModules.objects.filter(user=invited_user).first()
-                        if existing_assign_user:
-                            existing_assign_user.module.clear()
-                        else:  
-                            existing_assign_user = UserAssignedModules.objects.create(user=invited_user)
-
-                        for module_id in selected_modules:
-                            try:
-                                module = ModuleDetails.objects.get(id=module_id)
-                            except ModuleDetails.DoesNotExist:
-                                response_dict["error"] = f"Module with ID {module_id} doesn't exist"
-                                return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
-
-                            existing_assign_user.module.add(module)
-                            assigned_module_names.append(module.title)
-                    else:
-                        response_dict["error"] = "No module seleceted"                 
+                        user=request.user,
+                        is_free_user=True
+                    )             
 
                     admin_login.available_free_users -= 1
                     admin_login.save()
 
-                    # send otp to mail
-                    email = request.data.get('email')
-                    mail_subject = 'Invitation Link'
-                    otp = random_otp_generator()
-                    # LoginOTP.objects.create(
-                    #     email=request.data.get("email"),
-                    #     otp=otp,
-                    #     user_type="USER"
-                    # )
                     
-                    html_message = render_to_string('invitation_link.html', {
-                        'invited_user_name': data.get('name'),
-                        'invitation_link': f'http://127.0.0.1:8000/link-verification/{invite_details.id}/'
-                    })
-                    email = EmailMessage("Invitation Link", html_message, to=[email])
-                    email.content_subtype = "html"
-                    email.send() 
-
-                    response_dict["session_data"] = {
-                        "id": invite_details.id,
-                        "name": invite_details.name,
-                        # "username": user.username,
-                        "email": invite_details.email,
-                        # "id": user.id,
-                        # "user_type": user.user_type,
-                        # "created_admin": user.created_admin.id,
-                        "assigned_module_names":assigned_module_names
-                    }
-                    response_dict["status"] = True
-                    response_dict["message"] = "Invite OTP Send to mail"
-                    response_dict["invitation_link"] = f'http://127.0.0.1:8000/link-verification/{invite_details.id}/'
-                else:
-                    response_dict["error"] = "Not a user"
-            elif available_paid_user>0:
-                if available_paid_user:                    # Create a new UserProfile instance for the invited user
-                    invited_user = UserProfile.objects.create(
-                        user_type="USER",
-                        username=data.get("email"),
-                        email=data.get("email"),
-                        first_name=data.get("first_name"),
-                        created_admin=admin_login,
-                    )
-                    invited_user.is_active = False
-                    invited_user.save()
-                    invite_details = InviteDetails.objects.create(
-                        email=data.get("email"),
-                        name=data.get("first_name"),
-                        user=invited_user
-                    )
-                    invite_details.save()
-
                     if selected_modules:
-                        existing_assign_user = UserAssignedModules.objects.filter(user=invited_user).first()
-                        if existing_assign_user:
-                            existing_assign_user.module.clear() 
-                        else:
-                            existing_assign_user = UserAssignedModules.objects.create(user=invited_user)
-
                         for module_id in selected_modules:
+                            print('post')
                             try:
                                 module = ModuleDetails.objects.get(id=module_id)
+                                invite_details.module.add(module)
+                                assigned_module_names.append(module.title)
                             except ModuleDetails.DoesNotExist:
                                 response_dict["error"] = f"Module with ID {module_id} doesn't exist"
                                 return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
 
-                            existing_assign_user.module.add(module)
-                            assigned_module_names.append(module.title)
-                    else:
-                        response_dict["error"] = "No module selected"
+                    if selected_bundles:
+                        for bundle_id in selected_bundles:
+                            try:
+                                bundle = ModuleDetails.objects.get(id=bundle_id)
+                                invite_details.bundle.add(bundle)
+                                assigned_module_names.append(bundle.title)
+                            except ModuleDetails.DoesNotExist:
+                                response_dict["error"] = f"Module with ID {bundle_id} doesn't exist"
+                                return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
 
-                    admin_login.available_paid_users -= 1
-                    admin_login.save()
 
                     # send otp to mail
                     email = request.data.get('email')
                     mail_subject = 'Invitation Link'
-                    otp = random_otp_generator()
-                    # LoginOTP.objects.create(
-                    #     email=request.data.get("email"),
-                    #     otp=otp,
-                    #     user_type="USER"
-                    # )
-                    
+
                     html_message = render_to_string('invitation_link.html', {
                         'invited_user_name': data.get('name'),
-                        'invitation_link': f'http://127.0.0.1:8000/link-verification/{invite_details.id}/'
+                        'invitation_link': f'http://127.0.0.1:8000/accept-reject/{invite_details.id}/'
                     })
                     email = EmailMessage("Invitation Link", html_message, to=[email])
                     email.content_subtype = "html"
                     email.send() 
 
-                    response_dict["session_data"] = {
-                        "id": invite_details.id,
-                        "name": invite_details.name,
-                        # "username": user.username,
-                        "email": invite_details.email,
-                        # "id": user.id,
-                        # "user_type": user.user_type,
-                        # "created_admin": user.created_admin.id,
-                        "assigned_module_names":assigned_module_names
-                    }
                     response_dict["status"] = True
-                    response_dict["message"] = "Invite OTP Send to mail"
-                    response_dict["invitation_link"] = f'http://127.0.0.1:8000/link-verification/{invite_details.id}/'
+                    response_dict["message"] = "Invite Link Send to mail"
+                    return Response(response_dict, status=status.HTTP_200_OK)
+                    
+                else:
+                    response_dict["error"] = "Not a user"
+            elif available_paid_user>0:
+                if available_paid_user:  
+                    invite_details = InviteDetails.objects.create(
+                        email=data.get("email"),
+                        name=data.get("first_name"),
+                        user = request.user,
+                        is_free_user=False
+                    )
+
+                    admin_login.available_paid_users -= 1
+                    admin_login.save()
+
+                    # assign module
+                    # assign module
+                    if selected_modules:
+                        print("paid if")
+                        for module_id in selected_modules:
+                            print("for paid")
+                            try:
+                                module = ModuleDetails.objects.get(id=module_id)
+                                invite_details.module.add(module)
+                                assigned_module_names.append(module.title)
+                            except ModuleDetails.DoesNotExist:
+                                response_dict["error"] = f"Module with ID {module_id} doesn't exist"
+                                return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
+
+                    if selected_bundles:
+                        for bundle_id in selected_bundles:
+                            try:
+                                bundle = ModuleDetails.objects.get(id=bundle_id)
+                                invite_details.bundle.add(bundle)
+                                assigned_module_names.append(bundle.title)
+                            except ModuleDetails.DoesNotExist:
+                                response_dict["error"] = f"Module with ID {bundle_id} doesn't exist"
+                                return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
+
+                    # send otp to mail
+                    email = request.data.get('email')
+                    mail_subject = 'Invitation Link'
+
+                    html_message = render_to_string('invitation_link.html', {
+                        'invited_user_name': data.get('name'),
+                        'invitation_link': f'http://127.0.0.1:8000/accept-reject/{invite_details.id}/'
+                    })
+                    email = EmailMessage("Invitation Link", html_message, to=[email])
+                    email.content_subtype = "html"
+                    email.send() 
+
+                    response_dict["status"] = True
+                    response_dict["message"] = "Invite Link Send to mail"
+                    return Response(response_dict, status=status.HTTP_200_OK)
                 else:
                     response_dict["error"] = "Not a user"  
                     return Response(response_dict, status=status.HTTP_200_OK)
@@ -1911,83 +1881,6 @@ class UserInviteModule(APIView):
             response_dict["error"] = "Access denied, Only Admin can access the module list"
             return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
         return Response(response_dict, status=status.HTTP_200_OK)
-
-
-
-class InviteLinkVerification(APIView):
-    permission_classes = (AllowAny,)
-
-    def get(self, request, user_invite_id):
-        response_dict = {'msg':''}
-        invite_user = get_object_or_404(InviteDetails, id=user_invite_id)
-
-        if invite_user.is_verified:
-            response_dict["message"] = "The user is Already Verified"
-        elif invite_user.is_reject:
-            response_dict["message"] = "The user is rejected"
-        elif invite_user.is_deleted:
-            response_dict["message"] = "The user is deleted"
-        else:
-            response_dict["message"] = "Show password and confirm password page"
-        return Response(response_dict, status=status.HTTP_200_OK)
-
-    
-class AcceptReject(APIView):
-    permission_classes = (AllowAny,)
-
-    def post(self, request, user_invite_id):
-
-        response_dict = {}
-        invite_user = get_object_or_404(InviteDetails, id=user_invite_id)
-
-        email = invite_user.email
-        
-        if invite_user.is_verified:
-            return Response({"message": "The user is already verified"}, status=status.HTTP_400_BAD_REQUEST)
-        elif invite_user.is_reject:
-
-            return Response({"message": "The user is rejected"}, status=status.HTTP_400_BAD_REQUEST)
-        elif invite_user.is_deleted:
-            return Response({"message": "The user is deleted"}, status=status.HTTP_400_BAD_REQUEST)
-        else:
-            rejection_button_click = request.data.get('rejection_button_click')
-
-            if rejection_button_click:
-                invite_user.is_reject=True
-                invited_admin_obj = UserProfile.objects.get(email=email)
-                print(invited_admin_obj)
-                invited_admin = invited_admin_obj.created_admin
-                print(invited_admin, '12345')
-                if invite_user.user.is_free_user:
-                    
-                    invited_admin.available_free_users += 1
-                    invited_admin.save()
-                else:
-                    invited_admin.available_paid_users += 1
-                    invited_admin.save()
-                user_profile = UserProfile.objects.get(email=email).delete() 
-                response_dict["message"] = "User deleted from invitation"  
-
-            else:
-                password = request.data.get('password')
-                confirm_password = request.data.get('confirm_password')
-
-                if password != confirm_password:
-                    return Response({"message": "Password and confirm password do not match"}, status=status.HTTP_400_BAD_REQUEST)
-                elif len(password) < 5:
-                    return Response({"message": "Password must be at least 8 characters long"}, status=status.HTTP_400_BAD_REQUEST)
-                else:
-                    user_profile = UserProfile.objects.get(email=email)
-                    user_profile.is_active = True
-                    invite_user.is_verified = True
-                    invite_user.save()
-
-                    # Return success response
-                    response_dict["message"] = "Account created"
-                    return Response(response_dict, status=status.HTTP_201_CREATED)
-            return Response(response_dict, status=status.HTTP_200_OK)
-        return Response(response_dict, status=status.HTTP_200_OK)
-
 
 
 class UnAssignUserlist(APIView):
@@ -2192,7 +2085,10 @@ class PermanentDeleteUserFromAdmin(APIView):
         except UserProfile.DoesNotExist:
             return Response({"message": "User not found or access denied", "status": False}, status=status.HTTP_404_NOT_FOUND)
         
-        
+        try:
+            invited_user = InviteDetails.objects.get(id=pk, created_admin=admin_user, is_verified=True)
+        except InviteDetails.DoesNotExist:
+            return Response({"message": "User not found or access denied", "status": False}, status=status.HTTP_404_NOT_FOUND) 
 
 
         try:
@@ -2232,6 +2128,10 @@ class PermanentDeleteUserFromAdmin(APIView):
         else:
             response_dict["message"] = "Already Deleted"
             response_dict["status"] = True
+
+        if invited_user:
+            invited_user.is_verified = False
+            
         
         return Response(response_dict, status=status.HTTP_200_OK)
 
