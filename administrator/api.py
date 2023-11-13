@@ -2082,7 +2082,7 @@ class AssignUser(APIView):
                     response_dict["error"] = f"User with the ID {user_id} does not exsts"
                     return Response(response_dict, status=status.HTTP_403_FORBIDDEN)
                 # print(user_profile,"USE PROFIEL")
-
+                current_date = timezone.now().date()
                 free_subscribed_modules = FreeSubscriptionDetails.objects.filter(
                     user=request.user,
                     free_subscription_end_date__gte=current_date,
