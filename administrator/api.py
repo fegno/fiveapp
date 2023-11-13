@@ -54,6 +54,7 @@ from administrator.serializers import (
 )
 from superadmin.models import (
     DeleteUsersLog,
+    InviteDetails,
     ModuleDetails, 
     BundleDetails, 
     UserAssignedModules,
@@ -70,6 +71,7 @@ from django.template.loader import render_to_string
 from django.contrib.auth import get_user_model
 from django.db.models.functions import Round
 from dateutil.relativedelta import relativedelta 
+from superadmin.models import FreeSubscriptionDetails
 
 
 def random_otp_generator(size=4, chars="123456789"):
@@ -89,6 +91,12 @@ class Homepage(APIView):
         response_dict["modules"] = []
         current_date = timezone.now().date()
         if user.user_type == "ADMIN":
+            free_subscribed_modules = FreeSubscriptionDetails.objects.filter(
+                user=request.user,
+                free_subscription_end_date__gte=current_date
+            )
+            if free_subscribed_modules:
+                response_dict["free_subscription"] = True
             expired_subscription = None
             subscription = SubscriptionDetails.objects.filter(
                 user=request.user, 
@@ -99,17 +107,34 @@ class Homepage(APIView):
                 expired_subscription = SubscriptionDetails.objects.filter(
                     user=request.user
                 ).order_by("-id").first()
-                
 
             if subscription:
+                free_subscribed_modules_ids = []
+                free_subscribed_bundle_ids = []
+                for i in free_subscribed_modules:
+                    if i.module.all():
+                        free_subscribed_modules_ids.extend(
+                            list(i.module.all().values_list("id", flat=True))
+                        )
+                    if i.bundle.all():
+                        free_subscribed_bundle_ids.extend(
+                            list(i.bundle.all().values_list("id", flat=True))
+                        )
                 modules = ModuleDetails.objects.filter(is_active=True).filter(
-                    id__in=subscription.module.all().values_list("id", flat=True)
+                    Q(id__in=subscription.module.all().values_list("id", flat=True))|
+                    Q(id__in=free_subscribed_modules_ids)
                 ).order_by("module_identifier")
-                bundles = BundleDetails.objects.filter(is_active=True, id__in=subscription.bundle.all().values_list("id", flat=True))
+                bundles = BundleDetails.objects.filter(is_active=True).filter(
+                    Q(id__in=subscription.bundle.all().values_list("id", flat=True))|
+                    Q(id__in=free_subscribed_bundle_ids)
+                )
                 assigned_user = UserAssignedModules.objects.filter(
                     user__created_admin=request.user,
-                    module__id__in=subscription.module.all().values_list("id", flat=True)
+                ).filter(
+                    Q(module__id__in=subscription.module.all().values_list("id", flat=True))|
+                    Q(module__id__in=free_subscribed_modules_ids)
                 ).values_list("user__id", flat=True)
+
                 user_c  = UserProfile.objects.filter(id__in=assigned_user).count()
                 response_dict["bundles"] = BundleDetailsSerializer(bundles,context={"request": request}, many=True).data
                 response_dict["modules"] = ModuleDetailsSerializer(modules,context={"request": request}, many=True,).data
@@ -120,6 +145,27 @@ class Homepage(APIView):
                 return Response(response_dict, status=status.HTTP_200_OK)
             elif expired_subscription:
                 if expired_subscription:
+                    free_subscribed_modules_ids = []
+                    free_subscribed_bundle_ids = []
+                    for i in free_subscribed_modules:
+                        if i.module.all():
+                            free_subscribed_modules_ids.extend(
+                                list(i.module.all().values_list("id", flat=True))
+                            )
+                        if i.bundle.all():
+                            free_subscribed_bundle_ids.extend(
+                                list(i.bundle.all().values_list("id", flat=True))
+                            )
+
+                    modules = ModuleDetails.objects.filter(is_active=True).filter(
+                        Q(id__in=free_subscribed_modules_ids)
+                    ).order_by("module_identifier")
+                    bundles = BundleDetails.objects.filter(is_active=True).filter(
+                        Q(id__in=free_subscribed_bundle_ids)
+                    )
+                    response_dict["bundles"] = BundleDetailsSerializer(bundles,context={"request": request}, many=True).data
+                    response_dict["modules"] = ModuleDetailsSerializer(modules,context={"request": request}, many=True,).data
+
                     exp_modules = ModuleDetails.objects.filter(is_active=True).filter(id__in=expired_subscription.module.all().values_list("id", flat=True)).order_by("module_identifier")
                     exp_bundles = BundleDetails.objects.filter(is_active=True, id__in=expired_subscription.bundle.all().values_list("id", flat=True))
                     response_dict["message"] = "Subscription Expired"
@@ -129,26 +175,32 @@ class Homepage(APIView):
                 else:
                     response_dict["error"] = "Not started your any subscription"
                     return Response(response_dict, status=status.HTTP_200_OK)
-            elif user.take_free_subscription:
+            elif free_subscribed_modules:
                 response_dict["free_subscription"] = True
-                if user.free_subscription_end_date and user.free_subscription_end_date > current_date:
-                    modules = ModuleDetails.objects.filter(is_active=True).order_by("module_identifier")
-                    bundles = BundleDetails.objects.filter(is_active=True)
-                    assigned_user = UserAssignedModules.objects.filter(
-                        user__created_admin=request.user,
-                        module__id__in=modules.values_list("id", flat=True)
-                    ).values_list("user__id", flat=True)
-                    user_c  = UserProfile.objects.filter(id__in=assigned_user).count()
-                    response_dict["assigned_user"] = user_c
-                    response_dict["bundles"] = BundleDetailsSerializer(bundles,context={"request": request}, many=True).data
-                    response_dict["modules"] = ModuleDetailsSerializer(modules,context={"request": request}, many=True,).data
-                else:
-                    if user.free_subscription_end_date < current_date:
-                        exp_modules = ModuleDetails.objects.filter(is_active=True).order_by("module_identifier")
-                        exp_bundles = BundleDetails.objects.filter(is_active=True)
-                        response_dict["message"] = "Free Subscription Expired"
-                        response_dict["modules"] = ModuleDetailsSerializer(exp_modules,context={"request": request}, many=True,).data
-                        response_dict["bundles"] = BundleDetailsSerializer(exp_bundles,context={"request": request}, many=True).data
+                free_subscribed_modules_ids = []
+                free_subscribed_bundle_ids = []
+                for i in free_subscribed_modules:
+                    if i.module.all():
+                        free_subscribed_modules_ids.extend(
+                            list(i.module.all().values_list("id", flat=True))
+                        )
+                    if i.bundle.all():
+                        free_subscribed_bundle_ids.extend(
+                            list(i.bundle.all().values_list("id", flat=True))
+                        )
+                modules = ModuleDetails.objects.filter(is_active=True, id__in=free_subscribed_modules_ids).order_by("module_identifier")
+                bundles = BundleDetails.objects.filter(is_active=True, id__in=free_subscribed_bundle_ids)
+                assigned_user = UserAssignedModules.objects.filter(
+                    user__created_admin=request.user,
+                ).filter(
+                    Q(module__id__in=modules.values_list("id", flat=True))|
+                    Q(module__id__in=free_subscribed_modules_ids)
+                ).values_list("user__id", flat=True)
+                
+                user_c  = UserProfile.objects.filter(id__in=assigned_user).count()
+                response_dict["assigned_user"] = user_c
+                response_dict["bundles"] = BundleDetailsSerializer(bundles,context={"request": request}, many=True).data
+                response_dict["modules"] = ModuleDetailsSerializer(modules,context={"request": request}, many=True,).data
                 response_dict["take_subscription"] = True
                 response_dict["status"] = True
                 return Response(response_dict, status=status.HTTP_200_OK)
@@ -156,6 +208,16 @@ class Homepage(APIView):
                 response_dict["error"] = "Not started your any subscription"
                 return Response(response_dict, status=status.HTTP_200_OK)
         elif user.user_type == "USER":
+            free_subscribed_modules = FreeSubscriptionDetails.objects.filter(
+                user=request.user.created_admin,
+                free_subscription_end_date__gte=current_date
+            )
+            free_subscribed_modules_ids = []
+            for i in free_subscribed_modules:
+                if i.module.all():
+                    free_subscribed_modules_ids.extend(
+                        list(i.module.all().values_list("id", flat=True))
+                    )
             user_assigned_modules = UserAssignedModules.objects.filter(
                 user=request.user
             ).last()
@@ -163,7 +225,6 @@ class Homepage(APIView):
             if user_assigned_modules:
                 modules_list = user_assigned_modules.module.all().values_list("id", flat=True)
             admin = user.created_admin
-
             expired_subscription = None
             subscription = SubscriptionDetails.objects.filter(
                 user=admin, 
@@ -174,23 +235,31 @@ class Homepage(APIView):
                 expired_subscription = SubscriptionDetails.objects.filter(
                     user=admin
                 ).order_by("-id").first()
+
             if subscription:
                 modules = ModuleDetails.objects.filter(is_active=True, id__in=modules_list).filter(
-                    id__in=subscription.module.all().values_list("id", flat=True)
+                    Q(id__in=subscription.module.all().values_list("id", flat=True))|
+                    Q(id__in=free_subscribed_modules_ids)
                 ).order_by("module_identifier")
                 response_dict["modules"] = ModuleDetailsSerializer(modules,context={"request": request}, many=True,).data
                 response_dict["status"] = True
                 response_dict["take_subscription"] = True
                 return Response(response_dict, status=status.HTTP_200_OK)
             elif expired_subscription:
+                modules = ModuleDetails.objects.filter(is_active=True, id__in=modules_list).filter(
+                    Q(id__in=free_subscribed_modules_ids)
+                ).order_by("module_identifier")
+                response_dict["modules"] = ModuleDetailsSerializer(modules,context={"request": request}, many=True,).data
                 response_dict["message"] = "Subscription Expired"
                 response_dict["status"] = True
                 response_dict["take_subscription"] = True
                 return Response(response_dict, status=status.HTTP_200_OK)
-            elif admin.take_free_subscription:
+            elif free_subscribed_modules:
                 response_dict["free_subscription"] = True
-                if admin.free_subscription_end_date and admin.free_subscription_end_date > current_date:
-                    modules = ModuleDetails.objects.filter(is_active=True, id__in=modules_list).order_by("module_identifier")
+                if free_subscribed_modules:
+                    modules = ModuleDetails.objects.filter(is_active=True, id__in=modules_list).filter(
+                        Q(id__in=free_subscribed_modules_ids)
+                    ).order_by("module_identifier")
                     response_dict["modules"] = ModuleDetailsSerializer(modules,context={"request": request}, many=True,).data
                 else:
                     response_dict["message"] = "Free Subscription Expired"
@@ -261,6 +330,11 @@ class ListBundleModules(APIView):
         bundle_modules = BundleDetails.objects.filter(
             id=pk
         ).last()
+        free_subscribed_modules = FreeSubscriptionDetails.objects.filter(
+            user=request.user,
+            free_subscription_end_date__gte=current_date
+        )
+
         if bundle_modules:
             bundle_mod = bundle_modules.modules.all().values_list("id", flat=True)
         modules = ModuleDetails.objects.filter(is_active=True, id__in=bundle_mod).order_by("module_identifier")
@@ -285,14 +359,26 @@ class ListBundleModules(APIView):
                 is_subscribed=True,
                 subscription_end_date__gte=current_date
             ).last()
+            free_subscribed_modules_ids = []
+            for i in free_subscribed_modules:
+                if i.module.all():
+                    free_subscribed_modules_ids.extend(
+                        list(i.module.all().values_list("id", flat=True))
+                    )
             if user_assigned_modules and subscription:
                 subscribed_modules = modules.filter(
-                    id__in=subscription.module.all().values_list("id", flat=True)
+                    Q(id__in=subscription.module.all().values_list("id", flat=True))|
+                    Q(id__in=free_subscribed_modules_ids)
                 ).filter(id__in=user_assigned_modules.module.all().values_list("id", flat=True))            
                 response_dict["modules"] = ModuleDetailsSerializer(
                     subscribed_modules,context={"request": request, "from_module":True, 'admin':request.user.created_admin}, many=True,).data
-        
-        
+            elif free_subscribed_modules:
+                subscribed_modules = modules.filter(
+                    Q(id__in=free_subscribed_modules_ids)
+                ).filter(id__in=user_assigned_modules.module.all().values_list("id", flat=True))            
+                response_dict["modules"] = ModuleDetailsSerializer(
+                    subscribed_modules,context={"request": request, "from_module":True, 'admin':request.user.created_admin}, many=True,).data
+                
         response_dict["status"] = True
         return Response(response_dict, status=status.HTTP_200_OK)
 
@@ -374,15 +460,27 @@ class SelectFreeSubscription(APIView):
 
     def post(self, request):
         response_dict = {"status": False}
+        bundle_ids = request.data.get("bundle_ids", [])
+        modules_ids = request.data.get("modules_ids", [])
+        if FreeSubscriptionDetails.objects.filter(
+            user=request.user,
+        ).filter(Q(module__id__in=modules_ids,) |Q(bundle__id__in=bundle_ids)):
+            response_dict["error"]  = "Some of the module or bundle already free subscribed"
+            return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
         user = request.user
-        if user.take_free_subscription:
-            response_dict["error"] = "Already subscribed"
-            return Response(response_dict, status.HTTP_200_OK)
-        user.take_free_subscription = True
         user.free_subscribed = True
         user.free_subscription_start_date = timezone.now().date()
         user.free_subscription_end_date = timezone.now().date()  + timedelta(days=15)
         user.save()
+        free = FreeSubscriptionDetails.objects.create(
+            user=user,
+            free_subscription_start_date=timezone.now().date(),
+            free_subscription_end_date = timezone.now().date()  + timedelta(days=15)
+        )
+        free.module.add(*modules_ids)   
+        free.bundle.add(*bundle_ids)   
+        free.save()
+
         response_dict["message"] = "success"
         response_dict["status"] = True
         return Response(response_dict, status.HTTP_200_OK)
@@ -468,8 +566,38 @@ class UploadCsv(APIView):
         response_dict = {"status": False}
         csv_file = request.FILES.get("file")
         working_type = request.data.get("working_type")
-
         module = ModuleDetails.objects.filter(id=pk).last()
+        if user.user_type == "ADMIN":
+            current_date = timezone.now().date()
+            subscription_ext = SubscriptionDetails.objects.filter(
+                user=request.user, 
+                is_subscribed=True,
+                subscription_end_date__gte=current_date,
+                module__id=pk
+            ).order_by("-id").first()
+            if not subscription_ext:
+                if UploadedCsvFiles.objects.filter(
+                    uploaded_by=request.user,
+                    modules=module,
+                ).count() > 5:
+                    response_dict["error"] = "Module upload count exceed"
+                    return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            current_date = timezone.now().date()
+            subscription_ext = SubscriptionDetails.objects.filter(
+                user=request.user.created_admin, 
+                is_subscribed=True,
+                subscription_end_date__gte=current_date,
+                module__id=pk
+            ).order_by("-id").first()
+            if not subscription_ext:
+                if UploadedCsvFiles.objects.filter(
+                    uploaded_by=request.user,
+                    modules=module,
+                ).count() > 5:
+                    response_dict["error"] = "Module upload count exceed"
+                    return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
+
         if not module:
             response_dict["error"] = "Module Not Found"
             return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
@@ -1610,21 +1738,24 @@ class AdminModules(APIView):
     def get(self, request):
         response_dict={"status":False}
         logined_user =  request.user
-
+        current_date = timezone.now().date()
+        free_subscribed_modules = FreeSubscriptionDetails.objects.filter(
+            user=request.user,
+            free_subscription_end_date__gte=current_date
+        )
+        Subscribed_modules = SubscriptionDetails.objects.filter(user=request.user,).last()
         if logined_user.user_type == 'ADMIN':
-            if logined_user.free_subscribed == True:
-                free_modules = ModuleDetails.objects.all().order_by("module_identifier")
-                response_dict["modules"] = ModuleDetailsSerializer(free_modules, context={'request':request}, many=True).data
-                response_dict["additional_users"] = self.get_users_with_password()
-                response_dict["invited_users"] = self.get_users_without_password()
-                return Response(response_dict, status=status.HTTP_200_OK)
-            else:
-                Subscribed_modules = SubscriptionDetails.objects.filter(user=request.user)
-                modules_data = SubscriptionModuleSerilzer(Subscribed_modules, many=True).data
-
-                flat_modules = [module for sublist in modules_data for module in sublist['module']]
-                
-
+            if Subscribed_modules:
+                free_subscribed_modules_ids = []
+                for i in free_subscribed_modules:
+                    if i.module.all():
+                        free_subscribed_modules_ids.extend(
+                            list(i.module.all().values_list("id", flat=True))
+                        )
+                all_modules = ModuleDetails.objects.filter(
+                    Q(id__in=Subscribed_modules.module.all().values_list("id", flat=True))|
+                    Q(id__in=free_subscribed_modules_ids)
+                )
                 response_dict["user"] = {
                     "id": logined_user.id,
                     "first_name": logined_user.first_name,
@@ -1633,10 +1764,23 @@ class AdminModules(APIView):
                 
                 }
                 response_dict["status"] = True
-                response_dict["modules"] = flat_modules
+                response_dict["modules"] = ModuleDetailsSerializer(all_modules, context={'request':request}, many=True).data
                 response_dict["additional_users"] = self.get_users_with_password()
                 response_dict["invited_users"] = self.get_users_without_password()
                 return Response(response_dict, status=status.HTTP_200_OK)
+            elif free_subscribed_modules:
+                free_subscribed_modules_ids = []
+                for i in free_subscribed_modules:
+                    if i.module.all():
+                        free_subscribed_modules_ids.extend(
+                            list(i.module.all().values_list("id", flat=True))
+                        )
+                free_modules = ModuleDetails.objects.filter(id__in=free_subscribed_modules_ids).order_by("module_identifier")
+                response_dict["modules"] = ModuleDetailsSerializer(free_modules, context={'request':request}, many=True).data
+                response_dict["additional_users"] = self.get_users_with_password()
+                response_dict["invited_users"] = self.get_users_without_password()
+                return Response(response_dict, status=status.HTTP_200_OK)
+
         else:
             response_dict["error"] = "Access denied, Only Admin can access the module list"
             return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
@@ -1672,21 +1816,31 @@ class UserInviteModule(APIView):
 
             user_exists = UserProfile.objects.filter(email=data.get("email")).exists()
             deleted_user = UserProfile.objects.filter(email=data.get("email"), is_active=False).first()
+            print(deleted_user)
+            existing_invite = InviteDetails.objects.filter(email=data.get("email")).exists()
 
-            if user_exists and not deleted_user:
-                response_dict["error"] = "User already exists"
-                return Response(response_dict, status=status.HTTP_200_OK)
+            # if user_exists and not deleted_user:
+            #     response_dict["error"] = "User already exists"
+            #     return Response(response_dict, status=status.HTTP_200_OK)
+            
+            if existing_invite:
+                response_dict["error"] = "User already invited"
+                return Response(response_dict, status=status.HTTP_403_FORBIDDEN)
 
             available_free_user = admin_login.available_free_users
+            print(available_free_user)
             available_paid_user = admin_login.available_paid_users
-
+            print(available_paid_user)
             selected_modules = data.get("selected_modules")
+            print(selected_modules)
+            selected_bundles = data.get("selected_bundles")
             assigned_module_names = []
 
             if available_free_user>0:
+                print("first")
                 if deleted_user:
                     if deleted_user and deleted_user.is_free_user == True:
-
+                        print("freeuser")
                         if selected_modules:
                             existing_assign_delete_user = UserAssignedModules.objects.filter(user=deleted_user).first()
                             if existing_assign_delete_user:
@@ -1721,77 +1875,6 @@ class UserInviteModule(APIView):
                         response_dict["status"] = True
                         response_dict['message'] = "Reinvited the deleteed user"
                     else:
-                        response_dict["error"] = "The deleted user is not a free user"  
-                        return Response(response_dict, status=status.HTTP_200_OK)
-
-                elif not deleted_user:
-                    user = UserProfile.objects.create(
-                        user_type="USER",
-                        username=data.get("email"),
-                        email=data.get("email"),
-                        first_name=data.get("first_name"),
-                        created_admin=admin_login,
-                    )
-                    user.is_free_user = True
-                    user.save()
-
-                    if selected_modules: 
-                        existing_assign_user = UserAssignedModules.objects.filter(user=user).first()
-                        if existing_assign_user:
-                            existing_assign_user.module.clear()
-                        else:  
-                            existing_assign_user = UserAssignedModules.objects.create(user=user)
-
-                        for module_id in selected_modules:
-                            try:
-                                module = ModuleDetails.objects.get(id=module_id)
-                            except ModuleDetails.DoesNotExist:
-                                response_dict["error"] = f"Module with ID {module_id} doesn't exist"
-                                return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
-
-                            existing_assign_user.module.add(module)
-                            assigned_module_names.append(module.title)
-                    else:
-                        response_dict["error"] = "No module seleceted"                 
-
-                    admin_login.available_free_users -= 1
-                    admin_login.save()
-
-                    # send otp to mail
-                    email = request.data.get('email')
-                    mail_subject = 'OTP for registration'
-                    otp = random_otp_generator()
-                    LoginOTP.objects.create(
-                        email=request.data.get("email"),
-                        otp=otp,
-                        user_type="USER"
-                    )
-                    
-                    html_message = render_to_string(
-                        'register.html', {"otp":otp, "user":user}
-                    )
-                    email = EmailMessage("OTP for Registration", html_message, to=[email])
-                    email.content_subtype = "html"
-                    email.send() 
-
-                    response_dict["session_data"] = {
-                        "id": user.id,
-                        "name": user.first_name,
-                        "username": user.username,
-                        "email": user.email,
-                        "id": user.id,
-                        "user_type": user.user_type,
-                        "created_admin": user.created_admin.id,
-                        "assigned_module_names":assigned_module_names
-                    }
-                    response_dict["status"] = True
-                    response_dict["message"] = "Invite OTP Send to mail"
-                else:
-                    response_dict["error"] = "Not a user"
-            elif available_paid_user>0:
-                if deleted_user:
-                    if deleted_user and deleted_user.is_free_user == False:
-
                         if selected_modules:
                             existing_assign_delete_user = UserAssignedModules.objects.filter(user=deleted_user).first()
                             if existing_assign_delete_user:
@@ -1823,72 +1906,113 @@ class UserInviteModule(APIView):
                         admin_login.available_paid_users -= 1
                         admin_login.save()
                         response_dict["status"] = True
-                        response_dict['message'] = "Reinvited the deleteed user"
-                    else:
-                        response_dict["error"] = "The deleted user is not a free user"  
+                        response_dict['message'] = "Reinvited the deleteed user"  
                         return Response(response_dict, status=status.HTTP_200_OK)
+
                 elif not deleted_user:
-                    # Create a new UserProfile instance for the invited user
-                    user = UserProfile.objects.create(
-                        user_type="USER",
-                        username=data.get("email"),
+                    invite_details = InviteDetails.objects.create(
                         email=data.get("email"),
-                        first_name=data.get("first_name"),
-                        created_admin=admin_login, 
-                    )
-                    user.save()
+                        name=data.get("first_name"),
+                        user=request.user,
+                        is_free_user=True
+                    )             
 
+                    admin_login.available_free_users -= 1
+                    admin_login.save()
+
+                    
                     if selected_modules:
-                        existing_assign_user = UserAssignedModules.objects.filter(user=user).first()
-                        if existing_assign_user:
-                            existing_assign_user.module.clear() 
-                        else:
-                            existing_assign_user = UserAssignedModules.objects.create(user=user)
-
                         for module_id in selected_modules:
+                            print('post')
                             try:
                                 module = ModuleDetails.objects.get(id=module_id)
+                                invite_details.module.add(module)
+                                assigned_module_names.append(module.title)
                             except ModuleDetails.DoesNotExist:
                                 response_dict["error"] = f"Module with ID {module_id} doesn't exist"
                                 return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
 
-                            existing_assign_user.module.add(module)
-                            assigned_module_names.append(module.title)
-                    else:
-                        response_dict["error"] = "No module selected"
+                    if selected_bundles:
+                        for bundle_id in selected_bundles:
+                            try:
+                                bundle = ModuleDetails.objects.get(id=bundle_id)
+                                invite_details.bundle.add(bundle)
+                                assigned_module_names.append(bundle.title)
+                            except ModuleDetails.DoesNotExist:
+                                response_dict["error"] = f"Module with ID {bundle_id} doesn't exist"
+                                return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
+
+
+                    # send otp to mail
+                    email = request.data.get('email')
+                    mail_subject = 'Invitation Link'
+                    current_domain = request.get_host()
+
+                    html_message = render_to_string('invitation_link.html', {
+                        'invited_user_name': data.get('name'),
+                        'invitation_link': f'http://{current_domain}/accept-reject/{invite_details.id}/'
+                    })
+                    email = EmailMessage("Invitation Link", html_message, to=[email])
+                    email.content_subtype = "html"
+                    email.send() 
+
+                    response_dict["status"] = True
+                    response_dict["message"] = "Invite Link Send to mail"
+                    return Response(response_dict, status=status.HTTP_200_OK)
+                    
+                else:
+                    response_dict["error"] = "Not a user"
+            elif available_paid_user>0:
+                if available_paid_user:  
+                    invite_details = InviteDetails.objects.create(
+                        email=data.get("email"),
+                        name=data.get("first_name"),
+                        user = request.user,
+                        is_free_user=False
+                    )
 
                     admin_login.available_paid_users -= 1
                     admin_login.save()
 
+                    # assign module
+                    # assign module
+                    if selected_modules:
+                        print("paid if")
+                        for module_id in selected_modules:
+                            print("for paid")
+                            try:
+                                module = ModuleDetails.objects.get(id=module_id)
+                                invite_details.module.add(module)
+                                assigned_module_names.append(module.title)
+                            except ModuleDetails.DoesNotExist:
+                                response_dict["error"] = f"Module with ID {module_id} doesn't exist"
+                                return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
+
+                    if selected_bundles:
+                        for bundle_id in selected_bundles:
+                            try:
+                                bundle = ModuleDetails.objects.get(id=bundle_id)
+                                invite_details.bundle.add(bundle)
+                                assigned_module_names.append(bundle.title)
+                            except ModuleDetails.DoesNotExist:
+                                response_dict["error"] = f"Module with ID {bundle_id} doesn't exist"
+                                return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
+
                     # send otp to mail
-                    email=request.data.get('email')
-                    mail_subject = 'OTP for registration'
-                    otp = random_otp_generator()
-                    LoginOTP.objects.create(
-                        email=request.data.get("email"),
-                        otp=otp,
-                        user_type="USER"
-                    )
-                    
-                    html_message = render_to_string(
-                        'register.html', {"otp":otp}
-                    )
-                    email = EmailMessage("OTP for Registration", html_message, to=[email])
+                    email = request.data.get('email')
+                    mail_subject = 'Invitation Link'
+
+                    html_message = render_to_string('invitation_link.html', {
+                        'invited_user_name': data.get('name'),
+                        'invitation_link': f'http://{current_domain}/accept-reject/{invite_details.id}/'
+                    })
+                    email = EmailMessage("Invitation Link", html_message, to=[email])
                     email.content_subtype = "html"
                     email.send() 
 
-                    response_dict["session_data"] = {
-                        "id": user.id,
-                        "name": user.first_name,
-                        "username": user.username,
-                        "email": user.email,
-                        "id": user.id,
-                        "user_type": user.user_type,
-                        "created_admin": user.created_admin.id,
-                        "assigned_module_names":assigned_module_names
-                    }
                     response_dict["status"] = True
-                    response_dict["message"] = "Invite OTP Send to mail"
+                    response_dict["message"] = "Invite Link Send to mail"
+                    return Response(response_dict, status=status.HTTP_200_OK)
                 else:
                     response_dict["error"] = "Not a user"  
                     return Response(response_dict, status=status.HTTP_200_OK)
@@ -1911,11 +2035,15 @@ class UnAssignUserlist(APIView):
         response_dict = {"status":True}
         user = request.user
         module = ModuleDetails.objects.get(id=pk)
-
-        # is_free_subcribed =user.
-        if user.free_subscribed == True:
+        current_date = timezone.now().date()
+        free_subscribed_modules = FreeSubscriptionDetails.objects.filter(
+            user=request.user,
+            free_subscription_end_date__gte=current_date,
+            module__id=pk
+        )
+        
+        if free_subscribed_modules:
             un_assigned_user = UserProfile.objects.filter(created_admin=user).exclude(userassignedmodules__module=module)  
-            # unassigned_user = un_assigned_user.filter(created_admin=user)
             response_dict["module"] = module.title
             response_dict["un_assigned_users"] = UserSerializer(un_assigned_user, context={"request":request}, many=True).data
 
@@ -1954,10 +2082,28 @@ class AssignUser(APIView):
                     response_dict["error"] = f"User with the ID {user_id} does not exsts"
                     return Response(response_dict, status=status.HTTP_403_FORBIDDEN)
                 # print(user_profile,"USE PROFIEL")
-
-                subscribed_module = SubscriptionDetails.objects.filter(user=request.user, module=pk).exists()
+                current_date = timezone.now().date()
+                free_subscribed_modules = FreeSubscriptionDetails.objects.filter(
+                    user=request.user,
+                    free_subscription_end_date__gte=current_date,
+                    module__id=pk
+                )
+                subscribed_module = SubscriptionDetails.objects.filter(subscription_end_date__gte=current_date, user=request.user, module=pk).exists()
                 # print(subscribed_module)
                 if subscribed_module:
+                    if UserAssignedModules.objects.filter(user=user_profile).exists():
+                        if UserAssignedModules.objects.filter(user=user_profile, module=module).exists():
+                            response_dict["error"] = f"User {user_profile.id} is already assigned to module {module.id}"
+                        else:
+                            user_assign_object = UserAssignedModules.objects.filter(user=user_profile).first()
+                            user_assign_object.module.add(module)
+                            response_dict["message"] = "User is assigned to the module"
+                    else:
+                        assign_user = UserAssignedModules.objects.create(user=user_profile)
+                        assign_user.module.add(module)
+                        response_dict["satatus"] = True
+                        response_dict["message"] = f"User is added to the module"
+                elif free_subscribed_modules:
                     if UserAssignedModules.objects.filter(user=user_profile).exists():
                         if UserAssignedModules.objects.filter(user=user_profile, module=module).exists():
                             response_dict["error"] = f"User {user_profile.id} is already assigned to module {module.id}"
@@ -2030,20 +2176,35 @@ class UnassignedModule(APIView):
 
     def get(self, request, pk):
         response_dict = {"status":True}
+        current_date = timezone.now().date()
+        free_subscribed_modules = FreeSubscriptionDetails.objects.filter(
+            user=request.user,
+            free_subscription_end_date__gte=current_date,
+        )
+        free_subscribed_modules_ids = []
+        for i in free_subscribed_modules:
+            if i.module.all():
+                free_subscribed_modules_ids.extend(
+                    list(i.module.all().values_list("id", flat=True))
+                )
         try:
             user_obj = UserProfile.objects.get(id=pk, )
         except UserProfile.DoesNotExist:
             response_dict["error"] = f"User with the ID {pk} does not exists"
             return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
-        if user_obj.created_admin.free_subscribed == True:
-            unassigned_modules = ModuleDetails.objects.exclude(userassignedmodules__user=user_obj)
-            response_dict["unassigned module"] = ModuleDetailsSerializer(unassigned_modules, context={"request":request}, many=True).data
-        elif SubscriptionDetails.objects.filter(user=user_obj.created_admin).exists():
+        
+        if SubscriptionDetails.objects.filter(user=user_obj.created_admin).exists():
             subscribtion = SubscriptionDetails.objects.filter(user=user_obj.created_admin).first()
             subscribed_modules = subscribtion.module.all()
-            unassigned_modules = ModuleDetails.objects.exclude(userassignedmodules__user=user_obj)
-            available_un_assiged_module = subscribed_modules & unassigned_modules
+            unassigned_modules = ModuleDetails.objects.filter(
+                Q(id__in=free_subscribed_modules_ids)|
+                Q(id__in=subscribed_modules.values_list("id", flat=True))
+            ).exclude(userassignedmodules__user=user_obj)
+            available_un_assiged_module = unassigned_modules
             response_dict["unassigned module"] = ModuleDetailsSerializer(available_un_assiged_module, context={"request":request}, many=True).data
+        elif user_obj.created_admin.free_subscribed == True:
+            unassigned_modules = ModuleDetails.objects.filter(id__in=free_subscribed_modules_ids).exclude(userassignedmodules__user=user_obj)
+            response_dict["unassigned module"] = ModuleDetailsSerializer(unassigned_modules, context={"request":request}, many=True).data
         else:
             response_dict["message"] = f"Admin  not have subscription"
         return Response(response_dict, status=status.HTTP_200_OK)
@@ -2097,21 +2258,30 @@ class PermanentDeleteUserFromAdmin(APIView):
     authentication_classes = (CustomTokenAuthentication,)
 
     def post(self, request, pk):
+        print(pk)
         response_dict = {"status": False}
         admin_user = request.user
-
+        print(admin_user)
         try:
             deleted_user = UserProfile.objects.get(id=pk, created_admin=admin_user, is_active=True)
         except UserProfile.DoesNotExist:
             return Response({"message": "User not found or access denied", "status": False}, status=status.HTTP_404_NOT_FOUND)
         
-        
+        try:
+            invited_user = InviteDetails.objects.get(id=pk, user=admin_user, is_verified=True)
+            print(invited_user)
+        except InviteDetails.DoesNotExist:
+            return Response({"message": "User not found or access denied", "status": False}, status=status.HTTP_404_NOT_FOUND) 
 
 
         try:
             deleted_user_module = UserAssignedModules.objects.get(user=deleted_user)
         except UserAssignedModules.DoesNotExist:
             deleted_user_module = None
+
+        if invited_user:
+            invited_user.is_deleted = True
+            invited_user.save()
 
         
         if deleted_user_module:
@@ -2122,7 +2292,7 @@ class PermanentDeleteUserFromAdmin(APIView):
             delete_user_log_entry = DeleteUsersLog.objects.create(
                 user=deleted_user,
                 deleted_by=admin_user,
-                is_active=False, 
+                is_active=True, 
             )
             delete_user_log_entry.module.set(modules_assigned)  # Associate all modules
 
@@ -2137,7 +2307,7 @@ class PermanentDeleteUserFromAdmin(APIView):
             if deleted_user.is_free_user:
                 admin_user.available_free_users += 1
                 admin_user.save()
-            else:
+            else: 
                 admin_user.available_paid_users += 1
                 admin_user.save()
             response_dict["message"] = "Permanently marked the user as deleted and deleted all assigned modules."
@@ -2145,6 +2315,10 @@ class PermanentDeleteUserFromAdmin(APIView):
         else:
             response_dict["message"] = "Already Deleted"
             response_dict["status"] = True
+
+        # if invited_user:
+        #     invited_user.is_verified = False
+            
         
         return Response(response_dict, status=status.HTTP_200_OK)
 
@@ -2278,30 +2452,13 @@ class ModulePurchaseHistory(APIView):
         admin_user = request.user
         response_dict = {'status': False}
 
+        subscription_details =  PurchaseDetails.objects.filter(user=admin_user, status='Placed', is_active=True, parchase_user_type='Subscription')
         if admin_user.user_type == 'ADMIN':
-            if admin_user.free_subscribed and  admin_user.free_subscription_end_date >= date.today():
-                free_user_subscription = UserProfile.objects.get(id=admin_user.id)
-                free_module = ModuleDetails.objects.all()
-                response_dict["module"] = ModuleDetailsSerializer(free_module, context={'request':request}, many=True).data
-                return Response(response_dict)
-            else:
+            if subscription_details:
                 subscription_details =  PurchaseDetails.objects.filter(user=admin_user, status='Placed', is_active=True, parchase_user_type='Subscription')
-                
-                # module_data = []
-                # for subscription_detail in subscription_details:
-                #     module_data.append(ModuleDetailsSerializer(subscription_detail.module.all(), many=True).data)
-
-                # subscription_module = SubscriptionDetails.objects.filter(user=admin_user).last()
-                # if subscription_module:
-                #     subscription_module_queryset = [subscription_module]
-                #     modules_data = SubscriptionModuleSerilzer(subscription_module_queryset, context={'request': request}, many=True).data
-                #     flat_modules = [module for sublist in modules_data for module in sublist['module']]
-                # else:
-                #     flat_modules = []
                 response_dict = {'status': True}
                 response_dict["subscription-details"] = PurchaseHistorySerializer(subscription_details, context={'request': request}, many=True).data
                 # response_dict["module"] = module_data
-
                 return Response(response_dict, status=status.HTTP_200_OK)
         else:
             response_dict = {'status': False}

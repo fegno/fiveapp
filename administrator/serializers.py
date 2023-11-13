@@ -8,6 +8,7 @@ from superadmin.models import (
     FeatureDetails, 
     BundleDetails, 
     UserAssignedModules,
+    FreeSubscriptionDetails
   
 )
 from user.models import UserProfile
@@ -40,6 +41,17 @@ class ModuleDetailsSerializer(serializers.ModelSerializer):
             is_active=True, modules=obj
         ).values("id","benifit","feature"))
         cd["feature_benifit"] = feature_benifit
+        cd["free_subscribed"] = False
+        if self.context.get("request"):
+            if FreeSubscriptionDetails.objects.filter(
+                module=obj,
+                user=self.context.get("request").user
+            ).exists():
+                cd["free_subscribed"] = True
+            if not cd["free_subscribed"]:
+                if SubscriptionDetails.objects.filter(user=self.context.get("request").user, module=obj).exists():
+                    cd["free_subscribed"] = True
+           
         if self.context.get("from_module") and self.context.get("admin"):
             user_c = list(UserAssignedModules.objects.filter(
                 is_active=True, 
