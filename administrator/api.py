@@ -1674,7 +1674,7 @@ class UserInviteModule(APIView):
             user_exists = UserProfile.objects.filter(email=data.get("email")).exists()
             deleted_user = UserProfile.objects.filter(email=data.get("email"), is_active=False).first()
             print(deleted_user)
-            existing_invite = InviteDetails.objects.filter(email=data.get("email"), is_verified=True).exists()
+            existing_invite = InviteDetails.objects.filter(email=data.get("email")).exists()
 
             # if user_exists and not deleted_user:
             #     response_dict["error"] = "User already exists"
@@ -1803,10 +1803,11 @@ class UserInviteModule(APIView):
                     # send otp to mail
                     email = request.data.get('email')
                     mail_subject = 'Invitation Link'
+                    current_domain = request.get_host()
 
                     html_message = render_to_string('invitation_link.html', {
                         'invited_user_name': data.get('name'),
-                        'invitation_link': f'http://127.0.0.1:8000/accept-reject/{invite_details.id}/'
+                        'invitation_link': f'http://{current_domain}/accept-reject/{invite_details.id}/'
                     })
                     email = EmailMessage("Invitation Link", html_message, to=[email])
                     email.content_subtype = "html"
@@ -1860,7 +1861,7 @@ class UserInviteModule(APIView):
 
                     html_message = render_to_string('invitation_link.html', {
                         'invited_user_name': data.get('name'),
-                        'invitation_link': f'http://127.0.0.1:8000/accept-reject/{invite_details.id}/'
+                        'invitation_link': f'http://{current_domain}/accept-reject/{invite_details.id}/'
                     })
                     email = EmailMessage("Invitation Link", html_message, to=[email])
                     email.content_subtype = "html"
@@ -2077,16 +2078,18 @@ class PermanentDeleteUserFromAdmin(APIView):
     authentication_classes = (CustomTokenAuthentication,)
 
     def post(self, request, pk):
+        print(pk)
         response_dict = {"status": False}
         admin_user = request.user
-
+        print(admin_user)
         try:
             deleted_user = UserProfile.objects.get(id=pk, created_admin=admin_user, is_active=True)
         except UserProfile.DoesNotExist:
             return Response({"message": "User not found or access denied", "status": False}, status=status.HTTP_404_NOT_FOUND)
         
         try:
-            invited_user = InviteDetails.objects.get(id=pk, created_admin=admin_user, is_verified=True)
+            invited_user = InviteDetails.objects.get(id=pk, user=admin_user, is_verified=True)
+            print(invited_user)
         except InviteDetails.DoesNotExist:
             return Response({"message": "User not found or access denied", "status": False}, status=status.HTTP_404_NOT_FOUND) 
 
@@ -2095,6 +2098,10 @@ class PermanentDeleteUserFromAdmin(APIView):
             deleted_user_module = UserAssignedModules.objects.get(user=deleted_user)
         except UserAssignedModules.DoesNotExist:
             deleted_user_module = None
+
+        if invited_user:
+            invited_user.is_deleted = True
+            invited_user.save()
 
         
         if deleted_user_module:
@@ -2105,7 +2112,7 @@ class PermanentDeleteUserFromAdmin(APIView):
             delete_user_log_entry = DeleteUsersLog.objects.create(
                 user=deleted_user,
                 deleted_by=admin_user,
-                is_active=False, 
+                is_active=True, 
             )
             delete_user_log_entry.module.set(modules_assigned)  # Associate all modules
 
@@ -2120,7 +2127,7 @@ class PermanentDeleteUserFromAdmin(APIView):
             if deleted_user.is_free_user:
                 admin_user.available_free_users += 1
                 admin_user.save()
-            else:
+            else: 
                 admin_user.available_paid_users += 1
                 admin_user.save()
             response_dict["message"] = "Permanently marked the user as deleted and deleted all assigned modules."
@@ -2129,8 +2136,8 @@ class PermanentDeleteUserFromAdmin(APIView):
             response_dict["message"] = "Already Deleted"
             response_dict["status"] = True
 
-        if invited_user:
-            invited_user.is_verified = False
+        # if invited_user:
+        #     invited_user.is_verified = False
             
         
         return Response(response_dict, status=status.HTTP_200_OK)
