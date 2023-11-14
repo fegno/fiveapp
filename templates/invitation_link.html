@@ -1,5 +1,16 @@
 {% autoescape off %}
 
+<style>
+  .cta-button {
+            display: inline-block;
+            padding: 10px 20px;
+            background-color: #f3a326;
+            color: #fff;
+            text-decoration: none;
+            border-radius: 5px;
+        }
+</style>
+
 <div
   style="max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 20px; border-radius: 10px; box-shadow: 0px 0px 10px 0px rgba(0, 0, 0, 0.1);border: 1px gray solid;">
 
@@ -15,13 +26,13 @@
 
     <div
       style="background-color: #f3a326; color: white; padding: 10px; border-radius: 5px; margin: 10px 0; border: 1px rgb(231, 231, 231) solid;">
-      <h3 style="font-size: 22px; margin: 0;">Your One-Time Password (OTP) for Email change:</h3>
+      <h3 style="font-size: 22px; margin: 0;">Your invitation link is ready:</h3>
       <!-- <p style="font-size: 30px; margin: 0;font-weight: 500;">{{ otp }}</p> -->
-      <a href="{{invitation_link}}">link</a>
+      <a href="{{invitation_link}}" class="cta-button">Accept Invitation</a>
     </div><br>
-    <p style="font-size: 16px; color: #7b7b7b;">Please do not share this OTP with anyone.</p>
+    <p style="font-size: 16px; color: #7b7b7b;">Please do not share this Link with anyone.</p>
 
-    <p style="margin-top: 40px;font-size: 14px;">If you didn't request this OTP, please ignore this message.</p>
+    <p style="margin-top: 40px;font-size: 14px;">If you didn't request this Link, please ignore this message.</p>
 
     <p style="margin-top: 10px; font-size: 14px;">Best regards</p>
     <p>Team, Five App</p>

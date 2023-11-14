@@ -38,6 +38,7 @@ from fiveapp.utils import PageSerializer, localtime
 from administrator.models import PurchaseDetails, SubscriptionDetails,  CsvLogDetails, UploadedCsvFiles, AddToCart, CustomRequest, DepartmentWeightage
 from administrator.serializers import (
     DeletedUserLogSerializers,
+    InvitedUserSerializer,
     ModuleDetailsSerializer, 
     BundleDetailsSerializer,
     BundleDetailsLiteSerializer,
@@ -1080,7 +1081,6 @@ class ViewReport(APIView):
                 "gender",
                 "region"
             ).order_by("id"))
-            print(log , "pppppppppppp")
             
             response_dict["report"] = log
         
@@ -1756,6 +1756,8 @@ class AdminModules(APIView):
                     Q(id__in=Subscribed_modules.module.all().values_list("id", flat=True))|
                     Q(id__in=free_subscribed_modules_ids)
                 )
+                invited_users = InviteDetails.objects.filter(user=logined_user, is_deleted=False, is_verified=False, is_reject=False)
+                
                 response_dict["user"] = {
                     "id": logined_user.id,
                     "first_name": logined_user.first_name,
@@ -1766,10 +1768,11 @@ class AdminModules(APIView):
                 response_dict["status"] = True
                 response_dict["modules"] = ModuleDetailsSerializer(all_modules, context={'request':request}, many=True).data
                 response_dict["additional_users"] = self.get_users_with_password()
-                response_dict["invited_users"] = self.get_users_without_password()
+                response_dict["invited_users"] = InvitedUserSerializer(invited_users, context={'request':request}, many=True).data
                 return Response(response_dict, status=status.HTTP_200_OK)
             elif free_subscribed_modules:
                 free_subscribed_modules_ids = []
+                invited_users = InviteDetails.objects.filter(user=logined_user, is_deleted=False, is_verified=False)
                 for i in free_subscribed_modules:
                     if i.module.all():
                         free_subscribed_modules_ids.extend(
@@ -1778,7 +1781,7 @@ class AdminModules(APIView):
                 free_modules = ModuleDetails.objects.filter(id__in=free_subscribed_modules_ids).order_by("module_identifier")
                 response_dict["modules"] = ModuleDetailsSerializer(free_modules, context={'request':request}, many=True).data
                 response_dict["additional_users"] = self.get_users_with_password()
-                response_dict["invited_users"] = self.get_users_without_password()
+                response_dict["invited_users"] = InvitedUserSerializer(invited_users, context={'request':request}, many=True).data
                 return Response(response_dict, status=status.HTTP_200_OK)
 
         else:
@@ -1816,31 +1819,29 @@ class UserInviteModule(APIView):
 
             user_exists = UserProfile.objects.filter(email=data.get("email")).exists()
             deleted_user = UserProfile.objects.filter(email=data.get("email"), is_active=False).first()
-            print(deleted_user)
-            existing_invite = InviteDetails.objects.filter(email=data.get("email")).exists()
+            existing_invite = InviteDetails.objects.filter(email=data.get("email")).last()
 
-            # if user_exists and not deleted_user:
-            #     response_dict["error"] = "User already exists"
-            #     return Response(response_dict, status=status.HTTP_200_OK)
+            if user_exists and not deleted_user:
+                response_dict["error"] = "User already exists"
+                return Response(response_dict, status=status.HTTP_200_OK)
             
-            if existing_invite:
-                response_dict["error"] = "User already invited"
+            if existing_invite and not existing_invite.is_verified and not existing_invite.is_reject:
+                response_dict["error"] = "User already invited, but no action has been taken"
                 return Response(response_dict, status=status.HTTP_403_FORBIDDEN)
 
+                
             available_free_user = admin_login.available_free_users
-            print(available_free_user)
             available_paid_user = admin_login.available_paid_users
-            print(available_paid_user)
+
             selected_modules = data.get("selected_modules")
-            print(selected_modules)
             selected_bundles = data.get("selected_bundles")
             assigned_module_names = []
 
             if available_free_user>0:
-                print("first")
+                
                 if deleted_user:
                     if deleted_user and deleted_user.is_free_user == True:
-                        print("freeuser")
+                        
                         if selected_modules:
                             existing_assign_delete_user = UserAssignedModules.objects.filter(user=deleted_user).first()
                             if existing_assign_delete_user:
@@ -1923,7 +1924,7 @@ class UserInviteModule(APIView):
                     
                     if selected_modules:
                         for module_id in selected_modules:
-                            print('post')
+                            
                             try:
                                 module = ModuleDetails.objects.get(id=module_id)
                                 invite_details.module.add(module)
@@ -1975,11 +1976,10 @@ class UserInviteModule(APIView):
                     admin_login.save()
 
                     # assign module
-                    # assign module
                     if selected_modules:
-                        print("paid if")
+                    
                         for module_id in selected_modules:
-                            print("for paid")
+                        
                             try:
                                 module = ModuleDetails.objects.get(id=module_id)
                                 invite_details.module.add(module)
@@ -2001,6 +2001,7 @@ class UserInviteModule(APIView):
                     # send otp to mail
                     email = request.data.get('email')
                     mail_subject = 'Invitation Link'
+                    current_domain = request.get_host()
 
                     html_message = render_to_string('invitation_link.html', {
                         'invited_user_name': data.get('name'),
@@ -2073,7 +2074,7 @@ class AssignUser(APIView):
                 response_dict["error"] = f"Module with ID {pk} does not exists"
                 return Response(response_dict, status=status.HTTP_200_OK)
             users_to_assign = request.data.get("user_ids", [])
-            # print(users_to_assign)
+            
             for user_id in users_to_assign:
                 try:
                     user_profile = UserProfile.objects.get(id=user_id)
@@ -2081,7 +2082,7 @@ class AssignUser(APIView):
                 except UserProfile.DoesNotExist:
                     response_dict["error"] = f"User with the ID {user_id} does not exsts"
                     return Response(response_dict, status=status.HTTP_403_FORBIDDEN)
-                # print(user_profile,"USE PROFIEL")
+                
                 current_date = timezone.now().date()
                 free_subscribed_modules = FreeSubscriptionDetails.objects.filter(
                     user=request.user,
@@ -2089,7 +2090,7 @@ class AssignUser(APIView):
                     module__id=pk
                 )
                 subscribed_module = SubscriptionDetails.objects.filter(subscription_end_date__gte=current_date, user=request.user, module=pk).exists()
-                # print(subscribed_module)
+                
                 if subscribed_module:
                     if UserAssignedModules.objects.filter(user=user_profile).exists():
                         if UserAssignedModules.objects.filter(user=user_profile, module=module).exists():
@@ -2217,7 +2218,7 @@ class AssignModulesToUser(APIView):
     def post(self, request, pk):
         response_dict = {"status":True}
         serializer = ModuleSToUserserializer(data=request.data)
-        # print(serializer.data)
+        
         if request.user.user_type == "ADMIN":
             try:
                 assign_user = UserProfile.objects.get(id=pk)
@@ -2230,8 +2231,6 @@ class AssignModulesToUser(APIView):
             module_to_assign = serializer.validated_data.get('module_ids',[])  
 
             for module_id in module_to_assign:
-                # print(type(module_to_assign))
-                # print(module_id)
                 try:
                     module = ModuleDetails.objects.get(id=module_id)
 
@@ -2258,19 +2257,13 @@ class PermanentDeleteUserFromAdmin(APIView):
     authentication_classes = (CustomTokenAuthentication,)
 
     def post(self, request, pk):
-        print(pk)
+    
         response_dict = {"status": False}
         admin_user = request.user
-        print(admin_user)
+
         try:
             deleted_user = UserProfile.objects.get(id=pk, created_admin=admin_user, is_active=True)
         except UserProfile.DoesNotExist:
-            return Response({"message": "User not found or access denied", "status": False}, status=status.HTTP_404_NOT_FOUND)
-        
-        try:
-            invited_user = InviteDetails.objects.get(id=pk, user=admin_user, is_verified=True)
-            print(invited_user)
-        except InviteDetails.DoesNotExist:
             return Response({"message": "User not found or access denied", "status": False}, status=status.HTTP_404_NOT_FOUND) 
 
 
@@ -2278,10 +2271,6 @@ class PermanentDeleteUserFromAdmin(APIView):
             deleted_user_module = UserAssignedModules.objects.get(user=deleted_user)
         except UserAssignedModules.DoesNotExist:
             deleted_user_module = None
-
-        if invited_user:
-            invited_user.is_deleted = True
-            invited_user.save()
 
         
         if deleted_user_module:
@@ -2316,10 +2305,6 @@ class PermanentDeleteUserFromAdmin(APIView):
             response_dict["message"] = "Already Deleted"
             response_dict["status"] = True
 
-        # if invited_user:
-        #     invited_user.is_verified = False
-            
-        
         return Response(response_dict, status=status.HTTP_200_OK)
 
 
@@ -2337,14 +2322,6 @@ class CartHome(APIView):
         total_user_count = int(admin_user.available_free_users) + int(admin_user.available_paid_users) 
 
         users_with_password_count = UserProfile.objects.filter(created_admin=admin_user).exclude(password='').count()
-    
-        # assigned_users = UserAssignedModules.objects.filter(
-        #     user_created_admin=request.user,
-        #     module__id__in=subscribed_module.module.all().values_list("id", flat=True)
-        #         ).values_list("user__id", flat=True)
-        # user_c  = UserProfile.objects.filter(id__in=assigned_users).count()
-
-        # print(user_c)
 
         response_dict["subscribed_module"] = SubscriptionModuleSerilzer(subscribed_module, context={'request':request}, many=True).data
         response_dict["module_count"] = module_count['total_modules']
@@ -2493,7 +2470,7 @@ class PurchaseDetailsView(APIView):
     authentication_classes = (CustomTokenAuthentication,)
 
     def get(self, request, pk):
-        print(pk)
+        
         response_dict = {'status': False}
         admin_user = request.user
 

@@ -3,7 +3,8 @@ from administrator.api import AddToCart
 from payment.models import PaymentAttempt
 
 from superadmin.models import (
-    DeleteUsersLog, 
+    DeleteUsersLog,
+    InviteDetails, 
     ModuleDetails, 
     FeatureDetails, 
     BundleDetails, 
@@ -79,6 +80,17 @@ class BundleDetailsSerializer(serializers.ModelSerializer):
         cd = super(BundleDetailsSerializer, self).to_representation(
             obj, *args, **kwargs
         )
+        cd["free_subscribed"] = False
+        if self.context.get("request"):
+            if FreeSubscriptionDetails.objects.filter(
+                bundle=obj,
+                user=self.context.get("request").user
+            ).exists():
+                cd["free_subscribed"] = True
+            if not cd["free_subscribed"]:
+                if SubscriptionDetails.objects.filter(user=self.context.get("request").user, bundle=obj).exists():
+                    cd["free_subscribed"] = True
+
         return cd
 
 class ModuleLiteSerializer(serializers.ModelSerializer):
@@ -271,3 +283,9 @@ class UserPaymentAttemptsSerializer(serializers.ModelSerializer):
     class Meta:
         model = PaymentAttempt
         fields = ('parchase', 'payment_intent_id', 'amount', 'total_charge', 'client_secret', 'last_attempt_date')
+
+
+class InvitedUserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = InviteDetails
+        fields = ('name', 'email')
