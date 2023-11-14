@@ -159,7 +159,8 @@ class AcceptReject(View):
                     login_otp = LoginOTP.objects.create(
                         email=new_user.email,
                         otp=otp_value,
-                        is_verified=True
+                        is_verified=True,
+                        user_type="USER"
                     )
                     response_dict["message"] = "Password set successfully"
                     
