@@ -322,9 +322,22 @@ class ForgotPassword(APIView):
         if not user:
             response_dict["error"] = "user does not exists"
             return Response(response_dict, HTTP_200_OK)
+        
+        errors = []
+
+        if len(new_password) < 5:
+            errors.append("Password must have at least 5 characters.")
+        if not re.search("[a-zA-Z]", new_password):
+            errors.append("Password must contain at least one letter.")
+        if not re.search("[0-9]", new_password):
+            errors.append("Password must contain at least one number.")
         if new_password != confirm_password:
-            response_dict["error"] = "Password does not match"
-            return Response(response_dict, HTTP_200_OK)
+            errors.append("Passwords do not match.")
+
+        if errors:
+            response_dict["error"] = ", ".join(errors)
+            return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
+        
         user.set_password(new_password)
         user.save()
         response_dict["status"] = True

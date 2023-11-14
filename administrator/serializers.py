@@ -3,7 +3,8 @@ from administrator.api import AddToCart
 from payment.models import PaymentAttempt
 
 from superadmin.models import (
-    DeleteUsersLog, 
+    DeleteUsersLog,
+    InviteDetails, 
     ModuleDetails, 
     FeatureDetails, 
     BundleDetails, 
@@ -271,3 +272,9 @@ class UserPaymentAttemptsSerializer(serializers.ModelSerializer):
     class Meta:
         model = PaymentAttempt
         fields = ('parchase', 'payment_intent_id', 'amount', 'total_charge', 'client_secret', 'last_attempt_date')
+
+
+class InvitedUserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = InviteDetails
+        fields = ('name', 'email')

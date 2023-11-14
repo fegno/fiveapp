@@ -1,23 +1,96 @@
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Password Set</title>
+    <title>Verify Link</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f8f8f8;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+        }
+
+        form {
+            max-width: 400px;
+            width: 100%;
+            padding: 20px;
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0px 0px 10px 0px rgba(0, 0, 0, 0.1);
+            border: 1px solid #ddd;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+        }
+
+        input {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 15px;
+            box-sizing: border-box;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        button {
+            width: 100%;
+            padding: 10px;
+            background-color: #4caf50;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        p {
+            color: #ff0000;
+            margin-top: 10px;
+            text-align: center;
+        }
+    </style>
 </head>
 <body>
-    <h1>Set Password</h1>
-    
-    {% if message %}
-        <p>{{ message }}</p>
-    {% endif %}
-    
     <form method="POST" id="passwordForm">
+        <h1>Verify Link</h1>
+        
+        {% if message %}
+            <p>{{ message }}</p>
+        {% endif %}
+        
         {% csrf_token %}
-        <label for="password">Password:</label>
-        <input type="password" id="password" name="password" >
-        <input type="c-password" id="c-password" name="c-password">
-        <button type="submit" name="set_password">Set Password</button>
-        <button type="submit" name="reject">Reject</button>
+        
+        {% if not invited_user.is_verified and not invited_user.is_reject and not invited_user.is_deleted %}
+            <label for="password">Password:</label>
+            <input type="password" id="password" name="password">
+            
+            <label for="c-password">Confirm Password:</label>
+            <input type="password" id="c-password" name="c-password">
+            <p>{% if password_errors %}{{ password_errors }}{% endif %}</p>
+
+            <button type="submit" name="set_password">Set Password</button>
+            <button type="submit" name="reject">Reject</button>
+        {% endif %}
     </form>
 </body>
 </html>
