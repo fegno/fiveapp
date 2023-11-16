@@ -1950,8 +1950,9 @@ class UserInviteModule(APIView):
                     current_domain = request.get_host()
 
                     html_message = render_to_string('invitation_link.html', {
-                        'invited_user_name': data.get('name'),
-                        'invitation_link': f'http://{current_domain}/accept-reject/{invite_details.id}/'
+                        'invited_user_name': data.get('first_name'),
+                        'invitation_link': f'http://{current_domain}/accept-reject/{invite_details.id}/',
+                        'invited_by':request.user
                     })
                     email = EmailMessage("Invitation Link", html_message, to=[email])
                     email.content_subtype = "html"
@@ -2004,8 +2005,9 @@ class UserInviteModule(APIView):
                     current_domain = request.get_host()
 
                     html_message = render_to_string('invitation_link.html', {
-                        'invited_user_name': data.get('name'),
-                        'invitation_link': f'http://{current_domain}/accept-reject/{invite_details.id}/'
+                        'invited_user_name': data.get('first_name'),
+                        'invitation_link': f'http://{current_domain}/accept-reject/{invite_details.id}/',
+                        'invited_by':request.user
                     })
                     email = EmailMessage("Invitation Link", html_message, to=[email])
                     email.content_subtype = "html"

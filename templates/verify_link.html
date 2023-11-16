@@ -22,7 +22,7 @@
             padding: 20px;
             background-color: #ffffff;
             border-radius: 8px;
-            box-shadow: 0px 0px 10px 0px rgba(0, 0, 0, 0.1);
+            box-shadow: 0px 0px 10px 0px rgba(36, 36, 36, 0.1);
             border: 1px solid #ddd;
         }
 
@@ -30,6 +30,7 @@
             text-align: center;
             color: #333;
             margin-bottom: 20px;
+            font-weight: 800;
         }
 
         label {
@@ -49,9 +50,9 @@
         }
 
         button {
-            width: 100%;
+            /* width: 100%; */
             padding: 10px;
-            background-color: #4caf50;
+            background-color: #ef6508;
             color: #fff;
             border: none;
             border-radius: 4px;
@@ -60,13 +61,32 @@
         }
 
         button:hover {
-            background-color: #45a049;
+            background-color: #f5b387;
         }
 
         p {
             color: #ff0000;
             margin-top: 10px;
             text-align: center;
+        }
+        .button-container {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 15px;
+        }
+
+        .button-container button {
+            width: 48%;
+        }
+        .button-container button:nth-child(1) {
+            background-color: #ef6508;
+        }
+
+        .button-container button:nth-child(2) {
+            background-color: rgb(145, 33, 16);
+        }
+        .button-container button:hover {
+            background-color: #f5b387;
         }
     </style>
 </head>
@@ -75,7 +95,7 @@
         <h1>Verify Link</h1>
         
         {% if message %}
-            <p>{{ message }}</p>
+            <p style="font-weight: 600;">{{ message }}</p>
         {% endif %}
         
         {% csrf_token %}
@@ -86,10 +106,12 @@
             
             <label for="c-password">Confirm Password:</label>
             <input type="password" id="c-password" name="c-password">
-            <p>{% if password_errors %}{{ password_errors }}{% endif %}</p>
+            <p style="font-weight: 600;">{% if password_errors %}{{ password_errors }}{% endif %}</p>
 
-            <button type="submit" name="set_password">Set Password</button>
-            <button type="submit" name="reject">Reject</button>
+            <div class="button-container">
+                <button type="submit" name="set_password">Set Password</button>
+                <button type="submit" name="reject">Reject</button>
+            </div>
         {% endif %}
     </form>
 </body>
