@@ -21,6 +21,7 @@ class SubscriptionDetails(models.Model):
     created = models.DateTimeField(auto_now_add=True)
     updated = models.DateTimeField(auto_now=True)
 
+
 STATUS_CHOICES=(   
 	('Pending','Pending'),
 	('Placed','Placed'),
@@ -73,7 +74,9 @@ class PurchaseDetails(models.Model):
     card_number = models.CharField(max_length=20, null=True, blank=True)
     expiration_date = models.CharField(max_length=5, null=True, blank=True)
     ccv = models.CharField(max_length=3, null=True, blank=True)
+    renew_id = models.CharField(max_length=1000,null=True, blank=True)
 
+    is_renewed = models.BooleanField(null=False, blank=True, default=True)
     is_active = models.BooleanField(null=False, blank=True, default=True)
     created = models.DateTimeField(auto_now_add=True)
     updated = models.DateTimeField(auto_now=True)
@@ -192,6 +195,33 @@ class CustomRequest(models.Model):
     )
     status = models.CharField(null=True, blank=True, max_length=1000, default="Pending")
    
+    is_active = models.BooleanField(null=False, blank=True, default=True)
+    created = models.DateTimeField(auto_now_add=True)
+    updated = models.DateTimeField(auto_now=True)
+
+class UserSubscriptionDetails(models.Model):
+    user = models.ForeignKey(
+        UserProfile,
+        blank=True,
+        null=True,
+        on_delete=models.CASCADE,   
+        related_name="user_subscriptions"
+    )
+    current_purchase = models.ForeignKey(
+        PurchaseDetails,
+        blank=True,
+        null=True,
+        on_delete=models.CASCADE,   
+    )
+    total_price = models.FloatField(
+        null=False, blank=False, default=0
+    )
+    user_count              = models.IntegerField(null=True, blank=True)
+    subscription_start_date = models.DateField(null=True, blank=True)
+    subscription_end_date = models.DateField(null=True, blank=True)
+    is_subscribed = models.BooleanField(null=False, blank=True, default=True)
+    subscription_type = models.CharField(null=True, blank=True, max_length=1000)
+
     is_active = models.BooleanField(null=False, blank=True, default=True)
     created = models.DateTimeField(auto_now_add=True)
     updated = models.DateTimeField(auto_now=True)

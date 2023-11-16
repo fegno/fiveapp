@@ -16,6 +16,7 @@ from user.models import UserProfile
 from administrator.models import  CsvLogDetails, PurchaseDetails, SubscriptionDetails,UploadedCsvFiles
 from fiveapp.custom_serializer import CustomSerializer
 from user.serializers import UserSerializer
+from django.utils import timezone
 
 class ModuleDetailsSerializer(serializers.ModelSerializer):
     class Meta:
@@ -249,7 +250,7 @@ class UserPurchaseHistorySerializer(serializers.ModelSerializer):
     user = UserSerializer()
     class Meta:
         model = PurchaseDetails
-        fields = ('user', 'total_price', 'subscription_start_date', 'subscription_end_date', 'subscription_type', 'status', 'user_count')
+        fields = ('user', 'total_price', 'subscription_start_date', 'subscription_end_date', 'subscription_type', 'status', 'user_count', 'is_renewed')
 
     def to_representation(self, instance):
         representation = super().to_representation(instance)
@@ -274,9 +275,17 @@ class UserPurchaseHistorySerializers(serializers.ModelSerializer):
             'subscription_end_date', 'is_subscribed', 
             'subscription_type', 'received_amounts', 
             'payment_dates', 'parchase_user_type',
-            'user_count', 'status'
+            'user_count', 'status', 'is_renewed'
             )
-
+    def to_representation(self, obj, *args, **kwargs):
+        cd = super(UserPurchaseHistorySerializers, self).to_representation(
+            obj, *args, **kwargs
+        )
+        cd["can_renew"] = False
+        if not obj.is_renewed:
+            if obj.subscription_end_date and obj.subscription_end_date < timezone.now().date():
+                cd["can_renew"] = True
+        return cd
 
 class UserPaymentAttemptsSerializer(serializers.ModelSerializer):
     parchase = UserPurchaseHistorySerializers()

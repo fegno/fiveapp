@@ -35,7 +35,7 @@ from django.db.models import (
 )
 from fiveapp.utils import PageSerializer, localtime
 
-from administrator.models import PurchaseDetails, SubscriptionDetails,  CsvLogDetails, UploadedCsvFiles, AddToCart, CustomRequest, DepartmentWeightage
+from administrator.models import PurchaseDetails, SubscriptionDetails,  CsvLogDetails, UploadedCsvFiles, AddToCart, CustomRequest, DepartmentWeightage, UserSubscriptionDetails
 from administrator.serializers import (
     DeletedUserLogSerializers,
     InvitedUserSerializer,
@@ -2370,6 +2370,202 @@ class UserPurchasePrice(APIView):
             return Response({"error": "Invalid purchase duration"}, status=status.HTTP_400_BAD_REQUEST)
         
         
+
+        price_data = {
+            "added_by": {"id": admin_user.id}, 
+            "amount": amount, 
+        }
+
+        response_dict["price_data"] = price_data
+        response_dict["subscription_end_date"] = subscription_end_date
+        return Response(response_dict, status=status.HTTP_200_OK)
+    
+
+class UserPurchasePriceV2(APIView):
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (CustomTokenAuthentication,)
+
+    def get(self, request):
+        subscription_type = request.GET.get("subscription_type")
+        total_count = int(request.GET.get("total_count", 1))
+        action_type = request.GET.get("action_type")
+
+        response_dict = {"status":True}
+        admin_user = request.user
+
+        admin_subscription = UserSubscriptionDetails.objects.filter(user=admin_user, is_subscribed=True).first()
+        
+        if action_type == "renew":
+            parchase = PurchaseDetails.objects.filter(id=renew_id).last()
+            subscription_end_date = parchase.subscription_end_date
+            remaining_days = (subscription_end_date - current_date).days
+            subscription_type = parchase.subscription_type
+            total_count = parchase.user_count
+            weekly_price = 18
+            monthly_price = 69
+            yearly_price = 800
+            if subscription_type == "WEEK":
+                amount = (weekly_price / 7) * remaining_days
+            elif subscription_type == "MONTH":
+                amount = (monthly_price / 30) * remaining_days
+            elif subscription_type == "YEAR":
+                amount = (yearly_price / 365) * remaining_days
+            else:
+                return Response({"error": "Invalid purchase duration"}, status=status.HTTP_400_BAD_REQUEST)
+        elif action_type == "upgrade":
+            current_date = datetime.now().date()
+            if admin_subscription.subscription_type == subscription_type:
+                user_count = admin_subscription.user_count
+                subscription_end_date = admin_subscription.subscription_end_date
+                if subscription_type == "WEEK":
+                    new_end_date = current_date + timedelta(days=7)
+                    pending = (new_end_date - subscription_end_date).days
+                    pending_amount = (18 / 7) * pending
+                    pending_amount_t = pending_amount * user_count
+                    total_c = total_count - user_count
+                    actual_amount_t = 18 * total_c
+                    amount = pending_amount_t + actual_amount_t
+
+                elif subscription_type == "MONTH":
+                    new_end_date = current_date + timedelta(days=30)
+                    pending = (new_end_date - subscription_end_date).days
+                    pending_amount = (69 / 30) * pending
+                    pending_amount_t = pending_amount * user_count
+                    total_c = total_count - user_count
+                    actual_amount_t = 69 * total_c
+                    amount = pending_amount_t + actual_amount_t
+
+                elif subscription_type == "YEAR":
+                    new_end_date = current_date + timedelta(days=365)
+                    pending = (new_end_date - subscription_end_date).days
+                    pending_amount = (800 / 365) * pending
+                    pending_amount_t = pending_amount * user_count
+                    total_c = total_count - user_count
+                    actual_amount_t = 800 * total_c
+                    amount = pending_amount_t + actual_amount_t
+            elif admin_subscription.subscription_type == "WEEK":
+                if subscription_type == "MONTH":
+                    user_count = admin_subscription.user_count
+                    subscription_end_date = admin_subscription.subscription_end_date
+                    new_end_date = current_date + timedelta(days=30)
+                    pending = (new_end_date - subscription_end_date).days
+                    pending_amount = (69 / 30) * pending
+                    pending_amount_t = pending_amount * user_count
+                    total_c = total_count - user_count
+                    actual_amount_t = 69 * total_c
+                    amount = pending_amount_t + actual_amount_t
+
+                elif subscription_type == "YEAR":
+                    user_count = admin_subscription.user_count
+                    subscription_end_date = admin_subscription.subscription_end_date
+                    new_end_date = current_date + timedelta(days=365)
+                    pending = (new_end_date - subscription_end_date).days
+                    pending_amount = (800 / 365) * pending
+                    pending_amount_t = pending_amount * user_count
+                    total_c = total_count - user_count
+                    actual_amount_t = 800 * total_c
+                    amount = pending_amount_t + actual_amount_t
+            
+            elif admin_subscription.subscription_type == "MONTH":
+                if subscription_type == "YEAR":
+                    user_count = admin_subscription.user_count
+                    subscription_end_date = admin_subscription.subscription_end_date
+                    new_end_date = current_date + timedelta(days=365)
+                    pending = (new_end_date - subscription_end_date).days
+                    pending_amount = (800 / 365) * pending
+                    pending_amount_t = pending_amount * user_count
+                    total_c = total_count - user_count
+                    actual_amount_t = 800 * total_c
+                    amount = pending_amount_t + actual_amount_t
+
+        elif admin_subscription:
+
+            if admin_subscription.subscription_type == subscription_type:
+                subscription_end_date = admin_subscription.subscription_end_date
+                current_date = datetime.now().date()
+                remaining_days = (subscription_end_date - current_date).days
+                subscription_type = admin_subscription.subscription_type
+                response_dict["Subscription_type"] = subscription_type
+                weekly_price = 18
+                monthly_price = 69
+                yearly_price = 800
+                if subscription_type == "WEEK":
+                    amount = (weekly_price / 7) * remaining_days
+                elif subscription_type == "MONTH":
+                    amount = (monthly_price / 30) * remaining_days
+                elif subscription_type == "YEAR":
+                    amount = (yearly_price / 365) * remaining_days
+                else:
+                    return Response({"error": "Invalid purchase duration"}, status=status.HTTP_400_BAD_REQUEST)
+                amount = amount * total_count
+            else:
+                if admin_subscription.subscription_type == "WEEK":
+                    if subscription_type == "MONTH":
+                        user_count = admin_subscription.user_count
+                        subscription_end_date = admin_subscription.subscription_end_date
+                        subscription_start_date = admin_subscription.subscription_start_date
+                        actual_subscription_end_date = subscription_start_date + timedelta(days=30)
+                        remaining_days = (actual_subscription_end_date - subscription_end_date).days
+                        pending_amount = (monthly_price / 30) * remaining_days
+                        pending_amount = pending_amount * user_count
+
+                        current_date = datetime.now().date()
+                        real_remaining_days = (actual_subscription_end_date - current_date).days
+                        t_amount = (monthly_price / 30) * real_remaining_days
+                        t_amount = t_amount * total_count
+
+                        amount = pending_amount + t_amount
+
+                    elif subscription_type == "YEAR":
+                        user_count = admin_subscription.user_count
+                        subscription_end_date = admin_subscription.subscription_end_date
+                        subscription_start_date = admin_subscription.subscription_start_date
+                        actual_subscription_end_date = subscription_start_date + timedelta(days=365)
+                        remaining_days = (actual_subscription_end_date - subscription_end_date).days
+                        pending_amount = (monthly_price / 365) * remaining_days
+                        pending_amount = pending_amount * user_count
+
+                        current_date = datetime.now().date()
+                        real_remaining_days = (actual_subscription_end_date - current_date).days
+                        t_amount = (monthly_price / 365) * real_remaining_days
+                        t_amount = t_amount * total_count
+                        
+                        amount = pending_amount + t_amount
+
+                    else:
+                        return Response({"error": "Invalid purchase duration"}, status=status.HTTP_400_BAD_REQUEST)
+
+                elif admin_subscription.subscription_type == "MONTH":
+                    if subscription_type == "YEAR":
+                        user_count = admin_subscription.user_count
+                        subscription_end_date = admin_subscription.subscription_end_date
+                        subscription_start_date = admin_subscription.subscription_start_date
+                        actual_subscription_end_date = subscription_start_date + timedelta(days=365)
+                        remaining_days = (actual_subscription_end_date - subscription_end_date).days
+                        pending_amount = (monthly_price / 365) * remaining_days
+                        pending_amount = pending_amount * user_count
+
+                        current_date = datetime.now().date()
+                        real_remaining_days = (actual_subscription_end_date - current_date).days
+                        t_amount = (monthly_price / 365) * real_remaining_days
+                        t_amount = t_amount * total_count
+                        
+                        amount = pending_amount + t_amount
+
+                    else:
+                        return Response({"error": "Invalid purchase duration"}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            weekly_price = 18
+            monthly_price = 69
+            yearly_price = 800
+            if subscription_type == "WEEK":
+                amount = weekly_price * total_count
+            elif subscription_type == "MONTH":
+                amount = monthly_price * total_count
+            elif subscription_type == "YEAR":
+                amount = yearly_price * total_count
+            else:
+                return Response({"error": "Invalid purchase duration"}, status=status.HTTP_400_BAD_REQUEST)
 
         price_data = {
             "added_by": {"id": admin_user.id}, 

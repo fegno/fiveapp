@@ -13,7 +13,7 @@ from rest_framework import status
 
 from superadmin.models import ModuleDetails, FeatureDetails,  BundleDetails
 from payment.models import PaymentAttempt
-from administrator.models import PurchaseDetails, SubscriptionDetails, AddToCart
+from administrator.models import PurchaseDetails, SubscriptionDetails, AddToCart, UserSubscriptionDetails
 from user.models import CardDetails, BillingDetails
 
 import json
@@ -474,4 +474,61 @@ class MockInitiatePayment(APIView):
 			response_dict['error'] = str(e)
 			return Response(response_dict, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-		
+class InitiateUserPaymentV2(APIView):
+	permission_classes = (IsAuthenticated,)
+	authentication_classes = (CustomTokenAuthentication,)
+
+	def post(self,request):
+		response_dict={'status':False}
+		billing_id = request.data.get("billing_id")
+		card_id = request.data.get("card_id")
+		user_count = request.data.get("user_count")
+		total_price = request.data.get("total_price")
+		subscription_type = request.data.get("subscription_type")
+		renew_id = request.data.get("renew_id")
+
+		subscription = UserSubscriptionDetails.objects.filter(
+			user=request.user, 
+			is_subscribed=True
+		).last()
+		if subscription:
+			order = PurchaseDetails.objects.create(
+				user=request.user,
+				status="Pending",
+				subscription_type=subscription_type,
+				total_price=total_price,
+				is_subscribed=False,
+				subscription_end_date=subscription.subscription_end_date,
+				subscription_start_date=subscription.subscription_start_date,
+				user_count=user_count,
+				parchase_user_type="User",
+				renew_id=renew_id
+			)
+		else:
+			if subscription_type == "WEEK":
+				end_date = timezone.now().date()  + timedelta(days=7)
+			elif  subscription_type == "MONTH":
+				end_date = timezone.now().date()  + timedelta(days=30)
+			elif subscription_type == "YEAR":
+				end_date = timezone.now().date()  + timedelta(days=365)
+			order = PurchaseDetails.objects.create(
+				user=request.user,
+				status="Pending",
+				subscription_type=subscription_type,
+				total_price=total_price,
+				is_subscribed=False,
+				subscription_end_date=end_date,
+				subscription_start_date=timezone.now().date(),
+				user_count=user_count,
+				parchase_user_type="User",
+				renew_id=renew_id
+			)
+
+		with transaction.atomic():
+			stripe.api_key=settings.STRIPE_API_KEY
+			intent = stripe.PaymentIntent.create(amount=round(order.total_price*100),currency='inr')
+			payment_attempt=PaymentAttempt.objects.create(parchase_user_type="User",parchase=order,user=request.user,currency='inr',amount=order.total_price,
+				status='Initiated',client_secret=intent['client_secret'],payment_intent_id=intent['id'],last_attempt_date=timezone.now())
+			response_dict['client_secret']=payment_attempt.client_secret
+			response_dict['status']=True
+		return Response(response_dict,status.HTTP_200_OK)
