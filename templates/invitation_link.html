@@ -3,12 +3,16 @@
 <style>
   .cta-button {
             display: inline-block;
-            padding: 10px 20px;
+            padding: 10px 10px;
             background-color: #f3a326;
             color: #fff;
             text-decoration: none;
             border-radius: 5px;
         }
+  a .cta-button{
+    text-decoration: none;
+    padding: 10px;
+  }
 </style>
 
 <div
@@ -26,10 +30,22 @@
 
     <div
       style="background-color: #f3a326; color: white; padding: 10px; border-radius: 5px; margin: 10px 0; border: 1px rgb(231, 231, 231) solid;">
-      <h3 style="font-size: 22px; margin: 0;">Your invitation link is ready:</h3>
-      <!-- <p style="font-size: 30px; margin: 0;font-weight: 500;">{{ otp }}</p> -->
-      <a href="{{invitation_link}}" class="cta-button">Accept Invitation</a>
+      <h4
+       style="font-size: 22px; margin: 0;">Your invitation link is ready:</h4
+        > <br>
+      <a href="{{invitation_link}}" class="cta-button">Accept/Reject Invitation</a>
     </div><br>
+
+    <div style="font-size: 14px; color: #7b7b7b; margin-top: 20px;">
+      <p style="margin-bottom: 5px;">You've been invited as a <b>User</b>.</p>
+      {% if invited_by %}
+        <p style="margin-bottom: 5px;">You were invited by <b>{{ invited_by.first_name }} {{invited_by.last_name}}</b>.</p>
+      {% else %}
+        <p style="margin-bottom: 5px;">You were invited by an administrator.</p>
+      {% endif %}
+    </div>
+    
+
     <p style="font-size: 16px; color: #7b7b7b;">Please do not share this Link with anyone.</p>
 
     <p style="margin-top: 40px;font-size: 14px;">If you didn't request this Link, please ignore this message.</p>
