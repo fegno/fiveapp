@@ -570,7 +570,7 @@ class UploadCsv(APIView):
         csv_file = request.FILES.get("file")
         working_type = request.data.get("working_type")
         module = ModuleDetails.objects.filter(id=pk).last()
-        if user.user_type == "ADMIN":
+        if request.user.user_type == "ADMIN":
             current_date = timezone.now().date()
             subscription_ext = SubscriptionDetails.objects.filter(
                 user=request.user, 
@@ -719,6 +719,22 @@ class UploadCsv(APIView):
                         region=row.get("Region"),
                         gender=gender,
 
+                    )
+                )
+
+        elif module.module_identifier == 6:
+            c = 0
+            for row in reader:
+                c = c + 1
+                to_save.append(
+                    CsvLogDetails(
+                        uploaded_file=upload_log,
+                        sl_no=c,
+                        department=row.get("DEPARTMENTS"),
+                        system_name=row.get("SYSTEM NAME"),
+                        factors_effected=row.get("FACTORS EFFECTED"),
+                        downtime_week=row.get("DOWN TIME IN WEEK"),
+                        impact_hour=row.get("IMPACT HOUR"),
                     )
                 )
 
@@ -932,6 +948,28 @@ class GenerateReport(APIView):
             except Exception as e:
                 response_dict["error"] = str(e)
 
+        elif csv_file.modules.module_identifier == 6:
+            try:
+                peak_hour_sale_value = request.data.get("peak_hour_sale_value")
+                non_peak_hour_sale_value = request.data.get("non_peak_hour_sale_value")
+                sale_target = request.data.get("sale_target")
+                peak_hour_sale_hr = request.data.get("peak_hour_sale_hr")
+                non_peak_hour_sale_hr = request.data.get("non_peak_hour_sale_hr")
+                employee_cost_target = request.data.get("employee_cost_target")
+                csv_file.is_report_generated = True
+                csv_file.peak_hour_sale_value = peak_hour_sale_value
+                csv_file.non_peak_hour_sale_value = non_peak_hour_sale_value
+                csv_file.sale_target = sale_target
+                csv_file.peak_hour_sale_hr = peak_hour_sale_hr
+                csv_file.non_peak_hour_sale_hr = non_peak_hour_sale_hr
+                csv_file.employee_cost_target = employee_cost_target
+                csv_file.save()
+                response_dict["status"] = True
+                response_dict["message"] = "Generated"
+            except Exception as e:
+                response_dict["error"] = str(e)
+
+
         else:
             response_dict["error"] = "Module not Valid"
         return Response(response_dict, status=status.HTTP_200_OK)
@@ -1084,6 +1122,23 @@ class ViewReport(APIView):
                 "region"
             ).order_by("id"))
             
+            response_dict["report"] = log
+
+        elif csv_file.modules.module_identifier == 6:
+            log  = tuple(CsvLogDetails.objects.filter(
+                uploaded_file__id=pk,
+                is_active=True
+            ).filter(
+                Q(uploaded_file__uploaded_by=request.user)|
+                Q(uploaded_file__uploaded_by__created_admin=request.user)
+            ).values(
+                "sl_no", 
+                "department",
+                "system_name",
+                "factors_effected",
+                "downtime_week",
+                "impact_hour",
+            ).order_by("id"))
             response_dict["report"] = log
         
         response_dict["status"] = True
@@ -1631,6 +1686,172 @@ class AnalyticsReport(APIView):
 
             response_dict["region_report"] = tuple(log)
 
+        elif csv_file.modules.module_identifier == 6:
+            select_department = request.GET.get("select_department")
+            select_tab = request.GET.get("select_tab", "downtime_overview")
+
+            if select_tab == "downtime_overview":
+                if not select_department:
+                    response_dict["error"] = "Please select department"
+                    return Response(response_dict, status=status.HTTP_200_OK)
+
+                log  = CsvLogDetails.objects.filter(
+                    uploaded_file__id=pk,
+                    department=select_department
+                ).filter(
+                    Q(uploaded_file__uploaded_by=request.user)|
+                    Q(uploaded_file__uploaded_by__created_admin=request.user)
+                ).values("factors_effected").annotate(
+                    numbers=Sum("downtime_week"),
+                ).values(
+                    "factors_effected", 
+                    "numbers",
+                )
+
+                
+                total_order_loss_per_week = []
+                peak_sale = CsvLogDetails.objects.filter(
+                    uploaded_file__id=pk,
+                    department=select_department,
+                    factors_effected__in=["Sales impact downtime ", "Sales impact downtime"],
+                    impact_hour__in=["peak", "peak "]
+                ).aggregate(tot=Sum("downtime_week"))
+                non_peak_sale = CsvLogDetails.objects.filter(
+                    uploaded_file__id=pk,
+                    department=select_department,
+                    factors_effected__in=["Sales impact downtime ", "Sales impact downtime"],
+                    impact_hour__in=["No -peak ", "No -peak", "No-peak"]
+                ).aggregate(tot=Sum("downtime_week"))
+
+                total_cost_impact = CsvLogDetails.objects.filter(
+                    uploaded_file__id=pk,
+                    department=select_department,
+                    factors_effected__in=["cost impact downtime ", "cost impact downtime"],
+                ).aggregate(tot=Sum("downtime_week"))
+
+                sales_impact_down = CsvLogDetails.objects.filter(
+                    uploaded_file__id=pk,
+                    department=select_department,
+                    factors_effected__in=["Sales impact downtime ", "Sales impact downtime"],
+                ).aggregate(tot=Sum("downtime_week"))
+
+                peak_sale_val = peak_sale.get("tot") if peak_sale and peak_sale.get("tot") else 0
+                non_peak_sale_val = non_peak_sale.get("tot") if non_peak_sale and non_peak_sale.get("tot") else 0
+
+                sales_impact_down = sales_impact_down.get("tot") if sales_impact_down.get("tot") else 0
+                try:
+                    peak_sale_val = float(sales_impact_down)/(float(csv_file.peak_hour_sale_value)*7)
+                except:
+                    peak_sale_val = 0
+                peak_sale_val = peak_sale_val * float(csv_file.peak_hour_sale_hr)
+
+        
+                try:
+                    non_peak_sale_val = float(sales_impact_down)/(float(csv_file.non_peak_hour_sale_value)*7)
+                except:
+                    non_peak_sale_val = 0
+                non_peak_sale_val = non_peak_sale_val * float(csv_file.non_peak_hour_sale_hr)
+
+
+                total_target = csv_file.non_peak_hour_sale_value + csv_file.peak_hour_sale_value
+                total_cost_impact_val = total_cost_impact.get("tot") if total_cost_impact.get("tot") else 0
+                try:
+                    total_cost_impact_val = float(total_cost_impact_val)/(float(total_target)*7)
+                except:
+                    total_cost_impact_val = 0
+                total_cost_impact_val = total_cost_impact_val * float(csv_file.employee_cost_target)
+
+
+                peak_sale_val = peak_sale_val * -1
+                non_peak_sale_val = non_peak_sale_val * -1
+                total_cost_impact_val = total_cost_impact_val * -1
+
+                availability  = tuple(CsvLogDetails.objects.filter(
+                    uploaded_file__id=pk,
+                    department=select_department
+                ).filter(
+                    Q(uploaded_file__uploaded_by=request.user)|
+                    Q(uploaded_file__uploaded_by__created_admin=request.user)
+                ).values("system_name").annotate(
+                    numbers=Sum("downtime_week"),
+                ).values(
+                    "system_name", 
+                    "numbers",
+                ))
+                availability_dict = []
+                total_target = total_target * 7
+                for i in availability:
+                    cal = i.get("numbers")*100/total_target
+                    percentage = 100 - cal
+                    res_status = "Standard"
+                    if percentage > 90:
+                        res_status = "Standard"
+                    elif percentage > 50:
+                        res_status = "Overloaded"
+                    elif percentage < 50:
+                        res_status = "Underloaded"
+                    availability_dict.append(
+                        {
+                            "system_name":i.get("system_name"),
+                            "percentage":percentage,
+                            "status":res_status
+                        }
+                    )
+
+
+                total_order_loss_per_week.append(
+                    {
+                        "parameter": "Total order loss for the week",
+                        "number":round(non_peak_sale_val,1) + round(peak_sale_val,1)
+                    }
+                )
+                total_order_loss_per_week.append(
+                    {
+                        "parameter": "Peak Hour Sale Loss",
+                        "number":round(peak_sale_val,1)
+                    }
+                )
+                total_order_loss_per_week.append(
+                    {
+                        "parameter": "Non-Peak Hour Sale Loss",
+                        "number":round(non_peak_sale_val,1)
+                    }
+                )
+                total_order_loss_per_week.append(
+                    {
+                        "parameter": "Total cost impact of resource",
+                        "number":round(total_cost_impact_val,1)
+                    }
+                )
+                total_order_loss_per_week.append(
+                    {
+                        "parameter": "Resource utilisation impact",
+                        "number":0
+                    }
+                )
+                
+
+                total_downtime_per_week = []
+                total_down = 0
+                for i in log:
+                    if i.get("numbers"):
+                        total_down = total_down + int(i.get("numbers"))
+                    total_downtime_per_week.append(
+                        {
+                           "factors_effected":i.get("factors_effected"),
+                           "numbers":i.get("numbers")
+                        }
+                    )
+
+                total_downtime_per_week.append(
+                    {
+                        "factors_effected":"Total Down-Time Per Week",
+                        "numbers":total_down,
+                    }
+                )
+                response_dict["total_downtime_per_week"] = total_downtime_per_week
+                response_dict["total_order_loss_per_week"] = total_order_loss_per_week
+                response_dict["software_availability"]    = availability_dict
         response_dict["status"] = True
         return Response(response_dict, status=status.HTTP_200_OK)
 
