@@ -294,17 +294,17 @@ class StripePaymentWebhook(APIView):
 						user.available_paid_users = order.user_count
 						user.save()
 					elif order.action_type == "count_upgrade":
-						subscription.current_purchase = order
-						subscription.total_price = order.total_price
-						subscription.user_count = subscription.user_count + order.user_count
-						subscription.save()
-						first_count_users = UserProfile.objects.filter(
+						user_subscription.current_purchase = order
+						user_subscription.total_price = order.total_price
+						user_subscription.user_count = user_subscription.user_count + order.user_count
+						user_subscription.save()
+						first_count_users = list(UserProfile.objects.filter(
 							created_admin=user,
 							is_active=True,
 							is_free_user=False,
-						).order_by("-id")[:subscription.user_count]
+						).order_by("-id")[:user_subscription.user_count].values_list("id", flat=True))
 						UserProfile.objects.filter(
-							id__in=first_count_users.values_list("id", flat=True)
+							id__in=first_count_users
 						).update(
 							subscription_start_date=order.subscription_start_date,
 							subscription_end_date=order.subscription_end_date
@@ -314,38 +314,37 @@ class StripePaymentWebhook(APIView):
 						user.save()
 					
 					elif order.action_type == "plan_upgrade":
-						subscription.current_purchase = order
-						subscription.total_price = order.total_price
-						subscription.subscription_type =order.subscription_type
-						subscription.is_subscribed = True
-						subscription.save()
-						first_count_users = UserProfile.objects.filter(
+						user_subscription.current_purchase = order
+						user_subscription.total_price = order.total_price
+						user_subscription.subscription_type =order.subscription_type
+						user_subscription.is_subscribed = True
+						user_subscription.save()
+						first_count_users = (UserProfile.objects.filter(
 							created_admin=user,
 							is_active=True,
 							is_free_user=False,
-							subscription_end_date__lt=timezone.now().date()
-						).order_by("-id")[:subscription.user_count]
+						).order_by("-id")[:user_subscription.user_count].values_list("id", flat=True))
 						UserProfile.objects.filter(
-							id__in=first_count_users.values_list("id", flat=True)
+							id__in=first_count_users
 						).update(
 							subscription_start_date=order.subscription_start_date,
 							subscription_end_date=order.subscription_end_date
 						)
 
 					elif order.action_type == "both_upgrade":
-						subscription.current_purchase = order
-						subscription.total_price = order.total_price
-						subscription.subscription_type =order.subscription_type
-						subscription.user_count = subscription.user_count + order.user_count
-						subscription.is_subscribed = True
-						subscription.save()
-						first_count_users = UserProfile.objects.filter(
+						user_subscription.current_purchase = order
+						user_subscription.total_price = order.total_price
+						user_subscription.subscription_type =order.subscription_type
+						user_subscription.user_count = user_subscription.user_count + order.user_count
+						user_subscription.is_subscribed = True
+						user_subscription.save()
+						first_count_users = list(UserProfile.objects.filter(
 							created_admin=user,
 							is_active=True,
 							is_free_user=False,
-						).order_by("-id")[:subscription.user_count]
+						).order_by("-id")[:user_subscription.user_count].values_list("id", flat=True))
 						UserProfile.objects.filter(
-							id__in=first_count_users.values_list("id", flat=True)
+							id__in=first_count_users
 						).update(
 							subscription_start_date=order.subscription_start_date,
 							subscription_end_date=order.subscription_end_date
@@ -355,17 +354,17 @@ class StripePaymentWebhook(APIView):
 						user.save()
 
 					elif order.action_type == "renew":
-						subscription.current_purchase = order
-						subscription.total_price = order.total_price
-						subscription.is_subscribed = True
-						subscription.save()
-						first_count_users = UserProfile.objects.filter(
+						user_subscription.current_purchase = order
+						user_subscription.total_price = order.total_price
+						user_subscription.is_subscribed = True
+						user_subscription.save()
+						first_count_users = list(UserProfile.objects.filter(
 							created_admin=user,
 							is_active=True,
 							is_free_user=False,
-						).order_by("-id")[:subscription.user_count]
+						).order_by("-id")[:user_subscription.user_count].values_list("id", flat=True))
 						UserProfile.objects.filter(
-							id__in=first_count_users.values_list("id", flat=True)
+							id__in=first_count_users
 						).update(
 							subscription_start_date=order.subscription_start_date,
 							subscription_end_date=order.subscription_end_date
@@ -617,7 +616,7 @@ class InitiateUserPaymentV2(APIView):
 		elif action_type == "count_upgrade":
 			subscription_end_date = admin_subscription.subscription_end_date
 			t_user_count = admin_subscription.user_count
-			user_count = total_count - t_user_count
+			user_count = user_count - t_user_count
 
 		elif action_type == "plan_upgrade":
 			if admin_subscription.subscription_type == subscription_type:
@@ -646,7 +645,7 @@ class InitiateUserPaymentV2(APIView):
 
 		elif action_type == "both_upgrade":
 			t_user_count = admin_subscription.user_count
-			user_count = total_count - t_user_count
+			user_count = user_count - t_user_count
 
 			current_date = datetime.now().date()
 			if admin_subscription.subscription_type == subscription_type:
@@ -681,7 +680,7 @@ class InitiateUserPaymentV2(APIView):
 			elif subscription_type == "YEAR":
 				subscription_end_date = current_date + timedelta(days=365)
 
-		if subscription:
+		if admin_subscription:
 			order = PurchaseDetails.objects.create(
 				user=request.user,
 				status="Pending",
@@ -689,7 +688,7 @@ class InitiateUserPaymentV2(APIView):
 				total_price=total_price,
 				is_subscribed=False,
 				subscription_end_date=subscription_end_date,
-				subscription_start_date=subscription.subscription_start_date,
+				subscription_start_date=admin_subscription.subscription_start_date,
 				user_count=user_count,
 				parchase_user_type="User",
 				action_type=action_type

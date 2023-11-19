@@ -299,7 +299,7 @@ class InvitedUserSerializer(serializers.ModelSerializer):
         model = InviteDetails
         fields = ('name', 'email')
 
-class SubscriptionParchaseSerializers(serializers.Serializer):
+class SubscriptionParchaseSerializers(serializers.ModelSerializer):
     user = UserSerializer()
     module = ModuleDetailsSerializer(many=True,)
     bundle = BundleDetailsSerializer(many=True)
@@ -312,10 +312,11 @@ class SubscriptionParchaseSerializers(serializers.Serializer):
             "bundle", 
             "subscription_start_date", 
             "subscription_end_date",
-            "subscription_type"
+            "subscription_type",
+            "id"
         )
 
-class UserParchaseSerializers(serializers.Serializer):
+class UserSubscriptionSerializers(serializers.ModelSerializer):
     user = UserSerializer()
     class Meta:
         model = UserSubscriptionDetails
@@ -325,11 +326,12 @@ class UserParchaseSerializers(serializers.Serializer):
             "total_price", 
             "subscription_start_date", 
             "subscription_end_date",
-            "subscription_type"
+            "subscription_type",
+            "id"
         )
 
     def to_representation(self, obj, *args, **kwargs):
-        cd = super(UserParchaseSerializers, self).to_representation(
+        cd = super(UserSubscriptionSerializers, self).to_representation(
             obj, *args, **kwargs
         )
         cd["subscription_expired"] = False

@@ -47,6 +47,6 @@ urlpatterns = [
     re_path(r'^module-purchase-details/(?P<pk>\d+)/$', api.PurchaseDetailsView.as_view(), name='module-purchase-details'),
 
     re_path(r'^custom-subscription/', api.CreateCustomRequest.as_view(), name='custom-subscription'),
-    re_path(r'^list-admin-subscription/', api.ListAdminSUbscriptions.as_view(), name='list-admin-subscription'),
+    re_path(r'^list-admin-subscription/', api.ListAdminSubscriptions.as_view(), name='list-admin-subscription'),
 
 ]

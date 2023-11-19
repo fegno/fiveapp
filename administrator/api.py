@@ -53,7 +53,7 @@ from administrator.serializers import (
     UserPaymentAttemptsSerializer,
     UserPurchaseHistorySerializer,
     SubscriptionParchaseSerializers,
-    UserParchaseSerializers
+    UserSubscriptionSerializers
 )
 from superadmin.models import (
     DeleteUsersLog,
@@ -2759,9 +2759,7 @@ class CreateCustomRequest(APIView):
         response_dict["status"] = True
         return Response(response_dict, status=status.HTTP_200_OK)
 
-
-
-class ListAdminSUbscriptions(APIView):
+class ListAdminSubscriptions(APIView):
     permission_classes = (IsAuthenticated,)
     authentication_classes = (CustomTokenAuthentication, )
 
@@ -2773,9 +2771,8 @@ class ListAdminSUbscriptions(APIView):
         user_subscription = UserSubscriptionDetails.objects.filter(
             user=request.user
         ).last()
-
         response_dict["subscription"] = SubscriptionParchaseSerializers(subscription).data
-        response_dict["user_subscription"] = UserParchaseSerializers(user_subscription).data
+        response_dict["user_subscription"] = UserSubscriptionSerializers(user_subscription).data
         response_dict["status"] = True
         return Response(response_dict, status=status.HTTP_200_OK)
 
