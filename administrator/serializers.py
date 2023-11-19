@@ -13,7 +13,7 @@ from superadmin.models import (
   
 )
 from user.models import UserProfile
-from administrator.models import  CsvLogDetails, PurchaseDetails, SubscriptionDetails,UploadedCsvFiles
+from administrator.models import  UserSubscriptionDetails, CsvLogDetails, PurchaseDetails, SubscriptionDetails,UploadedCsvFiles
 from fiveapp.custom_serializer import CustomSerializer
 from user.serializers import UserSerializer
 from django.utils import timezone
@@ -298,3 +298,45 @@ class InvitedUserSerializer(serializers.ModelSerializer):
     class Meta:
         model = InviteDetails
         fields = ('name', 'email')
+
+class SubscriptionParchaseSerializers(serializers.Serializer):
+    user = UserSerializer()
+    module = ModuleDetailsSerializer(many=True,)
+    bundle = BundleDetailsSerializer(many=True)
+
+    class Meta:
+        model = SubscriptionDetails
+        fields = ( 
+            "user",
+            "module", 
+            "bundle", 
+            "subscription_start_date", 
+            "subscription_end_date",
+            "subscription_type"
+        )
+
+class UserParchaseSerializers(serializers.Serializer):
+    user = UserSerializer()
+    class Meta:
+        model = UserSubscriptionDetails
+        fields = ( 
+            "user",
+            "user_count", 
+            "total_price", 
+            "subscription_start_date", 
+            "subscription_end_date",
+            "subscription_type"
+        )
+
+    def to_representation(self, obj, *args, **kwargs):
+        cd = super(UserParchaseSerializers, self).to_representation(
+            obj, *args, **kwargs
+        )
+        cd["subscription_expired"] = False
+        if obj.subscription_end_date < timezone.now().date():
+            cd["subscription_expired"] = True
+        if obj.subscription_start_date:
+            days = obj.subscription_end_date  - timezone.now().date()
+            if int(days.days) > 0:
+                cd["subscription_expire_in"] = days.days
+        return cd

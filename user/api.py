@@ -72,7 +72,7 @@ class Applogin(APIView):
             if user.subscription_end_date and user.subscription_end_date < now_date:
                 response_dict["error"] = "Subscription expired please contact admin"
                 return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
-            else:
+            elif not user.subscription_end_date:
                 response_dict["error"] = "Not Subscribed"
                 return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
         if flag == 1 or tok == 1:

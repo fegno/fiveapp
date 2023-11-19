@@ -8,5 +8,4 @@ admin.site.register(UploadedCsvFiles)
 admin.site.register(AddToCart)
 admin.site.register(CustomRequest)
 admin.site.register(DepartmentWeightage)
-
-
+admin.site.register(UserSubscriptionDetails)

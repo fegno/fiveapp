@@ -51,7 +51,9 @@ from administrator.serializers import (
     UploadedCsvFilesSerializer,
     UserInviteSerializer,
     UserPaymentAttemptsSerializer,
-    UserPurchaseHistorySerializer
+    UserPurchaseHistorySerializer,
+    SubscriptionParchaseSerializers,
+    UserParchaseSerializers
 )
 from superadmin.models import (
     DeleteUsersLog,
@@ -2389,30 +2391,118 @@ class UserPurchasePriceV2(APIView):
         subscription_type = request.GET.get("subscription_type")
         total_count = int(request.GET.get("total_count", 1))
         action_type = request.GET.get("action_type")
-
         response_dict = {"status":True}
         admin_user = request.user
-
-        admin_subscription = UserSubscriptionDetails.objects.filter(user=admin_user, is_subscribed=True).first()
+        current_date = datetime.now().date()
+        admin_subscription = UserSubscriptionDetails.objects.filter(user=admin_user).first()
         
-        if action_type == "renew":
-            parchase = PurchaseDetails.objects.filter(id=renew_id).last()
-            subscription_end_date = parchase.subscription_end_date
-            remaining_days = (subscription_end_date - current_date).days
-            subscription_type = parchase.subscription_type
-            total_count = parchase.user_count
+        if action_type == "renew":            
+            subscription_type = admin_subscription.subscription_type
+            total_count = admin_subscription.user_count
             weekly_price = 18
             monthly_price = 69
             yearly_price = 800
             if subscription_type == "WEEK":
+                if admin_subscription.subscription_end_date < current_date:
+                    subscription_end_date = current_date
+                else:
+                    subscription_end_date = admin_subscription.subscription_end_date
+                new_end_date = subscription_end_date + timedelta(days=7)
+                remaining_days = (new_end_date - subscription_end_date).days
                 amount = (weekly_price / 7) * remaining_days
+                amount = amount * total_count
+                subscription_end_date = new_end_date
+                
             elif subscription_type == "MONTH":
+                if admin_subscription.subscription_end_date < current_date:
+                    subscription_end_date = current_date
+                else:
+                    subscription_end_date = admin_subscription.subscription_end_date
+                new_end_date = subscription_end_date + timedelta(days=30)
+                remaining_days = (new_end_date - subscription_end_date).days
                 amount = (monthly_price / 30) * remaining_days
+                amount = amount * total_count
+                subscription_end_date = new_end_date
             elif subscription_type == "YEAR":
+                if admin_subscription.subscription_end_date < current_date:
+                    subscription_end_date = current_date
+                else:
+                    subscription_end_date = admin_subscription.subscription_end_date
+                new_end_date = subscription_end_date + timedelta(days=365)
+                remaining_days = (new_end_date - subscription_end_date).days
                 amount = (yearly_price / 365) * remaining_days
+                amount = amount * total_count
+                subscription_end_date = new_end_date
             else:
                 return Response({"error": "Invalid purchase duration"}, status=status.HTTP_400_BAD_REQUEST)
-        elif action_type == "upgrade":
+        elif action_type == "count_upgrade":
+            subscription_end_date = admin_subscription.subscription_end_date
+            if admin_subscription.subscription_type == "WEEK":
+                user_count = admin_subscription.user_count
+                total_count = total_count - user_count
+                amount = total_count * 18
+            elif subscription_type == "MONTH":
+                user_count = admin_subscription.user_count
+                total_count = total_count - user_count
+                amount = total_count * 69
+
+            elif subscription_type == "YEAR":
+                user_count = admin_subscription.user_count
+                total_count = total_count - user_count
+                amount = total_count * 800
+
+        elif action_type == "plan_upgrade":
+            
+            if admin_subscription.subscription_type == subscription_type:
+                subscription_end_date = admin_subscription.subscription_end_date
+                if subscription_type == "WEEK":
+                    new_end_date = current_date + timedelta(days=7)
+                    pending = (new_end_date - subscription_end_date).days
+                    pending_amount = (18 / 7) * pending
+                    amount = pending_amount * user_count
+
+                elif subscription_type == "MONTH":
+                    new_end_date = current_date + timedelta(days=30)
+                    pending = (new_end_date - subscription_end_date).days
+                    amount = (69 / 30) * pending
+
+                elif subscription_type == "YEAR":
+                    new_end_date = current_date + timedelta(days=365)
+                    pending = (new_end_date - subscription_end_date).days
+                    amount = (800 / 365) * pending
+                subscription_end_date = new_end_date
+
+            elif admin_subscription.subscription_type == "WEEK":
+                if subscription_type == "MONTH":
+                    user_count = admin_subscription.user_count
+                    subscription_end_date = admin_subscription.subscription_end_date
+                    new_end_date = current_date + timedelta(days=30)
+                    pending = (new_end_date - subscription_end_date).days
+                    pending_amount = (69 / 30) * pending
+                    amount = pending_amount * user_count
+
+                elif subscription_type == "YEAR":
+                    user_count = admin_subscription.user_count
+                    subscription_end_date = admin_subscription.subscription_end_date
+                    new_end_date = current_date + timedelta(days=365)
+                    pending = (new_end_date - subscription_end_date).days
+                    pending_amount = (800 / 365) * pending
+                    amount = pending_amount * user_count
+                subscription_end_date = new_end_date
+            elif admin_subscription.subscription_type == "MONTH":
+                if subscription_type == "YEAR":
+                    user_count = admin_subscription.user_count
+                    subscription_end_date = admin_subscription.subscription_end_date
+                    new_end_date = current_date + timedelta(days=365)
+                    pending = (new_end_date - subscription_end_date).days
+                    pending_amount = (800 / 365) * pending
+                    pending_amount_t = pending_amount * user_count
+                    total_c = total_count - user_count
+                    actual_amount_t = 800 * total_c
+                    amount = pending_amount_t + actual_amount_t
+                subscription_end_date = new_end_date
+
+        elif action_type == "both_upgrade":
             current_date = datetime.now().date()
             if admin_subscription.subscription_type == subscription_type:
                 user_count = admin_subscription.user_count
@@ -2443,6 +2533,8 @@ class UserPurchasePriceV2(APIView):
                     total_c = total_count - user_count
                     actual_amount_t = 800 * total_c
                     amount = pending_amount_t + actual_amount_t
+
+                subscription_end_date = new_end_date
             elif admin_subscription.subscription_type == "WEEK":
                 if subscription_type == "MONTH":
                     user_count = admin_subscription.user_count
@@ -2465,6 +2557,8 @@ class UserPurchasePriceV2(APIView):
                     total_c = total_count - user_count
                     actual_amount_t = 800 * total_c
                     amount = pending_amount_t + actual_amount_t
+
+                subscription_end_date = new_end_date
             
             elif admin_subscription.subscription_type == "MONTH":
                 if subscription_type == "YEAR":
@@ -2478,92 +2572,21 @@ class UserPurchasePriceV2(APIView):
                     actual_amount_t = 800 * total_c
                     amount = pending_amount_t + actual_amount_t
 
-        elif admin_subscription:
-
-            if admin_subscription.subscription_type == subscription_type:
-                subscription_end_date = admin_subscription.subscription_end_date
-                current_date = datetime.now().date()
-                remaining_days = (subscription_end_date - current_date).days
-                subscription_type = admin_subscription.subscription_type
-                response_dict["Subscription_type"] = subscription_type
-                weekly_price = 18
-                monthly_price = 69
-                yearly_price = 800
-                if subscription_type == "WEEK":
-                    amount = (weekly_price / 7) * remaining_days
-                elif subscription_type == "MONTH":
-                    amount = (monthly_price / 30) * remaining_days
-                elif subscription_type == "YEAR":
-                    amount = (yearly_price / 365) * remaining_days
-                else:
-                    return Response({"error": "Invalid purchase duration"}, status=status.HTTP_400_BAD_REQUEST)
-                amount = amount * total_count
-            else:
-                if admin_subscription.subscription_type == "WEEK":
-                    if subscription_type == "MONTH":
-                        user_count = admin_subscription.user_count
-                        subscription_end_date = admin_subscription.subscription_end_date
-                        subscription_start_date = admin_subscription.subscription_start_date
-                        actual_subscription_end_date = subscription_start_date + timedelta(days=30)
-                        remaining_days = (actual_subscription_end_date - subscription_end_date).days
-                        pending_amount = (monthly_price / 30) * remaining_days
-                        pending_amount = pending_amount * user_count
-
-                        current_date = datetime.now().date()
-                        real_remaining_days = (actual_subscription_end_date - current_date).days
-                        t_amount = (monthly_price / 30) * real_remaining_days
-                        t_amount = t_amount * total_count
-
-                        amount = pending_amount + t_amount
-
-                    elif subscription_type == "YEAR":
-                        user_count = admin_subscription.user_count
-                        subscription_end_date = admin_subscription.subscription_end_date
-                        subscription_start_date = admin_subscription.subscription_start_date
-                        actual_subscription_end_date = subscription_start_date + timedelta(days=365)
-                        remaining_days = (actual_subscription_end_date - subscription_end_date).days
-                        pending_amount = (monthly_price / 365) * remaining_days
-                        pending_amount = pending_amount * user_count
-
-                        current_date = datetime.now().date()
-                        real_remaining_days = (actual_subscription_end_date - current_date).days
-                        t_amount = (monthly_price / 365) * real_remaining_days
-                        t_amount = t_amount * total_count
-                        
-                        amount = pending_amount + t_amount
-
-                    else:
-                        return Response({"error": "Invalid purchase duration"}, status=status.HTTP_400_BAD_REQUEST)
-
-                elif admin_subscription.subscription_type == "MONTH":
-                    if subscription_type == "YEAR":
-                        user_count = admin_subscription.user_count
-                        subscription_end_date = admin_subscription.subscription_end_date
-                        subscription_start_date = admin_subscription.subscription_start_date
-                        actual_subscription_end_date = subscription_start_date + timedelta(days=365)
-                        remaining_days = (actual_subscription_end_date - subscription_end_date).days
-                        pending_amount = (monthly_price / 365) * remaining_days
-                        pending_amount = pending_amount * user_count
-
-                        current_date = datetime.now().date()
-                        real_remaining_days = (actual_subscription_end_date - current_date).days
-                        t_amount = (monthly_price / 365) * real_remaining_days
-                        t_amount = t_amount * total_count
-                        
-                        amount = pending_amount + t_amount
-
-                    else:
-                        return Response({"error": "Invalid purchase duration"}, status=status.HTTP_400_BAD_REQUEST)
+                subscription_end_date = new_end_date
         else:
+            
             weekly_price = 18
             monthly_price = 69
             yearly_price = 800
             if subscription_type == "WEEK":
                 amount = weekly_price * total_count
+                subscription_end_date = current_date + timedelta(days=7)
             elif subscription_type == "MONTH":
                 amount = monthly_price * total_count
+                subscription_end_date = current_date + timedelta(days=30)
             elif subscription_type == "YEAR":
                 amount = yearly_price * total_count
+                subscription_end_date = current_date + timedelta(days=365)
             else:
                 return Response({"error": "Invalid purchase duration"}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -2733,6 +2756,26 @@ class CreateCustomRequest(APIView):
         if bundle_ids:  
             custom.bundle.add(*request.data.get("bundle_ids"))    
         response_dict["message"] = "Successfully submitted"
+        response_dict["status"] = True
+        return Response(response_dict, status=status.HTTP_200_OK)
+
+
+
+class ListAdminSUbscriptions(APIView):
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (CustomTokenAuthentication, )
+
+    def get(self, request):
+        response_dict = {"status": False}
+        subscription = SubscriptionDetails.objects.filter(
+            user=request.user
+        ).last()
+        user_subscription = UserSubscriptionDetails.objects.filter(
+            user=request.user
+        ).last()
+
+        response_dict["subscription"] = SubscriptionParchaseSerializers(subscription).data
+        response_dict["user_subscription"] = UserParchaseSerializers(user_subscription).data
         response_dict["status"] = True
         return Response(response_dict, status=status.HTTP_200_OK)
 

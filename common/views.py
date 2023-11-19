@@ -16,6 +16,7 @@ from django.contrib.auth import authenticate, login, logout as auth_logout
 from django.contrib import messages
 from django.contrib.auth.hashers import make_password
 from fiveapp.utils import get_error
+from administrator.models import UserSubscriptionDetails
 
 class Login(View):
     def get(self, request):
@@ -138,6 +139,9 @@ class AcceptReject(View):
                     }
                     return render(request, 'verify_link.html', context)
 
+                admin_subscription = UserSubscriptionDetails.objects.filter(
+                    user=invited_user.user, 
+                ).last()
                 if c_password == password:
                     invited_user.is_verified = True
                     invited_user.save()
@@ -150,6 +154,10 @@ class AcceptReject(View):
                         created_admin=invited_user.user,
                         is_free_user=invited_user.is_free_user
                     )
+                    if admin_subscription and not new_user.is_free_user:
+                        new_user.subscription_start_date = admin_subscription.subscription_start_date
+                        new_user.subscription_end_date = admin_subscription.subscription_end_date
+                        new_user.save()
 
                     assigned_modules = invited_user.module.all()
                     user_assigned_module = UserAssignedModules.objects.create(user=new_user)

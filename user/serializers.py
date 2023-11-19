@@ -52,12 +52,15 @@ class UserSerializer(serializers.ModelSerializer):
 			user=obj, 
 		).last()
         if obj.user_type == "USER":
-            my_subscription = SubscriptionDetails.objects.filter(
-                user=obj.created_admin, 
-            ).last()
-            if my_subscription:
-                cd["subscription_type"] = my_subscription.subscription_type
-        if subscription:
+            cd["user_expired"] = False
+            if obj.subscription_end_date and obj.subscription_end_date < timezone.now().date():
+                cd["user_expired"] = True
+            cd["subscription_start_date"] = obj.subscription_start_date
+            cd["subscription_end_date"] = obj.subscription_end_date
+            if obj.subscription_start_date:
+                days = obj.subscription_end_date  - timezone.now().date()
+                cd["subscription_expire_in"] = days.days
+        if subscription and obj.user_type != "USER":
             cd["subscription_type"] = subscription.subscription_type
             cd["subscription_start_date"] = subscription.subscription_start_date
             cd["subscription_end_date"] = subscription.subscription_end_date

@@ -74,7 +74,7 @@ class PurchaseDetails(models.Model):
     card_number = models.CharField(max_length=20, null=True, blank=True)
     expiration_date = models.CharField(max_length=5, null=True, blank=True)
     ccv = models.CharField(max_length=3, null=True, blank=True)
-    renew_id = models.CharField(max_length=1000,null=True, blank=True)
+    action_type = models.CharField(max_length=3, null=True, blank=True)
 
     is_renewed = models.BooleanField(null=False, blank=True, default=True)
     is_active = models.BooleanField(null=False, blank=True, default=True)
