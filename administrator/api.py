@@ -1759,9 +1759,15 @@ class AnalyticsReport(APIView):
                     total_cost_impact_val = float(total_cost_impact_val)/(float(total_target)*7)
                 except:
                     total_cost_impact_val = 0
+
+              
                 total_cost_impact_val = total_cost_impact_val * float(csv_file.employee_cost_target)
 
-
+                res_cal = total_cost_impact.get("tot") if total_cost_impact.get("tot") else 0 
+                res_total = total_target * 7
+          
+                resource_utilisation = res_cal/ res_total if res_total != 0 else 0
+                resource_utilisation = resource_utilisation *100
                 peak_sale_val = peak_sale_val * -1
                 non_peak_sale_val = non_peak_sale_val * -1
                 total_cost_impact_val = total_cost_impact_val * -1
@@ -1781,7 +1787,10 @@ class AnalyticsReport(APIView):
                 availability_dict = []
                 total_target = total_target * 7
                 for i in availability:
-                    cal = i.get("numbers")*100/total_target
+                    if total_target != 0:
+                        cal = i.get("numbers")*100/total_target
+                    else:
+                        cal = 0
                     percentage = 100 - cal
                     res_status = "Standard"
                     if percentage > 90:
@@ -1826,7 +1835,7 @@ class AnalyticsReport(APIView):
                 total_order_loss_per_week.append(
                     {
                         "parameter": "Resource utilisation impact",
-                        "number":0
+                        "number":round(resource_utilisation, 2)
                     }
                 )
                 
@@ -1852,6 +1861,85 @@ class AnalyticsReport(APIView):
                 response_dict["total_downtime_per_week"] = total_downtime_per_week
                 response_dict["total_order_loss_per_week"] = total_order_loss_per_week
                 response_dict["software_availability"]    = availability_dict
+            elif select_tab == "total_downtime":
+                status_list = [
+                    When(numbers__gt=10, then=Value("Overloaded")),
+                    When(numbers__lt=10,numbers__gt=0, then=Value("Underloaded")),
+                    When(numbers__lte=0, then=Value("Standard")),
+                ]
+                log  = CsvLogDetails.objects.filter(
+                    uploaded_file__id=pk,
+                ).filter(
+                    Q(uploaded_file__uploaded_by=request.user)|
+                    Q(uploaded_file__uploaded_by__created_admin=request.user)
+                ).values("department").annotate(
+                    numbers=Sum("downtime_week", default=0),
+                ).annotate(
+                    status=Case(
+                        *status_list, default=Value("Standard"), output_field=CharField()
+                    ),
+                ).values(
+                    "department", 
+                    "numbers",
+                    "status"
+                )
+
+                sales_log  = CsvLogDetails.objects.filter(
+                    uploaded_file__id=pk,
+                    factors_effected__in=["Sales impact downtime ", "Sales impact downtime"],
+                ).filter(
+                    Q(uploaded_file__uploaded_by=request.user)|
+                    Q(uploaded_file__uploaded_by__created_admin=request.user)
+                ).values("department").annotate(
+                    numbers=Sum("downtime_week", default=0),
+                ).annotate(
+                    status=Case(
+                        *status_list, default=Value("Standard"), output_field=CharField()
+                    ),
+                ).values(
+                    "department", 
+                    "numbers",
+                    "status"
+                )
+                cost_log  = CsvLogDetails.objects.filter(
+                    uploaded_file__id=pk,
+                    factors_effected__in=["cost impact downtime ", "cost impact downtime"],
+                ).filter(
+                    Q(uploaded_file__uploaded_by=request.user)|
+                    Q(uploaded_file__uploaded_by__created_admin=request.user)
+                ).values("department").annotate(
+                    numbers=Sum("downtime_week", default=0),
+                ).annotate(
+                    status=Case(
+                        *status_list, default=Value("Standard"), output_field=CharField()
+                    ),
+                ).values(
+                    "department", 
+                    "numbers",
+                    "status"
+                )
+                other_log  = CsvLogDetails.objects.filter(
+                    uploaded_file__id=pk,
+                    factors_effected__in=["other impact downtime ", "other impact downtime"],
+                ).filter(
+                    Q(uploaded_file__uploaded_by=request.user)|
+                    Q(uploaded_file__uploaded_by__created_admin=request.user)
+                ).values("department").annotate(
+                    numbers=Sum("downtime_week", default=0),
+                ).annotate(
+                    status=Case(
+                        *status_list, default=Value("Standard"), output_field=CharField()
+                    ),
+                ).values(
+                    "department", 
+                    "numbers",
+                    "status"
+                )
+
+                response_dict["total_downtime_per_week"] = tuple(log)
+                response_dict["sales_impact_downtime"] = tuple(sales_log)
+                response_dict["cost_impact_downtime"] = tuple(cost_log)
+                response_dict["other_impact_downtime"] = tuple(other_log)
         response_dict["status"] = True
         return Response(response_dict, status=status.HTTP_200_OK)
 
