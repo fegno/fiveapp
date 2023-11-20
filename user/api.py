@@ -11,6 +11,8 @@ from rest_framework.status import HTTP_200_OK
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.views import APIView
 from django.contrib.auth import login, logout
+
+from django.utils import timezone
 from superadmin.models import InviteDetails
 
 from user.api_permissions import CustomTokenAuthentication
@@ -66,7 +68,15 @@ class Applogin(APIView):
         else:
             response_dict["message"] = "Login Method DoesNotExist"
             return Response(response_dict, HTTP_200_OK)
-       
+        
+        if user.user_type == "USER":
+            now_date = timezone.now().date()
+            if user.subscription_end_date and user.subscription_end_date < now_date:
+                response_dict["error"] = "Subscription expired please contact admin"
+                return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
+            elif not user.subscription_end_date:
+                response_dict["error"] = "Not Subscribed"
+                return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
         if flag == 1 or tok == 1:
             Token.objects.filter(user=user).delete()
             token, c = Token.objects.get_or_create(user=user)

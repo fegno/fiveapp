@@ -35,7 +35,7 @@ from django.db.models import (
 )
 from fiveapp.utils import PageSerializer, localtime
 
-from administrator.models import PurchaseDetails, SubscriptionDetails,  CsvLogDetails, UploadedCsvFiles, AddToCart, CustomRequest, DepartmentWeightage
+from administrator.models import PurchaseDetails, SubscriptionDetails,  CsvLogDetails, UploadedCsvFiles, AddToCart, CustomRequest, DepartmentWeightage, UserSubscriptionDetails
 from administrator.serializers import (
     DeletedUserLogSerializers,
     InvitedUserSerializer,
@@ -51,7 +51,9 @@ from administrator.serializers import (
     UploadedCsvFilesSerializer,
     UserInviteSerializer,
     UserPaymentAttemptsSerializer,
-    UserPurchaseHistorySerializer
+    UserPurchaseHistorySerializer,
+    SubscriptionParchaseSerializers,
+    UserSubscriptionSerializers
 )
 from superadmin.models import (
     DeleteUsersLog,
@@ -568,7 +570,7 @@ class UploadCsv(APIView):
         csv_file = request.FILES.get("file")
         working_type = request.data.get("working_type")
         module = ModuleDetails.objects.filter(id=pk).last()
-        if user.user_type == "ADMIN":
+        if request.user.user_type == "ADMIN":
             current_date = timezone.now().date()
             subscription_ext = SubscriptionDetails.objects.filter(
                 user=request.user, 
@@ -717,6 +719,22 @@ class UploadCsv(APIView):
                         region=row.get("Region"),
                         gender=gender,
 
+                    )
+                )
+
+        elif module.module_identifier == 6:
+            c = 0
+            for row in reader:
+                c = c + 1
+                to_save.append(
+                    CsvLogDetails(
+                        uploaded_file=upload_log,
+                        sl_no=c,
+                        department=row.get("DEPARTMENTS"),
+                        system_name=row.get("SYSTEM NAME"),
+                        factors_effected=row.get("FACTORS EFFECTED"),
+                        downtime_week=row.get("DOWN TIME IN WEEK"),
+                        impact_hour=row.get("IMPACT HOUR"),
                     )
                 )
 
@@ -930,6 +948,28 @@ class GenerateReport(APIView):
             except Exception as e:
                 response_dict["error"] = str(e)
 
+        elif csv_file.modules.module_identifier == 6:
+            try:
+                peak_hour_sale_value = request.data.get("peak_hour_sale_value")
+                non_peak_hour_sale_value = request.data.get("non_peak_hour_sale_value")
+                sale_target = request.data.get("sale_target")
+                peak_hour_sale_hr = request.data.get("peak_hour_sale_hr")
+                non_peak_hour_sale_hr = request.data.get("non_peak_hour_sale_hr")
+                employee_cost_target = request.data.get("employee_cost_target")
+                csv_file.is_report_generated = True
+                csv_file.peak_hour_sale_value = peak_hour_sale_value
+                csv_file.non_peak_hour_sale_value = non_peak_hour_sale_value
+                csv_file.sale_target = sale_target
+                csv_file.peak_hour_sale_hr = peak_hour_sale_hr
+                csv_file.non_peak_hour_sale_hr = non_peak_hour_sale_hr
+                csv_file.employee_cost_target = employee_cost_target
+                csv_file.save()
+                response_dict["status"] = True
+                response_dict["message"] = "Generated"
+            except Exception as e:
+                response_dict["error"] = str(e)
+
+
         else:
             response_dict["error"] = "Module not Valid"
         return Response(response_dict, status=status.HTTP_200_OK)
@@ -1082,6 +1122,23 @@ class ViewReport(APIView):
                 "region"
             ).order_by("id"))
             
+            response_dict["report"] = log
+
+        elif csv_file.modules.module_identifier == 6:
+            log  = tuple(CsvLogDetails.objects.filter(
+                uploaded_file__id=pk,
+                is_active=True
+            ).filter(
+                Q(uploaded_file__uploaded_by=request.user)|
+                Q(uploaded_file__uploaded_by__created_admin=request.user)
+            ).values(
+                "sl_no", 
+                "department",
+                "system_name",
+                "factors_effected",
+                "downtime_week",
+                "impact_hour",
+            ).order_by("id"))
             response_dict["report"] = log
         
         response_dict["status"] = True
@@ -1629,6 +1686,260 @@ class AnalyticsReport(APIView):
 
             response_dict["region_report"] = tuple(log)
 
+        elif csv_file.modules.module_identifier == 6:
+            select_department = request.GET.get("select_department")
+            select_tab = request.GET.get("select_tab", "downtime_overview")
+
+            if select_tab == "downtime_overview":
+                if not select_department:
+                    response_dict["error"] = "Please select department"
+                    return Response(response_dict, status=status.HTTP_200_OK)
+
+                log  = CsvLogDetails.objects.filter(
+                    uploaded_file__id=pk,
+                    department=select_department
+                ).filter(
+                    Q(uploaded_file__uploaded_by=request.user)|
+                    Q(uploaded_file__uploaded_by__created_admin=request.user)
+                ).values("factors_effected").annotate(
+                    numbers=Sum("downtime_week"),
+                ).values(
+                    "factors_effected", 
+                    "numbers",
+                )
+
+                
+                total_order_loss_per_week = []
+                peak_sale = CsvLogDetails.objects.filter(
+                    uploaded_file__id=pk,
+                    department=select_department,
+                    factors_effected__in=["Sales impact downtime ", "Sales impact downtime"],
+                    impact_hour__in=["peak", "peak "]
+                ).aggregate(tot=Sum("downtime_week"))
+                non_peak_sale = CsvLogDetails.objects.filter(
+                    uploaded_file__id=pk,
+                    department=select_department,
+                    factors_effected__in=["Sales impact downtime ", "Sales impact downtime"],
+                    impact_hour__in=["No -peak ", "No -peak", "No-peak"]
+                ).aggregate(tot=Sum("downtime_week"))
+
+                total_cost_impact = CsvLogDetails.objects.filter(
+                    uploaded_file__id=pk,
+                    department=select_department,
+                    factors_effected__in=["cost impact downtime ", "cost impact downtime"],
+                ).aggregate(tot=Sum("downtime_week"))
+
+                sales_impact_down = CsvLogDetails.objects.filter(
+                    uploaded_file__id=pk,
+                    department=select_department,
+                    factors_effected__in=["Sales impact downtime ", "Sales impact downtime"],
+                ).aggregate(tot=Sum("downtime_week"))
+
+                peak_sale_val = peak_sale.get("tot") if peak_sale and peak_sale.get("tot") else 0
+                non_peak_sale_val = non_peak_sale.get("tot") if non_peak_sale and non_peak_sale.get("tot") else 0
+
+                sales_impact_down = sales_impact_down.get("tot") if sales_impact_down.get("tot") else 0
+                try:
+                    peak_sale_val = float(sales_impact_down)/(float(csv_file.peak_hour_sale_value)*7)
+                except:
+                    peak_sale_val = 0
+                peak_sale_val = peak_sale_val * float(csv_file.peak_hour_sale_hr)
+
+        
+                try:
+                    non_peak_sale_val = float(sales_impact_down)/(float(csv_file.non_peak_hour_sale_value)*7)
+                except:
+                    non_peak_sale_val = 0
+                non_peak_sale_val = non_peak_sale_val * float(csv_file.non_peak_hour_sale_hr)
+
+
+                total_target = csv_file.non_peak_hour_sale_value + csv_file.peak_hour_sale_value
+                total_cost_impact_val = total_cost_impact.get("tot") if total_cost_impact.get("tot") else 0
+                try:
+                    total_cost_impact_val = float(total_cost_impact_val)/(float(total_target)*7)
+                except:
+                    total_cost_impact_val = 0
+
+              
+                total_cost_impact_val = total_cost_impact_val * float(csv_file.employee_cost_target)
+
+                res_cal = total_cost_impact.get("tot") if total_cost_impact.get("tot") else 0 
+                res_total = total_target * 7
+          
+                resource_utilisation = res_cal/ res_total if res_total != 0 else 0
+                resource_utilisation = resource_utilisation *100
+                peak_sale_val = peak_sale_val * -1
+                non_peak_sale_val = non_peak_sale_val * -1
+                total_cost_impact_val = total_cost_impact_val * -1
+
+                availability  = tuple(CsvLogDetails.objects.filter(
+                    uploaded_file__id=pk,
+                    department=select_department
+                ).filter(
+                    Q(uploaded_file__uploaded_by=request.user)|
+                    Q(uploaded_file__uploaded_by__created_admin=request.user)
+                ).values("system_name").annotate(
+                    numbers=Sum("downtime_week"),
+                ).values(
+                    "system_name", 
+                    "numbers",
+                ))
+                availability_dict = []
+                total_target = total_target * 7
+                for i in availability:
+                    if total_target != 0:
+                        cal = i.get("numbers")*100/total_target
+                    else:
+                        cal = 0
+                    percentage = 100 - cal
+                    res_status = "Standard"
+                    if percentage > 90:
+                        res_status = "Standard"
+                    elif percentage > 50:
+                        res_status = "Overloaded"
+                    elif percentage < 50:
+                        res_status = "Underloaded"
+                    availability_dict.append(
+                        {
+                            "system_name":i.get("system_name"),
+                            "percentage":percentage,
+                            "status":res_status
+                        }
+                    )
+
+
+                total_order_loss_per_week.append(
+                    {
+                        "parameter": "Total order loss for the week",
+                        "number":round(non_peak_sale_val,1) + round(peak_sale_val,1)
+                    }
+                )
+                total_order_loss_per_week.append(
+                    {
+                        "parameter": "Peak Hour Sale Loss",
+                        "number":round(peak_sale_val,1)
+                    }
+                )
+                total_order_loss_per_week.append(
+                    {
+                        "parameter": "Non-Peak Hour Sale Loss",
+                        "number":round(non_peak_sale_val,1)
+                    }
+                )
+                total_order_loss_per_week.append(
+                    {
+                        "parameter": "Total cost impact of resource",
+                        "number":round(total_cost_impact_val,1)
+                    }
+                )
+                total_order_loss_per_week.append(
+                    {
+                        "parameter": "Resource utilisation impact",
+                        "number":round(resource_utilisation, 2)
+                    }
+                )
+                
+
+                total_downtime_per_week = []
+                total_down = 0
+                for i in log:
+                    if i.get("numbers"):
+                        total_down = total_down + int(i.get("numbers"))
+                    total_downtime_per_week.append(
+                        {
+                           "factors_effected":i.get("factors_effected"),
+                           "numbers":i.get("numbers")
+                        }
+                    )
+
+                total_downtime_per_week.append(
+                    {
+                        "factors_effected":"Total Down-Time Per Week",
+                        "numbers":total_down,
+                    }
+                )
+                response_dict["total_downtime_per_week"] = total_downtime_per_week
+                response_dict["total_order_loss_per_week"] = total_order_loss_per_week
+                response_dict["software_availability"]    = availability_dict
+            elif select_tab == "total_downtime":
+                status_list = [
+                    When(numbers__gt=10, then=Value("Overloaded")),
+                    When(numbers__lt=10,numbers__gt=0, then=Value("Underloaded")),
+                    When(numbers__lte=0, then=Value("Standard")),
+                ]
+                log  = CsvLogDetails.objects.filter(
+                    uploaded_file__id=pk,
+                ).filter(
+                    Q(uploaded_file__uploaded_by=request.user)|
+                    Q(uploaded_file__uploaded_by__created_admin=request.user)
+                ).values("department").annotate(
+                    numbers=Sum("downtime_week", default=0),
+                ).annotate(
+                    status=Case(
+                        *status_list, default=Value("Standard"), output_field=CharField()
+                    ),
+                ).values(
+                    "department", 
+                    "numbers",
+                    "status"
+                )
+
+                sales_log  = CsvLogDetails.objects.filter(
+                    uploaded_file__id=pk,
+                    factors_effected__in=["Sales impact downtime ", "Sales impact downtime"],
+                ).filter(
+                    Q(uploaded_file__uploaded_by=request.user)|
+                    Q(uploaded_file__uploaded_by__created_admin=request.user)
+                ).values("department").annotate(
+                    numbers=Sum("downtime_week", default=0),
+                ).annotate(
+                    status=Case(
+                        *status_list, default=Value("Standard"), output_field=CharField()
+                    ),
+                ).values(
+                    "department", 
+                    "numbers",
+                    "status"
+                )
+                cost_log  = CsvLogDetails.objects.filter(
+                    uploaded_file__id=pk,
+                    factors_effected__in=["cost impact downtime ", "cost impact downtime"],
+                ).filter(
+                    Q(uploaded_file__uploaded_by=request.user)|
+                    Q(uploaded_file__uploaded_by__created_admin=request.user)
+                ).values("department").annotate(
+                    numbers=Sum("downtime_week", default=0),
+                ).annotate(
+                    status=Case(
+                        *status_list, default=Value("Standard"), output_field=CharField()
+                    ),
+                ).values(
+                    "department", 
+                    "numbers",
+                    "status"
+                )
+                other_log  = CsvLogDetails.objects.filter(
+                    uploaded_file__id=pk,
+                    factors_effected__in=["other impact downtime ", "other impact downtime"],
+                ).filter(
+                    Q(uploaded_file__uploaded_by=request.user)|
+                    Q(uploaded_file__uploaded_by__created_admin=request.user)
+                ).values("department").annotate(
+                    numbers=Sum("downtime_week", default=0),
+                ).annotate(
+                    status=Case(
+                        *status_list, default=Value("Standard"), output_field=CharField()
+                    ),
+                ).values(
+                    "department", 
+                    "numbers",
+                    "status"
+                )
+
+                response_dict["total_downtime_per_week"] = tuple(log)
+                response_dict["sales_impact_downtime"] = tuple(sales_log)
+                response_dict["cost_impact_downtime"] = tuple(cost_log)
+                response_dict["other_impact_downtime"] = tuple(other_log)
         response_dict["status"] = True
         return Response(response_dict, status=status.HTTP_200_OK)
 
@@ -2383,6 +2694,223 @@ class UserPurchasePrice(APIView):
         return Response(response_dict, status=status.HTTP_200_OK)
     
 
+class UserPurchasePriceV2(APIView):
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (CustomTokenAuthentication,)
+
+    def get(self, request):
+        subscription_type = request.GET.get("subscription_type")
+        total_count = int(request.GET.get("total_count", 1))
+        action_type = request.GET.get("action_type")
+        response_dict = {"status":True}
+        admin_user = request.user
+        current_date = datetime.now().date()
+        admin_subscription = UserSubscriptionDetails.objects.filter(user=admin_user).first()
+        
+        if action_type == "renew":            
+            subscription_type = admin_subscription.subscription_type
+            total_count = admin_subscription.user_count
+            weekly_price = 18
+            monthly_price = 69
+            yearly_price = 800
+            if subscription_type == "WEEK":
+                if admin_subscription.subscription_end_date < current_date:
+                    subscription_end_date = current_date
+                else:
+                    subscription_end_date = admin_subscription.subscription_end_date
+                new_end_date = subscription_end_date + timedelta(days=7)
+                remaining_days = (new_end_date - subscription_end_date).days
+                amount = (weekly_price / 7) * remaining_days
+                amount = amount * total_count
+                subscription_end_date = new_end_date
+                
+            elif subscription_type == "MONTH":
+                if admin_subscription.subscription_end_date < current_date:
+                    subscription_end_date = current_date
+                else:
+                    subscription_end_date = admin_subscription.subscription_end_date
+                new_end_date = subscription_end_date + timedelta(days=30)
+                remaining_days = (new_end_date - subscription_end_date).days
+                amount = (monthly_price / 30) * remaining_days
+                amount = amount * total_count
+                subscription_end_date = new_end_date
+            elif subscription_type == "YEAR":
+                if admin_subscription.subscription_end_date < current_date:
+                    subscription_end_date = current_date
+                else:
+                    subscription_end_date = admin_subscription.subscription_end_date
+                new_end_date = subscription_end_date + timedelta(days=365)
+                remaining_days = (new_end_date - subscription_end_date).days
+                amount = (yearly_price / 365) * remaining_days
+                amount = amount * total_count
+                subscription_end_date = new_end_date
+            else:
+                return Response({"error": "Invalid purchase duration"}, status=status.HTTP_400_BAD_REQUEST)
+        elif action_type == "count_upgrade":
+            subscription_end_date = admin_subscription.subscription_end_date
+            if admin_subscription.subscription_type == "WEEK":
+                user_count = admin_subscription.user_count
+                total_count = total_count - user_count
+                amount = total_count * 18
+            elif subscription_type == "MONTH":
+                user_count = admin_subscription.user_count
+                total_count = total_count - user_count
+                amount = total_count * 69
+
+            elif subscription_type == "YEAR":
+                user_count = admin_subscription.user_count
+                total_count = total_count - user_count
+                amount = total_count * 800
+
+        elif action_type == "plan_upgrade":
+            
+            if admin_subscription.subscription_type == subscription_type:
+                subscription_end_date = admin_subscription.subscription_end_date
+                if subscription_type == "WEEK":
+                    new_end_date = current_date + timedelta(days=7)
+                    pending = (new_end_date - subscription_end_date).days
+                    pending_amount = (18 / 7) * pending
+                    amount = pending_amount * user_count
+
+                elif subscription_type == "MONTH":
+                    new_end_date = current_date + timedelta(days=30)
+                    pending = (new_end_date - subscription_end_date).days
+                    amount = (69 / 30) * pending
+
+                elif subscription_type == "YEAR":
+                    new_end_date = current_date + timedelta(days=365)
+                    pending = (new_end_date - subscription_end_date).days
+                    amount = (800 / 365) * pending
+                subscription_end_date = new_end_date
+
+            elif admin_subscription.subscription_type == "WEEK":
+                if subscription_type == "MONTH":
+                    user_count = admin_subscription.user_count
+                    subscription_end_date = admin_subscription.subscription_end_date
+                    new_end_date = current_date + timedelta(days=30)
+                    pending = (new_end_date - subscription_end_date).days
+                    pending_amount = (69 / 30) * pending
+                    amount = pending_amount * user_count
+
+                elif subscription_type == "YEAR":
+                    user_count = admin_subscription.user_count
+                    subscription_end_date = admin_subscription.subscription_end_date
+                    new_end_date = current_date + timedelta(days=365)
+                    pending = (new_end_date - subscription_end_date).days
+                    pending_amount = (800 / 365) * pending
+                    amount = pending_amount * user_count
+                subscription_end_date = new_end_date
+            elif admin_subscription.subscription_type == "MONTH":
+                if subscription_type == "YEAR":
+                    user_count = admin_subscription.user_count
+                    subscription_end_date = admin_subscription.subscription_end_date
+                    new_end_date = current_date + timedelta(days=365)
+                    pending = (new_end_date - subscription_end_date).days
+                    pending_amount = (800 / 365) * pending
+                    pending_amount_t = pending_amount * user_count
+                    total_c = total_count - user_count
+                    actual_amount_t = 800 * total_c
+                    amount = pending_amount_t + actual_amount_t
+                subscription_end_date = new_end_date
+
+        elif action_type == "both_upgrade":
+            current_date = datetime.now().date()
+            if admin_subscription.subscription_type == subscription_type:
+                user_count = admin_subscription.user_count
+                subscription_end_date = admin_subscription.subscription_end_date
+                if subscription_type == "WEEK":
+                    new_end_date = current_date + timedelta(days=7)
+                    pending = (new_end_date - subscription_end_date).days
+                    pending_amount = (18 / 7) * pending
+                    pending_amount_t = pending_amount * user_count
+                    total_c = total_count - user_count
+                    actual_amount_t = 18 * total_c
+                    amount = pending_amount_t + actual_amount_t
+
+                elif subscription_type == "MONTH":
+                    new_end_date = current_date + timedelta(days=30)
+                    pending = (new_end_date - subscription_end_date).days
+                    pending_amount = (69 / 30) * pending
+                    pending_amount_t = pending_amount * user_count
+                    total_c = total_count - user_count
+                    actual_amount_t = 69 * total_c
+                    amount = pending_amount_t + actual_amount_t
+
+                elif subscription_type == "YEAR":
+                    new_end_date = current_date + timedelta(days=365)
+                    pending = (new_end_date - subscription_end_date).days
+                    pending_amount = (800 / 365) * pending
+                    pending_amount_t = pending_amount * user_count
+                    total_c = total_count - user_count
+                    actual_amount_t = 800 * total_c
+                    amount = pending_amount_t + actual_amount_t
+
+                subscription_end_date = new_end_date
+            elif admin_subscription.subscription_type == "WEEK":
+                if subscription_type == "MONTH":
+                    user_count = admin_subscription.user_count
+                    subscription_end_date = admin_subscription.subscription_end_date
+                    new_end_date = current_date + timedelta(days=30)
+                    pending = (new_end_date - subscription_end_date).days
+                    pending_amount = (69 / 30) * pending
+                    pending_amount_t = pending_amount * user_count
+                    total_c = total_count - user_count
+                    actual_amount_t = 69 * total_c
+                    amount = pending_amount_t + actual_amount_t
+
+                elif subscription_type == "YEAR":
+                    user_count = admin_subscription.user_count
+                    subscription_end_date = admin_subscription.subscription_end_date
+                    new_end_date = current_date + timedelta(days=365)
+                    pending = (new_end_date - subscription_end_date).days
+                    pending_amount = (800 / 365) * pending
+                    pending_amount_t = pending_amount * user_count
+                    total_c = total_count - user_count
+                    actual_amount_t = 800 * total_c
+                    amount = pending_amount_t + actual_amount_t
+
+                subscription_end_date = new_end_date
+            
+            elif admin_subscription.subscription_type == "MONTH":
+                if subscription_type == "YEAR":
+                    user_count = admin_subscription.user_count
+                    subscription_end_date = admin_subscription.subscription_end_date
+                    new_end_date = current_date + timedelta(days=365)
+                    pending = (new_end_date - subscription_end_date).days
+                    pending_amount = (800 / 365) * pending
+                    pending_amount_t = pending_amount * user_count
+                    total_c = total_count - user_count
+                    actual_amount_t = 800 * total_c
+                    amount = pending_amount_t + actual_amount_t
+
+                subscription_end_date = new_end_date
+        else:
+            
+            weekly_price = 18
+            monthly_price = 69
+            yearly_price = 800
+            if subscription_type == "WEEK":
+                amount = weekly_price * total_count
+                subscription_end_date = current_date + timedelta(days=7)
+            elif subscription_type == "MONTH":
+                amount = monthly_price * total_count
+                subscription_end_date = current_date + timedelta(days=30)
+            elif subscription_type == "YEAR":
+                amount = yearly_price * total_count
+                subscription_end_date = current_date + timedelta(days=365)
+            else:
+                return Response({"error": "Invalid purchase duration"}, status=status.HTTP_400_BAD_REQUEST)
+
+        price_data = {
+            "added_by": {"id": admin_user.id}, 
+            "amount": amount, 
+        }
+
+        response_dict["price_data"] = price_data
+        response_dict["subscription_end_date"] = subscription_end_date
+        return Response(response_dict, status=status.HTTP_200_OK)
+    
+
 class AddToCartView(APIView):
     permission_classes = (IsAuthenticated,)
     authentication_classes = (CustomTokenAuthentication,)
@@ -2539,6 +3067,23 @@ class CreateCustomRequest(APIView):
         if bundle_ids:  
             custom.bundle.add(*request.data.get("bundle_ids"))    
         response_dict["message"] = "Successfully submitted"
+        response_dict["status"] = True
+        return Response(response_dict, status=status.HTTP_200_OK)
+
+class ListAdminSubscriptions(APIView):
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (CustomTokenAuthentication, )
+
+    def get(self, request):
+        response_dict = {"status": False}
+        subscription = SubscriptionDetails.objects.filter(
+            user=request.user
+        ).last()
+        user_subscription = UserSubscriptionDetails.objects.filter(
+            user=request.user
+        ).last()
+        response_dict["subscription"] = SubscriptionParchaseSerializers(subscription).data
+        response_dict["user_subscription"] = UserSubscriptionSerializers(user_subscription).data
         response_dict["status"] = True
         return Response(response_dict, status=status.HTTP_200_OK)
 

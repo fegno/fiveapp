@@ -13,7 +13,7 @@ from rest_framework import status
 
 from superadmin.models import ModuleDetails, FeatureDetails,  BundleDetails
 from payment.models import PaymentAttempt
-from administrator.models import PurchaseDetails, SubscriptionDetails, AddToCart
+from administrator.models import PurchaseDetails, SubscriptionDetails, AddToCart, UserSubscriptionDetails
 from user.models import CardDetails, BillingDetails
 
 import json
@@ -107,7 +107,6 @@ class InitiatePayment(APIView):
 		)
 		if billing_id:
 			billing = BillingDetails.objects.filter(id=billing_id, user=request.user).last()
-			print(billing)
 			if billing:
 				order.bill = billing
 				order.company_name = billing.company_name
@@ -120,7 +119,6 @@ class InitiatePayment(APIView):
 
 		if card_id:
 			card = CardDetails.objects.filter(id=card_id, user=request.user).last()
-			print(card)
 			if card:
 				order.card = card
 				order.holder_name = card.holder_name
@@ -266,9 +264,113 @@ class StripePaymentWebhook(APIView):
 						subscription.save()
 				else:
 					user = order.user
-					user.total_users = user.total_users + order.user_count
-					user.available_paid_users = user.available_paid_users + order.user_count
-					user.save()
+					user_subscription = UserSubscriptionDetails.objects.filter(
+						user=order.user, 
+					).last()
+					if not user_subscription:
+						subscription = UserSubscriptionDetails.objects.create(
+							user=user,
+							current_purchase=order,
+							total_price=order.total_price,
+							user_count=order.user_count,
+							subscription_start_date=order.subscription_start_date,
+							subscription_end_date=order.subscription_end_date,
+							is_subscribed=True,
+							subscription_type=order.subscription_type,
+						)
+						first_count_users = UserProfile.objects.filter(
+							created_admin=user,
+							is_active=True,
+							is_free_user=False,
+							subscription_end_date__lt=timezone.now().date()
+						).order_by("-id")[:order.user_count]
+						UserProfile.objects.filter(
+							id__in=first_count_users.values_list("id", flat=True)
+						).update(
+							subscription_start_date=order.subscription_start_date,
+							subscription_end_date=order.subscription_end_date
+						)
+						user.total_users = user.total_users + order.user_count
+						user.available_paid_users = order.user_count
+						user.save()
+					elif order.action_type == "count_upgrade":
+						user_subscription.current_purchase = order
+						user_subscription.total_price = order.total_price
+						user_subscription.user_count = user_subscription.user_count + order.user_count
+						user_subscription.save()
+						first_count_users = list(UserProfile.objects.filter(
+							created_admin=user,
+							is_active=True,
+							is_free_user=False,
+						).order_by("-id")[:user_subscription.user_count].values_list("id", flat=True))
+						UserProfile.objects.filter(
+							id__in=first_count_users
+						).update(
+							subscription_start_date=order.subscription_start_date,
+							subscription_end_date=order.subscription_end_date
+						)
+						user.total_users = user.total_users + order.user_count
+						user.available_paid_users = user.available_paid_users + order.user_count
+						user.save()
+					
+					elif order.action_type == "plan_upgrade":
+						user_subscription.current_purchase = order
+						user_subscription.total_price = order.total_price
+						user_subscription.subscription_type =order.subscription_type
+						user_subscription.is_subscribed = True
+						user_subscription.save()
+						first_count_users = (UserProfile.objects.filter(
+							created_admin=user,
+							is_active=True,
+							is_free_user=False,
+						).order_by("-id")[:user_subscription.user_count].values_list("id", flat=True))
+						UserProfile.objects.filter(
+							id__in=first_count_users
+						).update(
+							subscription_start_date=order.subscription_start_date,
+							subscription_end_date=order.subscription_end_date
+						)
+
+					elif order.action_type == "both_upgrade":
+						user_subscription.current_purchase = order
+						user_subscription.total_price = order.total_price
+						user_subscription.subscription_type =order.subscription_type
+						user_subscription.user_count = user_subscription.user_count + order.user_count
+						user_subscription.is_subscribed = True
+						user_subscription.save()
+						first_count_users = list(UserProfile.objects.filter(
+							created_admin=user,
+							is_active=True,
+							is_free_user=False,
+						).order_by("-id")[:user_subscription.user_count].values_list("id", flat=True))
+						UserProfile.objects.filter(
+							id__in=first_count_users
+						).update(
+							subscription_start_date=order.subscription_start_date,
+							subscription_end_date=order.subscription_end_date
+						)
+						user.total_users = user.total_users + order.user_count
+						user.available_paid_users = user.available_paid_users + order.user_count
+						user.save()
+
+					elif order.action_type == "renew":
+						user_subscription.current_purchase = order
+						user_subscription.total_price = order.total_price
+						user_subscription.is_subscribed = True
+						user_subscription.save()
+						first_count_users = list(UserProfile.objects.filter(
+							created_admin=user,
+							is_active=True,
+							is_free_user=False,
+						).order_by("-id")[:user_subscription.user_count].values_list("id", flat=True))
+						UserProfile.objects.filter(
+							id__in=first_count_users
+						).update(
+							subscription_start_date=order.subscription_start_date,
+							subscription_end_date=order.subscription_end_date
+						)
+
+
 					AddToCart.objects.filter(added_by=user, is_active=True).update(is_active=False)
 		elif event.type == 'payment_intent.cancelled':
 			intent = event.data.object # contains a stripe.PaymentIntent
@@ -352,7 +454,6 @@ class MockInitiatePayment(APIView):
 
 			if billing_id:
 				billing = BillingDetails.objects.filter(id=billing_id, user=request.user).last()
-				print(billing)
 				if billing:
 					order.bill = billing
 					order.company_name = billing.company_name
@@ -365,7 +466,6 @@ class MockInitiatePayment(APIView):
 
 			if card_id:
 				card = CardDetails.objects.filter(id=card_id, user=request.user).last()
-				print(card)
 				if card:
 					order.card = card
 					order.holder_name = card.holder_name
@@ -474,4 +574,166 @@ class MockInitiatePayment(APIView):
 			response_dict['error'] = str(e)
 			return Response(response_dict, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-		
+class InitiateUserPaymentV2(APIView):
+	permission_classes = (IsAuthenticated,)
+	authentication_classes = (CustomTokenAuthentication,)
+
+	def post(self,request):
+		response_dict={'status':False}
+		billing_id = request.data.get("billing_id")
+		card_id = request.data.get("card_id")
+		user_count = request.data.get("user_count")
+		total_price = request.data.get("total_price")
+		subscription_type = request.data.get("subscription_type")
+		action_type = request.data.get("action_type")
+
+		admin_subscription = UserSubscriptionDetails.objects.filter(
+			user=request.user, 
+		).last()
+		current_date = datetime.now().date()
+		if action_type == "renew":            
+			subscription_type = admin_subscription.subscription_type
+			if subscription_type == "WEEK":
+				if admin_subscription.subscription_end_date < current_date:
+					subscription_end_date = current_date
+				else:
+					subscription_end_date = admin_subscription.subscription_end_date
+				subscription_end_date = subscription_end_date + timedelta(days=7)
+			elif subscription_type == "MONTH":
+				if admin_subscription.subscription_end_date < current_date:
+					subscription_end_date = current_date
+				else:
+					subscription_end_date = admin_subscription.subscription_end_date
+				subscription_end_date = subscription_end_date + timedelta(days=30)
+			elif subscription_type == "YEAR":
+				if admin_subscription.subscription_end_date < current_date:
+					subscription_end_date = current_date
+				else:
+					subscription_end_date = admin_subscription.subscription_end_date
+				subscription_end_date = subscription_end_date + timedelta(days=365)
+			else:
+				return Response({"error": "Invalid purchase duration"}, status=status.HTTP_400_BAD_REQUEST)
+		elif action_type == "count_upgrade":
+			subscription_end_date = admin_subscription.subscription_end_date
+			t_user_count = admin_subscription.user_count
+			user_count = user_count - t_user_count
+
+		elif action_type == "plan_upgrade":
+			if admin_subscription.subscription_type == subscription_type:
+				subscription_end_date = admin_subscription.subscription_end_date
+				if subscription_type == "WEEK":
+					new_end_date = current_date + timedelta(days=7)
+				elif subscription_type == "MONTH":
+					new_end_date = current_date + timedelta(days=30)
+				elif subscription_type == "YEAR":
+					new_end_date = current_date + timedelta(days=365)
+				subscription_end_date = new_end_date
+
+			elif admin_subscription.subscription_type == "WEEK":
+				if subscription_type == "MONTH":
+					subscription_end_date = admin_subscription.subscription_end_date
+					new_end_date = current_date + timedelta(days=30)
+				elif subscription_type == "YEAR":
+					subscription_end_date = admin_subscription.subscription_end_date
+					new_end_date = current_date + timedelta(days=365)
+				subscription_end_date = new_end_date
+			elif admin_subscription.subscription_type == "MONTH":
+				if subscription_type == "YEAR":
+					subscription_end_date = admin_subscription.subscription_end_date
+					new_end_date = current_date + timedelta(days=365)
+				subscription_end_date = new_end_date
+
+		elif action_type == "both_upgrade":
+			t_user_count = admin_subscription.user_count
+			user_count = user_count - t_user_count
+
+			current_date = datetime.now().date()
+			if admin_subscription.subscription_type == subscription_type:
+				subscription_end_date = admin_subscription.subscription_end_date
+				if subscription_type == "WEEK":
+					new_end_date = current_date + timedelta(days=7)
+				elif subscription_type == "MONTH":
+					new_end_date = current_date + timedelta(days=30)
+				elif subscription_type == "YEAR":
+					new_end_date = current_date + timedelta(days=365)
+				subscription_end_date = new_end_date
+
+			elif admin_subscription.subscription_type == "WEEK":
+				if subscription_type == "MONTH":
+					subscription_end_date = admin_subscription.subscription_end_date
+					new_end_date = current_date + timedelta(days=30)
+				elif subscription_type == "YEAR":
+					subscription_end_date = admin_subscription.subscription_end_date
+					new_end_date = current_date + timedelta(days=365)
+				subscription_end_date = new_end_date
+			
+			elif admin_subscription.subscription_type == "MONTH":
+				if subscription_type == "YEAR":
+					subscription_end_date = admin_subscription.subscription_end_date
+					new_end_date = current_date + timedelta(days=365)
+				subscription_end_date = new_end_date
+		else:
+			if subscription_type == "WEEK":
+				subscription_end_date = current_date + timedelta(days=7)
+			elif subscription_type == "MONTH":
+				subscription_end_date = current_date + timedelta(days=30)
+			elif subscription_type == "YEAR":
+				subscription_end_date = current_date + timedelta(days=365)
+
+		if admin_subscription:
+			order = PurchaseDetails.objects.create(
+				user=request.user,
+				status="Pending",
+				subscription_type=subscription_type,
+				total_price=total_price,
+				is_subscribed=False,
+				subscription_end_date=subscription_end_date,
+				subscription_start_date=admin_subscription.subscription_start_date,
+				user_count=user_count,
+				parchase_user_type="User",
+				action_type=action_type
+			)
+		else:
+			order = PurchaseDetails.objects.create(
+				user=request.user,
+				status="Pending",
+				subscription_type=subscription_type,
+				total_price=total_price,
+				is_subscribed=False,
+				subscription_end_date=subscription_end_date,
+				subscription_start_date=timezone.now().date(),
+				user_count=user_count,
+				parchase_user_type="User",
+				action_type=action_type
+			)
+
+		if billing_id:
+			billing = BillingDetails.objects.filter(id=billing_id, user=request.user).last()
+			if billing:
+				order.bill = billing
+				order.company_name = billing.company_name
+				order.address = billing.address
+				order.billing_contact = billing.billing_contact
+				order.issuing_country = billing.issuing_country
+				order.legal_company_name = billing.legal_company_name
+				order.tax_id = billing.tax_id
+				order.save()
+
+		if card_id:
+			card = CardDetails.objects.filter(id=card_id, user=request.user).last()
+			if card:
+				order.card = card
+				order.holder_name = card.holder_name
+				order.card_number = card.card_number
+				order.expiration_date = card.expiration_date
+				order.ccv = card.ccv
+				order.save()
+
+		with transaction.atomic():
+			stripe.api_key=settings.STRIPE_API_KEY
+			intent = stripe.PaymentIntent.create(amount=round(order.total_price*100),currency='inr')
+			payment_attempt=PaymentAttempt.objects.create(parchase_user_type="User",parchase=order,user=request.user,currency='inr',amount=order.total_price,
+				status='Initiated',client_secret=intent['client_secret'],payment_intent_id=intent['id'],last_attempt_date=timezone.now())
+			response_dict['client_secret']=payment_attempt.client_secret
+			response_dict['status']=True
+		return Response(response_dict,status.HTTP_200_OK)

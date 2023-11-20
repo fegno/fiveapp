@@ -34,6 +34,9 @@ class UserProfile(AbstractUser):
     is_free_user = models.BooleanField(null=True, blank=True, default=False)
     is_subscribed = models.BooleanField(null=True, blank=True, default=False)
 
+    subscription_start_date = models.DateField(null=True, blank=True)
+    subscription_end_date = models.DateField(null=True, blank=True)
+
     free_subscription_start_date = models.DateField(null=True, blank=True)
     free_subscription_end_date = models.DateField(null=True, blank=True)
     free_subscribed = models.BooleanField(null=True, blank=True, default=False)
