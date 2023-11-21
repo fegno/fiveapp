@@ -186,8 +186,22 @@ class RegisterUser(APIView):
         ).first():
             response_dict["error"] ="User already exists"
             return Response(response_dict, HTTP_200_OK)
-        with transaction.atomic():
-            if serializer.is_valid():
+        
+        if serializer.is_valid():
+            errors = []
+
+            if len(data.get("password")) < 5:
+                errors.append("Password must have at least 5 characters.")
+            if not re.search("[a-zA-Z]", data.get("password")):
+                errors.append("Password must contain at least one letter.")
+            if not re.search("[0-9]", data.get("password")):
+                errors.append("Password must contain at least one number.")
+
+            if errors:
+                response_dict["error"] = ", ".join(errors)
+                return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
+            
+            with transaction.atomic():
                 user = serializer.save(
                     user_type="ADMIN",
                 )
@@ -209,10 +223,11 @@ class RegisterUser(APIView):
                 }
                 response_dict["token"] = token.key
                 response_dict["status"] = True
-            else:
-                response_dict["error"] = get_error(serializer)
-        return Response(response_dict, HTTP_200_OK)
-
+        else:
+            response_dict["error"] = get_error(serializer)
+        
+        return Response(response_dict, status=status.HTTP_200_OK)
+            
 
 class AppLogout(APIView):
     permission_classes = (IsAuthenticated,)
