@@ -11,7 +11,9 @@ from rest_framework.status import HTTP_200_OK
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.views import APIView
 from django.contrib.auth import login, logout
+
 from django.utils import timezone
+from superadmin.models import InviteDetails
 
 from user.api_permissions import CustomTokenAuthentication
 from django.db.models import BooleanField, Case, Q, Sum, Value, When
@@ -184,8 +186,22 @@ class RegisterUser(APIView):
         ).first():
             response_dict["error"] ="User already exists"
             return Response(response_dict, HTTP_200_OK)
-        with transaction.atomic():
-            if serializer.is_valid():
+        
+        if serializer.is_valid():
+            errors = []
+
+            if len(data.get("password")) < 5:
+                errors.append("Password must have at least 5 characters.")
+            if not re.search("[a-zA-Z]", data.get("password")):
+                errors.append("Password must contain at least one letter.")
+            if not re.search("[0-9]", data.get("password")):
+                errors.append("Password must contain at least one number.")
+
+            if errors:
+                response_dict["error"] = ", ".join(errors)
+                return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
+            
+            with transaction.atomic():
                 user = serializer.save(
                     user_type="ADMIN",
                 )
@@ -207,10 +223,11 @@ class RegisterUser(APIView):
                 }
                 response_dict["token"] = token.key
                 response_dict["status"] = True
-            else:
-                response_dict["error"] = get_error(serializer)
-        return Response(response_dict, HTTP_200_OK)
-
+        else:
+            response_dict["error"] = get_error(serializer)
+        
+        return Response(response_dict, status=status.HTTP_200_OK)
+            
 
 class AppLogout(APIView):
     permission_classes = (IsAuthenticated,)
@@ -515,6 +532,11 @@ class CheckLoginMethod(APIView):
         user = UserProfile.objects.filter(
             email=data.get("email"),
         ).first()
+        
+        invited_user = InviteDetails.objects.filter(
+            email=data.get("email")
+        ).last()
+
         if user and user.user_type == "ADMIN":
             response_dict["user_type"] = "ADMIN"
             response_dict["password_set"] = True
@@ -529,6 +551,11 @@ class CheckLoginMethod(APIView):
                 response_dict["user_type"] = "USER"
                 created_admin_email = user.created_admin.email if user.created_admin else None
                 response_dict["Created_by"] = created_admin_email
+        elif invited_user:
+            response_dict["user_type"] = "USER"
+            created_admin_email = invited_user.user.email if invited_user.user else None
+            response_dict["Created_by"] = created_admin_email
+            response_dict["message"] = f'You are invited as User, Created/Invited by {created_admin_email}'
         elif not user:
             if LoginOTP.objects.filter(email=email, is_verified=True):
                 otp_user = LoginOTP.objects.filter(email=email).order_by('id').last()

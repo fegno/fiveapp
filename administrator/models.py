@@ -143,7 +143,7 @@ class CsvLogDetails(models.Model):
     age = models.IntegerField(null=True, blank=True)
     system_name = models.CharField(null=True, blank=True, max_length=1000)
     factors_effected = models.CharField(null=True, blank=True, max_length=1000)
-    downtime_week = models.IntegerField(default=0)
+    downtime_week = models.IntegerField(default=0, null=True, blank=True)
     impact_hour = models.CharField(null=True, blank=True, max_length=1000)
 
     hourly_rate = models.FloatField(null=True, blank=True, default=0)
