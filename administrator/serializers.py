@@ -17,6 +17,7 @@ from administrator.models import  UserSubscriptionDetails, CsvLogDetails, Purcha
 from fiveapp.custom_serializer import CustomSerializer
 from user.serializers import UserSerializer
 from django.utils import timezone
+from datetime import date
 
 class ModuleDetailsSerializer(serializers.ModelSerializer):
     class Meta:
@@ -44,12 +45,24 @@ class ModuleDetailsSerializer(serializers.ModelSerializer):
         ).values("id","benifit","feature"))
         cd["feature_benifit"] = feature_benifit
         cd["free_subscribed"] = False
+        cd["free_subscribed_status"] = False
         if self.context.get("request"):
             if FreeSubscriptionDetails.objects.filter(
                 module=obj,
                 user=self.context.get("request").user
             ).exists():
                 cd["free_subscribed"] = True
+
+                free_subscription = FreeSubscriptionDetails.objects.filter(
+                module=obj,
+                user=self.context.get("request").user,
+                is_active=True,
+            ).order_by('-free_subscription_end_date').first()
+                if free_subscription.free_subscription_end_date >= date.today():
+                    cd["free_subscription_status"] = True
+                    subscription_end_date = free_subscription.free_subscription_end_date
+                cd["free_subscription_end_date"] = subscription_end_date
+
             if not cd["free_subscribed"]:
                 if SubscriptionDetails.objects.filter(user=self.context.get("request").user, module=obj).exists():
                     cd["free_subscribed"] = True
