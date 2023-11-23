@@ -604,7 +604,7 @@ class UploadCsv(APIView):
         if not module:
             response_dict["error"] = "Module Not Found"
             return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
-        if not csv_file:
+        if module.module_identifier != 9 and not csv_file:
             response_dict["error"] = "File Not Found"
             return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
         if module.module_identifier == 1 or  module.module_identifier == 2:
@@ -612,15 +612,55 @@ class UploadCsv(APIView):
                 response_dict["error"] = "Type Required"
                 return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
         to_save = []
-        decoded_file = csv_file.read().decode('utf-8').splitlines()
-        reader = csv.DictReader(decoded_file)
+        if module.module_identifier != 9:
+            decoded_file = csv_file.read().decode('utf-8').splitlines()
+            reader = csv.DictReader(decoded_file)
 
-        upload_log = UploadedCsvFiles.objects.create(
-            uploaded_by=request.user,
-            modules=module,
-            csv_file=csv_file,
-            working_type=working_type
-        )
+        if module.module_identifier != 9:
+            upload_log = UploadedCsvFiles.objects.create(
+                uploaded_by=request.user,
+                modules=module,
+                csv_file=csv_file,
+                working_type=working_type
+            )
+        else:
+            workhouse_space = request.data.get("workhouse_space")
+            total_orders_pay_day = request.data.get("total_orders_pay_day")
+            operating_hours_day = request.data.get("operating_hours_day")
+            actual_resource_per_day = request.data.get("actual_resource_per_day")
+            actual_resource_per_hour = request.data.get("actual_resource_per_hour")
+            cost_per_man = request.data.get("cost_per_man")
+            temporary_man_cost = request.data.get("temporary_man_cost")
+            temporary_man_arranged = request.data.get("temporary_man_arranged")
+            productivity_varriation = request.data.get("productivity_varriation")
+            lead_time = request.data.get("lead_time")
+            resource_additional_cost = request.data.get("resource_additional_cost")
+            shortage_of_manpower = request.data.get("shortage_of_manpower")
+            order_loss = request.data.get("order_loss")
+            cost_per_shipment = request.data.get("cost_per_shipment")
+            delay_duration = request.data.get("delay_duration")
+            sqft_allocation = request.data.get("sqft_allocation")
+
+            upload_log = UploadedCsvFiles.objects.create(
+                uploaded_by=request.user,
+                modules=module,
+                sqft_allocation=sqft_allocation,
+                workhouse_space=workhouse_space,
+                total_orders_pay_day=total_orders_pay_day,
+                operating_hours_day=operating_hours_day,
+                actual_resource_per_day=actual_resource_per_day,
+                actual_resource_per_hour=actual_resource_per_hour,
+                cost_per_man=cost_per_man,
+                temporary_man_arranged=temporary_man_arranged,
+                temporary_man_cost=temporary_man_cost,
+                productivity_varriation=productivity_varriation,
+                lead_time=lead_time,
+                resource_additional_cost=resource_additional_cost,
+                shortage_of_manpower=shortage_of_manpower,
+                order_loss=order_loss,
+                cost_per_shipment=cost_per_shipment,
+                delay_duration=delay_duration,
+            )
         if module.module_identifier == 1:
             for row in reader:
                 if "S.NO"in row and "EMPLOYEE ID" in row and  "EMPLOYEE NAME"  in row and "TEAM" in row and "WORKING HOURS/WEEK/ MONTHLY":
@@ -753,11 +793,13 @@ class UploadCsv(APIView):
                     )
                 )
 
-        if (len(to_save)) < 1:
-            upload_log.delete()
-            response_dict["error"] = "CSV should contain atleast one entry"
-            return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
-        CsvLogDetails.objects.bulk_create(to_save)
+        if module.module_identifier != 9:
+            if (len(to_save)) < 1:
+                upload_log.delete()
+                response_dict["error"] = "CSV should contain atleast one entry"
+                return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
+            CsvLogDetails.objects.bulk_create(to_save)
+      
         response_dict["csv_id"] = upload_log.id
         response_dict["message"] = "Successfully uploaded"
         response_dict["status"] = True
@@ -813,7 +855,6 @@ class ViewCsv(APIView):
         csv_file = UploadedCsvFiles.objects.filter(id=pk).first()
 
         if csv_file:
-            # Assuming that 'csv_file.modules.csv_file' contains the file
             csv_files = csv_file.csv_file
             decoded_file = csv_files.read().decode('utf-8')
             reader = csv.DictReader(decoded_file.splitlines())
@@ -821,8 +862,8 @@ class ViewCsv(APIView):
 
             for row in reader:
                 data_list.append(list(row.values()))
-
             response_dict["data"] = data_list
+            
             return Response(response_dict, status=status.HTTP_200_OK)
         else:
             response_dict["error"] = "CSV file not found."
@@ -1009,7 +1050,14 @@ class GenerateReport(APIView):
                 response_dict["message"] = "Generated"
             except Exception as e:
                 response_dict["error"] = str(e)
-
+        elif csv_file.modules.module_identifier == 9:
+            try:
+                csv_file.is_report_generated = True
+                csv_file.save()
+                response_dict["status"] = True
+                response_dict["message"] = "Generated"
+            except Exception as e:
+                response_dict["error"] = str(e)
         else:
             response_dict["error"] = "Module not Valid"
         return Response(response_dict, status=status.HTTP_200_OK)
@@ -1199,7 +1247,28 @@ class ViewReport(APIView):
                 "actual_calculated"
             ).order_by("id"))
             response_dict["report"] = log
-
+        elif csv_file.modules.module_identifier == 9:
+            minr2=60/5
+            avg_order_per_hour = float(csv_file.total_orders_pay_day)/float(csv_file.operating_hours_day) if csv_file.operating_hours_day != 0 else 0
+            total_productivity_at_warehouse = float(csv_file.total_orders_pay_day)*(365/7)
+            csv_file_log = {
+                "workhouse_space":csv_file.workhouse_space,
+                "total_orders_pay_day":csv_file.total_orders_pay_day,
+                "operating_hours_day":csv_file.operating_hours_day,
+                "actual_resource_per_day":csv_file.actual_resource_per_day,
+                "actual_resource_per_hour":csv_file.actual_resource_per_hour,
+                "cost_per_man":csv_file.cost_per_man,
+                "temporary_man_cost":csv_file.temporary_man_cost,
+                "temporary_man_arranged":csv_file.temporary_man_arranged,
+                "avg_order_per_hour":round(avg_order_per_hour),
+                "no_resource_required_per_day":round(float(csv_file.total_orders_pay_day)*1.1/float(minr2)), 
+                "no_resource_required_per_hour":round(avg_order_per_hour/float(minr2)), 
+                "total_productivity_at_warehouse":round(total_productivity_at_warehouse),
+                "inventory_turnover_rate":7,
+                "total_resource_in_day":round(float(csv_file.actual_resource_per_day)+float(csv_file.temporary_man_arranged)),
+                "manpower_as_per_standard":round(csv_file.workhouse_space/1500),
+            }
+            response_dict["report"] = csv_file_log
         response_dict["status"] = True
         return Response(response_dict, status=status.HTTP_200_OK)
 
