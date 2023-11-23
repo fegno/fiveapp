@@ -2277,7 +2277,99 @@ class AnalyticsReport(APIView):
             response_dict["vehicle_utilisation"]    = vehicle_dict
             response_dict["monthly_vehicle_report"]    = monthly_vehicle_report
 
+        elif csv_file.modules.module_identifier == 9:
+            report = []
 
+    
+            avg_order_per_hour = float(csv_file.total_orders_pay_day)/float(csv_file.operating_hours_day) if csv_file.operating_hours_day != 0 else 0
+            no_of_res = avg_order_per_hour/12
+            productivity_varriation_cal = float(csv_file.actual_resource_per_hour)/no_of_res if no_of_res !=0  else 0
+            productivity_varriation_cal2 = float(csv_file.total_orders_pay_day)/float(csv_file.productivity_varriation) if csv_file.productivity_varriation !=0  else 0
+            productivity_varriation = productivity_varriation_cal * productivity_varriation_cal2
+            report.append(
+                {
+                    "per_day_value":"PRODUCTIVITY VARIATION (WAREHOUSE)",
+                    "target":csv_file.productivity_varriation,
+                    "actual":round(productivity_varriation*100, 3)
+                }
+            )
+
+            lead_time = csv_file.lead_time
+            if no_of_res > csv_file.actual_resource_per_hour:
+                lead_time_v1 = no_of_res - csv_file.actual_resource_per_hour
+                lead_time_v2 = lead_time_v1 * 60
+                lead_time_v3 = lead_time_v2/lead_time if lead_time != 0  else 0
+
+                lead_time_v4 = lead_time/csv_file.actual_resource_per_hour if csv_file.actual_resource_per_hour != 0 else 0
+                lead_time_v5 = lead_time_v3 * lead_time_v4
+            report.append(
+                {
+                    "per_day_value":"LEAD TIME (AT WAREHOUSE)",
+                    "target":csv_file.lead_time,
+                    "actual":lead_time_v5
+                }
+            )
+            resource_additional_cost_cal = (csv_file.temporary_man_cost - csv_file.cost_per_man)*csv_file.temporary_man_arranged
+            report.append(
+                {
+                    "per_day_value":"RESOURCES ADDITIONAL COST",
+                    "target":csv_file.resource_additional_cost,
+                    "actual":round(resource_additional_cost_cal)
+                }
+            )
+            shortage_of_manpower_cal = float(csv_file.total_orders_pay_day)*1.1/12
+            tot_res = float(csv_file.actual_resource_per_day)+float(csv_file.temporary_man_arranged)
+            shortage_of_manpower = shortage_of_manpower_cal - tot_res
+            report.append(
+                {
+                    "per_day_value":"SHORTAGE OF MANPOWER",
+                    "target":csv_file.shortage_of_manpower,
+                    "actual":round(shortage_of_manpower)
+                }
+            )
+
+            sqft_allocation = csv_file.workhouse_space/tot_res if tot_res != 0 else 0
+            report.append(
+                {
+                    "per_day_value":"SQUARE FEET ALLOCATION PER RESOURCE",
+                    "target":csv_file.sqft_allocation,
+                    "actual":round(sqft_allocation)
+                }
+            )
+
+            order_loss_cal = csv_file.productivity_varriation * (productivity_varriation*100)
+            order_loss_cal = order_loss_cal/100
+            order_loss = order_loss_cal - csv_file.productivity_varriation
+            report.append(
+                {
+                    "per_day_value":"ORDER LOSS",
+                    "target":csv_file.order_loss,
+                    "actual":round(order_loss)
+                }
+            )
+            cost_per_shipment_v1 = csv_file.actual_resource_per_day - csv_file.temporary_man_arranged
+            cost_per_shipment_v2 = cost_per_shipment_v1 * csv_file.cost_per_man
+            cost_per_shipment_v3 = csv_file.temporary_man_arranged * csv_file.temporary_man_cost
+            cost_per_shipment_v4 = cost_per_shipment_v2 + cost_per_shipment_v3
+            cost_per_shipment_v5 = order_loss_cal
+            cost_per_shipment_v6 = cost_per_shipment_v4 / cost_per_shipment_v5 if cost_per_shipment_v5 != 0 else 0
+            report.append(
+                {
+                    "per_day_value":"COST PER SHIPMENT PROCESSING",
+                    "target":csv_file.cost_per_shipment,
+                    "actual":round(cost_per_shipment_v6, 4)
+                }
+            )
+            report.append(
+                {
+                    "per_day_value":"DELAY DURATION",
+                    "target":csv_file.delay_duration,
+                    "actual":lead_time_v5 - csv_file.lead_time
+                }
+            )
+
+            
+            response_dict["report"]    = report
         response_dict["status"] = True
         return Response(response_dict, status=status.HTTP_200_OK)
 
