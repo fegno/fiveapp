@@ -45,7 +45,7 @@ class ModuleDetailsSerializer(serializers.ModelSerializer):
         ).values("id","benifit","feature"))
         cd["feature_benifit"] = feature_benifit
         cd["free_subscribed"] = False
-        cd["free_subscribed_status"] = False
+        cd["free_subscription_status"] = False
         if self.context.get("request"):
             if FreeSubscriptionDetails.objects.filter(
                 module=obj,
