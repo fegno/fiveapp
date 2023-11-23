@@ -116,6 +116,10 @@ class UploadedCsvFiles(models.Model):
     non_peak_hour_sale_hr = models.FloatField(null=True, blank=True, default=0)
     employee_cost_target = models.FloatField(null=True, blank=True, default=0)
 
+    average_ton_per_truck = models.FloatField(null=True, blank=True, default=0)
+    max_ton_per_truck = models.FloatField(null=True, blank=True, default=0)
+    no_of_days = models.FloatField(null=True, blank=True, default=0)
+
     is_active = models.BooleanField(null=False, blank=True, default=True)
     created = models.DateTimeField(auto_now_add=True)
     updated = models.DateTimeField(auto_now=True)
@@ -160,12 +164,13 @@ class CsvLogDetails(models.Model):
     department_varriable_pay = models.FloatField(null=True, blank=True, default=0)
     company_varriable_pay = models.FloatField(null=True, blank=True, default=0)
 
-    no_of_truckers = models.FloatField(null=True, blank=True, default=0)
+    no_of_truck_required = models.FloatField(null=True, blank=True, default=0)
     actual = models.FloatField(null=True, blank=True, default=0)
     vehicle_utilisation = models.FloatField(null=True, blank=True, default=0)
     per_ton_revenue_loss = models.FloatField(null=True, blank=True, default=0)
     total_required_capacity = models.FloatField(null=True, blank=True, default=0)
     location = models.CharField(null=True, blank=True, max_length=1000)
+    actual_calculated = models.FloatField(null=True, blank=True, default=0)
 
     is_active = models.BooleanField(null=False, blank=True, default=True)
     created = models.DateTimeField(auto_now_add=True)

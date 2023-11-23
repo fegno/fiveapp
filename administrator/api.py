@@ -738,6 +738,21 @@ class UploadCsv(APIView):
                     )
                 )
 
+        elif module.module_identifier == 10:
+            c = 0
+            for row in reader:
+                c = c + 1
+                to_save.append(
+                    CsvLogDetails(
+                        uploaded_file=upload_log,
+                        sl_no=c,
+                        location=row.get("LOCATIONS"),
+                        no_of_truck_required=row.get("No of truckers required"),
+                        actual=row.get("Actual"),
+                        vehicle_utilisation=row.get("Vehicle utilisation/ no of days running."),
+                    )
+                )
+
         if (len(to_save)) < 1:
             upload_log.delete()
             response_dict["error"] = "CSV should contain atleast one entry"
@@ -969,6 +984,31 @@ class GenerateReport(APIView):
             except Exception as e:
                 response_dict["error"] = str(e)
 
+        elif csv_file.modules.module_identifier == 10:
+            try:
+                average_ton_per_truck = request.data.get("average_ton_per_truck")
+                max_ton_per_truck = request.data.get("max_ton_per_truck")
+                no_of_days = request.data.get("no_of_days")
+
+                csv_file.is_report_generated = True
+                csv_file.average_ton_per_truck = average_ton_per_truck
+                csv_file.max_ton_per_truck = max_ton_per_truck
+                csv_file.no_of_days = no_of_days
+
+                csv_file.save()
+
+                for i in log:
+                    i.actual_calculated = i.actual * float(csv_file.average_ton_per_truck)
+                    i.total_required_capacity = i.no_of_truck_required * float(csv_file.average_ton_per_truck)
+                    per_ton_revenue_loss = (i.actual_calculated - i.total_required_capacity)*1000
+
+                    i.per_ton_revenue_loss = float(csv_file.max_ton_per_truck) * float(per_ton_revenue_loss)
+                    i.save()
+
+                response_dict["status"] = True
+                response_dict["message"] = "Generated"
+            except Exception as e:
+                response_dict["error"] = str(e)
 
         else:
             response_dict["error"] = "Module not Valid"
@@ -1141,6 +1181,25 @@ class ViewReport(APIView):
             ).order_by("id"))
             response_dict["report"] = log
         
+        elif csv_file.modules.module_identifier == 10:
+            log  = tuple(CsvLogDetails.objects.filter(
+                uploaded_file__id=pk,
+                is_active=True
+            ).filter(
+                Q(uploaded_file__uploaded_by=request.user)|
+                Q(uploaded_file__uploaded_by__created_admin=request.user)
+            ).values(
+                "sl_no", 
+                "location",
+                "no_of_truck_required",
+                "actual",
+                "vehicle_utilisation",
+                "per_ton_revenue_loss",
+                "total_required_capacity",
+                "actual_calculated"
+            ).order_by("id"))
+            response_dict["report"] = log
+
         response_dict["status"] = True
         return Response(response_dict, status=status.HTTP_200_OK)
 
@@ -1771,6 +1830,7 @@ class AnalyticsReport(APIView):
                 peak_sale_val = peak_sale_val * -1
                 non_peak_sale_val = non_peak_sale_val * -1
                 total_cost_impact_val = total_cost_impact_val * -1
+                resource_utilisation = resource_utilisation *-1
 
                 availability  = tuple(CsvLogDetails.objects.filter(
                     uploaded_file__id=pk,
@@ -1940,6 +2000,215 @@ class AnalyticsReport(APIView):
                 response_dict["sales_impact_downtime"] = tuple(sales_log)
                 response_dict["cost_impact_downtime"] = tuple(cost_log)
                 response_dict["other_impact_downtime"] = tuple(other_log)
+        
+        
+        elif csv_file.modules.module_identifier == 10:
+
+            trucks_required_dict = []
+            trucks_required  = tuple(CsvLogDetails.objects.filter(
+                uploaded_file__id=pk,
+            ).filter(
+                Q(uploaded_file__uploaded_by=request.user)|
+                Q(uploaded_file__uploaded_by__created_admin=request.user)
+            ).values("location").annotate(
+                total_actual=Sum("actual"),
+                total_truck=Sum("no_of_truck_required"),
+                total_capacity=Sum("total_required_capacity"),
+                total_actual_cal=Sum("actual_calculated"),
+                total_revenue=Sum("per_ton_revenue_loss"),
+                total_vehicle=Sum("vehicle_utilisation"),
+
+            ).values(
+                "total_actual", 
+                "total_truck",
+                "location",
+                "total_actual_cal",
+                "total_capacity",
+                "total_revenue",
+                "total_vehicle"
+            ))
+            payload_drop_dict = []
+            revenue_drop_dict = []
+            vehicle_dict = []
+            monthly_vehicle_report = []
+
+            total_actual = 0
+            total_truck = 0
+            total_capa = 0
+            total_actual_cal = 0
+            total_revenue = 0
+            total_vehicle = 0
+
+            for i in trucks_required:
+                truck_required = 0
+                if i.get("total_truck",0) != 0:
+                    truck_required = round(float(i.get("total_actual",0))*100/float(i.get("total_truck",0)), 2)
+                total_actual = total_actual + i.get("total_actual", 0)
+                total_truck = total_truck + i.get("total_truck", 0)
+
+                if truck_required < 60:
+                    status_tr = "Overloaded"
+                elif truck_required < 90:
+                    status_tr = "Underloaded"
+                else:
+                    status_tr = "Standard"
+
+                trucks_required_dict.append(
+                    {
+                        "no_of_truck_required":truck_required,
+                        "location":i.get("location"),
+                        "status":status_tr
+                    }
+                )
+
+                pay = i.get("total_capacity", 0)- i.get("total_actual_cal", 0)
+                pay_cal = pay/i.get("total_capacity", 0) if i.get("total_capacity", 0) != 0 else 0
+                
+                total_capa = total_capa + i.get("total_capacity", 0)
+                total_actual_cal = total_actual_cal + i.get("total_actual_cal", 0)
+
+                if round(pay_cal *100, 2) < 60:
+                    status_p = "Overloaded"
+                elif round(pay_cal *100, 2) < 90:
+                    status_p = "Underloaded"
+                else:
+                    status_p = "Standard"
+
+                payload_drop_dict.append(
+                    {
+                        "payload_drop":round(pay_cal *100, 2),
+                        "location":i.get("location"),
+                        "status":status_p
+                    }
+                )
+
+                total_revenue = total_revenue + i.get("total_revenue", 0)
+                revenue_cal = (i.get("total_capacity", 0) * 1000)*2
+                revenue_cal = i.get("total_revenue", 0) / revenue_cal if revenue_cal != 0  else 0
+                
+                if round(revenue_cal *100, 2) < 60:
+                    status_r = "Overloaded"
+                elif round(revenue_cal *100, 2) < 90:
+                    status_r = "Underloaded"
+                else:
+                    status_r = "Standard"
+                revenue_drop_dict.append(
+                    {
+                        "revenue_drop":round(revenue_cal *100, 2),
+                        "location":i.get("location"),
+                        "status":status_r
+                    }
+                )
+
+                total_vehicle = total_vehicle + i.get("total_vehicle", 0)
+                veh_cal = i.get("total_vehicle", 0) / float(csv_file.no_of_days)
+
+                if round(veh_cal *100, 2) < 60:
+                    status_v = "Overloaded"
+                elif round(veh_cal *100, 2) < 90:
+                    status_v = "Underloaded"
+                else:
+                    status_v = "Standard"
+
+                vehicle_dict.append(
+                    {
+                        "vehicle_utilisation":round(veh_cal *100, 2),
+                        "location":i.get("location"),
+                        "status":status_v
+                    }
+                )
+
+
+                monthly_vehicle_report.append(
+                    {
+                        "no_of_truck_required":truck_required,
+                        "payload_drop":round(pay_cal *100, 2),
+                        "revenue_drop":round(revenue_cal *100, 2),
+                        "vehicle_utilisation":round(veh_cal *100, 2),
+                        "location":i.get("location"),
+                        "status":status_v
+                    }
+                )
+
+
+            tr_total = total_actual*100/total_truck if total_truck != 0 else 0
+            if round(tr_total, 2) < 60:
+                status_v = "Overloaded"
+            elif round(tr_total, 2) < 90:
+                status_v = "Underloaded"
+            else:
+                status_v = "Standard"
+            trucks_required_dict.append(
+                {
+                    "no_of_truck_required":round(tr_total, 2),
+                    "location":"Total",
+                    "status":status_v
+                }
+            )
+
+            p_total = (total_capa - total_actual_cal)/total_capa if total_capa != 0 else 0
+            if round(p_total *100, 2) < 60:
+                status_v = "Overloaded"
+            elif round(p_total *100, 2) < 90:
+                status_v = "Underloaded"
+            else:
+                status_v = "Standard"
+            payload_drop_dict.append(
+                {
+                    "payload_drop":round(p_total *100, 2),
+                    "location":"Total",
+                    "status":status_v
+                }
+            )
+
+            t_total = (total_capa * 1000)*2
+            total = total_revenue/t_total if t_total !=0 else 0
+            if round(total *100, 2) < 60:
+                status_v = "Overloaded"
+            elif round(total *100, 2) < 90:
+                status_v = "Underloaded"
+            else:
+                status_v = "Standard"
+            revenue_drop_dict.append(
+                {
+                    "revenue_drop":round(total *100, 2),
+                    "location":"Total",
+                    "status":status_v
+                }
+            )
+
+            total_vehicle = total_vehicle / len(trucks_required)
+            v_total = total_vehicle/float(csv_file.no_of_days) if float(csv_file.no_of_days) !=0 else 0
+            if round(v_total *100, 2) < 60:
+                status_v = "Overloaded"
+            elif round(v_total *100, 2) < 90:
+                status_v = "Underloaded"
+            else:
+                status_v = "Standard"
+            vehicle_dict.append(
+                {
+                    "vehicle_utilisation":round(v_total *100, 2),
+                    "location":"Total",
+                    "status":status_v
+                }
+            )
+            monthly_vehicle_report.append(
+                {
+                    "no_of_truck_required":round(tr_total, 2),
+                    "payload_drop":round(p_total *100, 2),
+                    "revenue_drop":round(total *100, 2),
+                    "vehicle_utilisation":round(v_total *100, 2),
+                    "location":"Total",
+                    "status":status_v
+                }
+            )
+            response_dict["trucks_required"]    = trucks_required_dict
+            response_dict["payload_drop"]    = payload_drop_dict
+            response_dict["revenue_drop"]    = revenue_drop_dict
+            response_dict["vehicle_utilisation"]    = vehicle_dict
+            response_dict["monthly_vehicle_report"]    = monthly_vehicle_report
+
+
         response_dict["status"] = True
         return Response(response_dict, status=status.HTTP_200_OK)
 
