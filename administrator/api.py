@@ -454,38 +454,35 @@ class ListModules(APIView):
                 user=request.user
             ).order_by("-id").first()
 
-        # subscribed_modules = []
+        free_subscribed_modules_ids = []
+        for i in free_subscribed_modules:
+            if i.module.all():
+                free_subscribed_modules_ids.extend(
+                    list(i.module.all().values_list("id", flat=True))
+                )
+                
+        response_dict["unsubscribed_modules"] = []
+        response_dict["subscribed_modules"] = []
         if subscription:
-            free_subscribed_modules_ids = []
-            free_subscribed_bundle_ids = []
-            for i in free_subscribed_modules:
-                if i.module.all():
-                    free_subscribed_modules_ids.extend(
-                        list(i.module.all().values_list("id", flat=True))
-                    )
-                if i.bundle.all():
-                    free_subscribed_bundle_ids.extend(
-                        list(i.bundle.all().values_list("id", flat=True))
-                    )
             modules = ModuleDetails.objects.filter(is_active=True).filter(
                 Q(id__in=subscription.module.all().values_list("id", flat=True))|
                 Q(id__in=free_subscribed_modules_ids)
             ).order_by("module_identifier")
-            bundles = BundleDetails.objects.filter(is_active=True).filter(
-                Q(id__in=subscription.bundle.all().values_list("id", flat=True))|
-                Q(id__in=free_subscribed_bundle_ids)
-            )
-
-
-            # modules = modules.exclude(id__in=subscription.module.all().values_list("id", flat=True))
             unsubscribed_modules = all_modules.exclude(
                 Q(id__in=modules) |
                 Q(id__in=free_subscribed_modules_ids)
             ).order_by("module_identifier")
-
-        response_dict["unsubscribed_modules"] = ModuleDetailsSerializer(unsubscribed_modules,context={"request": request}, many=True,).data
-        response_dict["subscribed_modules"] = ModuleDetailsSerializer(
-            modules,context={"request": request, "from_module":True, "admin":request.user}, many=True,).data
+            response_dict["unsubscribed_modules"] = ModuleDetailsSerializer(unsubscribed_modules,context={"request": request}, many=True,).data
+        
+        if not subscription and free_subscribed_modules:
+            unsubscribed_modules = all_modules.exclude(
+                id__in=free_subscribed_modules_ids
+            ).order_by("module_identifier")
+            response_dict["unsubscribed_modules"] = ModuleDetailsSerializer(unsubscribed_modules,context={"request": request}, many=True,).data
+        
+        if modules:
+            response_dict["subscribed_modules"] = ModuleDetailsSerializer(
+                modules,context={"request": request, "from_module":True, "admin":request.user}, many=True,).data
         
         response_dict["status"] = True
         return Response(response_dict, status=status.HTTP_200_OK)
