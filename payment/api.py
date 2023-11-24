@@ -5,7 +5,7 @@ from django.db import transaction
 from django.http import HttpResponse
 
 from rest_framework.response import Response
-from superadmin.models import ModuleDetails, BundleDetails
+from superadmin.models import FreeSubscriptionDetails, ModuleDetails, BundleDetails
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from user.api_permissions import CustomTokenAuthentication, IsAdmin
 from rest_framework.views import APIView
@@ -14,7 +14,7 @@ from rest_framework import status
 from superadmin.models import ModuleDetails, FeatureDetails,  BundleDetails
 from payment.models import PaymentAttempt
 from administrator.models import PurchaseDetails, SubscriptionDetails, AddToCart, UserSubscriptionDetails
-from user.models import CardDetails, BillingDetails
+from user.models import CardDetails, BillingDetails, UserProfile
 
 import json
 import stripe
@@ -243,12 +243,31 @@ class StripePaymentWebhook(APIView):
 							if order.bundle:
 								subscription.bundle.add(*list(order.bundle.values_list("id", flat=True)))    
 							subscription.save()
+
+							try:
+								module_list = list(order.module.values_list("id", flat=True))
+								for i in module_list:
+									FreeSubscriptionDetails.objects.filter(user=user, module__id=i).update(
+										free_subscription_end_date=timezone.now().date()
+									)
+							except Exception as e:
+								print(f"An error occurred: {e}")
+						
 						else:
 							if order.module:
 								subscription.module.add(*list(order.module.values_list("id", flat=True)))      
 							if order.bundle:
 								subscription.bundle.add(*list(order.bundle.values_list("id", flat=True)))    
 							subscription.save()
+
+							try:
+								module_list = list(order.module.values_list("id", flat=True))
+								for i in module_list:
+									FreeSubscriptionDetails.objects.filter(user=user, module__id=i).update(
+										free_subscription_end_date=timezone.now().date()
+									)
+							except Exception as e:
+								print(f"An error occurred: {e}")
 					else:
 						subscription = SubscriptionDetails.objects.create(
 							user=order.user,

@@ -477,12 +477,11 @@ class ListModules(APIView):
             )
 
 
-
-            unsubscribed_modules = modules.exclude(
-                Q(id__in=subscription.module.all()) |
-                Q(id__in=free_subscribed_modules.values_list("module__id", flat=True))
-            )
-            print(unsubscribed_modules)
+            # modules = modules.exclude(id__in=subscription.module.all().values_list("id", flat=True))
+            unsubscribed_modules = all_modules.exclude(
+                Q(id__in=modules) |
+                Q(id__in=free_subscribed_modules_ids)
+            ).order_by("module_identifier")
 
         response_dict["unsubscribed_modules"] = ModuleDetailsSerializer(unsubscribed_modules,context={"request": request}, many=True,).data
         response_dict["subscribed_modules"] = ModuleDetailsSerializer(
