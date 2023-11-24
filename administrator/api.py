@@ -473,16 +473,17 @@ class ListModules(APIView):
                 Q(id__in=free_subscribed_modules_ids)
             ).order_by("module_identifier")
             response_dict["unsubscribed_modules"] = ModuleDetailsSerializer(unsubscribed_modules,context={"request": request}, many=True,).data
-        
+            response_dict["subscribed_modules"] = ModuleDetailsSerializer(
+                modules,context={"request": request, "from_module":True, "admin":request.user}, many=True,).data
         if not subscription and free_subscribed_modules:
             unsubscribed_modules = all_modules.exclude(
                 id__in=free_subscribed_modules_ids
             ).order_by("module_identifier")
             response_dict["unsubscribed_modules"] = ModuleDetailsSerializer(unsubscribed_modules,context={"request": request}, many=True,).data
         
-        if subscription:
-            response_dict["subscribed_modules"] = ModuleDetailsSerializer(
-                modules,context={"request": request, "from_module":True, "admin":request.user}, many=True,).data
+        if not subscription and not free_subscribed_modules:
+            response_dict["unsubscribed_modules"] = ModuleDetailsSerializer(all_modules,context={"request": request}, many=True,).data
+            
         
         response_dict["status"] = True
         return Response(response_dict, status=status.HTTP_200_OK)
@@ -2024,8 +2025,8 @@ class AnalyticsReport(APIView):
             elif select_tab == "total_downtime":
                 status_list = [
                     When(numbers__gt=10, then=Value("Overloaded")),
-                    When(numbers__lt=10,numbers__gt=0, then=Value("Underloaded")),
-                    When(numbers__lte=0, then=Value("Standard")),
+                    When(numbers__lt=10,numbers__gte=5, then=Value("Underloaded")),
+                    When(numbers__lt=5, then=Value("Standard")),
                 ]
                 log  = CsvLogDetails.objects.filter(
                     uploaded_file__id=pk,
