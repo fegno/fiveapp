@@ -12,7 +12,7 @@ Type_Choice = (
     ("Support","Support"),
     ("Impression","Impression"),
     ("Metrics Meter","Metrics Meter"),
-    ("Warehouse MAP Retail","Warehouse MAP Retail"),
+    ("Warehouse MAP Retailing","Warehouse MAP Retailing"),
     ("Logistic Controller","Logistic Controller"),
     ("Odometers","Odometers")
 )
