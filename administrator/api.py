@@ -476,9 +476,14 @@ class ListModules(APIView):
             response_dict["subscribed_modules"] = ModuleDetailsSerializer(
                 modules,context={"request": request, "from_module":True, "admin":request.user}, many=True,).data
         if not subscription and free_subscribed_modules:
+            modules = ModuleDetails.objects.filter(is_active=True).filter(
+                Q(id__in=free_subscribed_modules_ids)
+            ).order_by("module_identifier")
             unsubscribed_modules = all_modules.exclude(
                 id__in=free_subscribed_modules_ids
             ).order_by("module_identifier")
+            response_dict["subscribed_modules"] = ModuleDetailsSerializer(
+                modules,context={"request": request, "from_module":True, "admin":request.user}, many=True,).data
             response_dict["unsubscribed_modules"] = ModuleDetailsSerializer(unsubscribed_modules,context={"request": request}, many=True,).data
         
         if not subscription and not free_subscribed_modules:
