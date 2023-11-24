@@ -2556,7 +2556,11 @@ class AdminModules(APIView):
                 response_dict["additional_users"] = self.get_users_with_password()
                 response_dict["invited_users"] = InvitedUserSerializer(invited_users, context={'request':request}, many=True).data
                 return Response(response_dict, status=status.HTTP_200_OK)
-
+            else:
+                response_dict["modules"] = []
+                response_dict["additional_users"] = []
+                response_dict["invited_users"] = []
+                return Response(response_dict, status=status.HTTP_200_OK)
         else:
             response_dict["error"] = "Access denied, Only Admin can access the module list"
             return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
