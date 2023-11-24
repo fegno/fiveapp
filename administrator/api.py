@@ -480,7 +480,7 @@ class ListModules(APIView):
             ).order_by("module_identifier")
             response_dict["unsubscribed_modules"] = ModuleDetailsSerializer(unsubscribed_modules,context={"request": request}, many=True,).data
         
-        if modules:
+        if subscription:
             response_dict["subscribed_modules"] = ModuleDetailsSerializer(
                 modules,context={"request": request, "from_module":True, "admin":request.user}, many=True,).data
         
