@@ -3222,18 +3222,23 @@ class UserPurchasePriceV2(APIView):
         elif action_type == "count_upgrade":
             subscription_end_date = admin_subscription.subscription_end_date
             if admin_subscription.subscription_type == "WEEK":
+                pending = (subscription_end_date - current_date).days
+                pending_amount = (18 / 7) * pending
                 user_count = admin_subscription.user_count
                 total_count = total_count - user_count
-                amount = total_count * 18
+                amount = total_count * pending_amount
             elif subscription_type == "MONTH":
+                pending = (subscription_end_date - current_date).days
+                pending_amount = (69 / 30) * pending
                 user_count = admin_subscription.user_count
                 total_count = total_count - user_count
-                amount = total_count * 69
-
+                amount = total_count * pending_amount
             elif subscription_type == "YEAR":
+                pending = (subscription_end_date - current_date).days
+                pending_amount = (800 / 365) * pending
                 user_count = admin_subscription.user_count
                 total_count = total_count - user_count
-                amount = total_count * 800
+                amount = total_count * pending_amount
 
         elif action_type == "plan_upgrade":
             
