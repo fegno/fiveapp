@@ -756,3 +756,154 @@ class InitiateUserPaymentV2(APIView):
 			response_dict['client_secret']=payment_attempt.client_secret
 			response_dict['status']=True
 		return Response(response_dict,status.HTTP_200_OK)
+
+
+class InitiatePaymentV2(APIView):
+	permission_classes = (IsAuthenticated,)
+	authentication_classes = (CustomTokenAuthentication,)
+
+	def post(self,request):
+		response_dict={'status':False}
+		billing_id = request.data.get("billing_id")
+		card_id = request.data.get("card_id")
+		bundle_ids = request.data.get("bundle_ids")
+		modules_ids = request.data.get("modules_ids")
+		total_price = request.data.get("total_price")
+		subscription_type = request.data.get("subscription_type")
+		action_type = request.data.get("action_type")
+		
+		order = PurchaseDetails.objects.create(
+			user=request.user,
+			status="Pending",
+			subscription_type=subscription_type,
+			total_price=total_price,
+			is_subscribed=False
+		)
+		if billing_id:
+			billing = BillingDetails.objects.filter(id=billing_id, user=request.user).last()
+			if billing:
+				order.bill = billing
+				order.company_name = billing.company_name
+				order.address = billing.address
+				order.billing_contact = billing.billing_contact
+				order.issuing_country = billing.issuing_country
+				order.legal_company_name = billing.legal_company_name
+				order.tax_id = billing.tax_id
+				order.save()
+
+		if card_id:
+			card = CardDetails.objects.filter(id=card_id, user=request.user).last()
+			if card:
+				order.card = card
+				order.holder_name = card.holder_name
+				order.card_number = card.card_number
+				order.expiration_date = card.expiration_date
+				order.ccv = card.ccv
+				order.save()
+
+		if modules_ids:
+			order.module.add(*request.data.get("modules_ids"))    
+		if bundle_ids:  
+			order.bundle.add(*request.data.get("bundle_ids"))    
+
+		subscription = SubscriptionDetails.objects.filter(
+			user=order.user, 
+		).last()
+		admin_subscription = subscription
+		current_date = datetime.now().date()
+		if action_type == "renew":   
+			order.subscription_start_date =  admin_subscription.subscription_start_date
+			subscription_type = admin_subscription.subscription_type
+			if subscription_type == "WEEK":
+				if admin_subscription.subscription_end_date < current_date:
+					subscription_end_date = current_date
+				else:
+					subscription_end_date = admin_subscription.subscription_end_date
+				subscription_end_date = subscription_end_date + timedelta(days=7)
+			elif subscription_type == "MONTH":
+				if admin_subscription.subscription_end_date < current_date:
+					subscription_end_date = current_date
+				else:
+					subscription_end_date = admin_subscription.subscription_end_date
+				subscription_end_date = subscription_end_date + timedelta(days=30)
+			elif subscription_type == "YEAR":
+				if admin_subscription.subscription_end_date < current_date:
+					subscription_end_date = current_date
+				else:
+					subscription_end_date = admin_subscription.subscription_end_date
+				subscription_end_date = subscription_end_date + timedelta(days=365)
+		elif action_type == "module_bundle_upgrade":
+			order.subscription_start_date =  admin_subscription.subscription_start_date
+			subscription_end_date = admin_subscription.subscription_end_date
+		elif action_type == "plan_upgrade":
+			order.subscription_start_date =  admin_subscription.subscription_start_date
+			if admin_subscription.subscription_type == subscription_type:
+				subscription_end_date = admin_subscription.subscription_end_date
+				if subscription_type == "WEEK":
+					new_end_date = current_date + timedelta(days=7)
+				elif subscription_type == "MONTH":
+					new_end_date = current_date + timedelta(days=30)
+				elif subscription_type == "YEAR":
+					new_end_date = current_date + timedelta(days=365)
+				subscription_end_date = new_end_date
+			elif admin_subscription.subscription_type == "WEEK":
+				if subscription_type == "MONTH":
+					subscription_end_date = admin_subscription.subscription_end_date
+					new_end_date = current_date + timedelta(days=30)
+				elif subscription_type == "YEAR":
+					subscription_end_date = admin_subscription.subscription_end_date
+					new_end_date = current_date + timedelta(days=365)
+				subscription_end_date = new_end_date
+			elif admin_subscription.subscription_type == "MONTH":
+				if subscription_type == "YEAR":
+					subscription_end_date = admin_subscription.subscription_end_date
+					new_end_date = current_date + timedelta(days=365)
+				subscription_end_date = new_end_date
+
+		elif action_type == "both_upgrade":
+			order.subscription_start_date =  admin_subscription.subscription_start_date
+			if admin_subscription.subscription_type == subscription_type:
+				subscription_end_date = admin_subscription.subscription_end_date
+				if subscription_type == "WEEK":
+					new_end_date = current_date + timedelta(days=7)
+				elif subscription_type == "MONTH":
+					new_end_date = current_date + timedelta(days=30)
+				elif subscription_type == "YEAR":
+					new_end_date = current_date + timedelta(days=365)
+				subscription_end_date = new_end_date
+
+			elif admin_subscription.subscription_type == "WEEK":
+				if subscription_type == "MONTH":
+					subscription_end_date = admin_subscription.subscription_end_date
+					new_end_date = current_date + timedelta(days=30)
+				elif subscription_type == "YEAR":
+					subscription_end_date = admin_subscription.subscription_end_date
+					new_end_date = current_date + timedelta(days=365)
+				subscription_end_date = new_end_date
+			
+			elif admin_subscription.subscription_type == "MONTH":
+				if subscription_type == "YEAR":
+					subscription_end_date = admin_subscription.subscription_end_date
+					new_end_date = current_date + timedelta(days=365)
+				subscription_end_date = new_end_date
+		else:
+			order.subscription_start_date =  timezone.now().date()
+			if subscription_type == "WEEK":
+				subscription_end_date = current_date + timedelta(days=7)
+			elif subscription_type == "MONTH":
+				subscription_end_date = current_date + timedelta(days=30)
+			elif subscription_type == "YEAR":
+				subscription_end_date = current_date + timedelta(days=365)
+
+		order.subscription_end_date =  subscription_end_date
+		order.save()
+
+		with transaction.atomic():
+			stripe.api_key=settings.STRIPE_API_KEY
+			intent = stripe.PaymentIntent.create(amount=round(order.total_price*100),currency='inr')
+			payment_attempt=PaymentAttempt.objects.create(parchase_user_type="Subscription",parchase=order,user=request.user,currency='inr',amount=order.total_price,
+				status='Initiated',client_secret=intent['client_secret'],payment_intent_id=intent['id'],last_attempt_date=timezone.now())
+		
+			response_dict['client_secret']=payment_attempt.client_secret
+			response_dict['status']=True
+		return Response(response_dict,status.HTTP_200_OK)
