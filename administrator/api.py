@@ -3560,3 +3560,320 @@ class ListAdminSubscriptions(APIView):
         response_dict["status"] = True
         return Response(response_dict, status=status.HTTP_200_OK)
 
+
+class ModulePurchasePriceV2(APIView):
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (CustomTokenAuthentication,)
+
+    def get(self, request):
+        subscription_type = request.GET.get("subscription_type")
+        bundle_ids = request.data.get("bundle_ids", [])
+        modules_ids = request.data.get("modules_ids", [])
+        action_type = request.GET.get("action_type")
+
+        response_dict = {"status":True}
+        admin_user = request.user
+        current_date = datetime.now().date()
+        admin_subscription = SubscriptionDetails.objects.filter(user=admin_user, is_active=True).first()
+        
+        if action_type == "renew":            
+            subscription_type = admin_subscription.subscription_type
+            total_count = admin_subscription.user_count
+            if subscription_type == "WEEK":
+                if admin_subscription.subscription_end_date < current_date:
+                    subscription_end_date = current_date
+                else:
+                    subscription_end_date = admin_subscription.subscription_end_date
+                new_end_date = subscription_end_date + timedelta(days=7)
+                subscription_end_date = new_end_date
+            elif subscription_type == "MONTH":
+                if admin_subscription.subscription_end_date < current_date:
+                    subscription_end_date = current_date
+                else:
+                    subscription_end_date = admin_subscription.subscription_end_date
+                new_end_date = subscription_end_date + timedelta(days=30)
+                subscription_end_date = new_end_date
+            elif subscription_type == "YEAR":
+                if admin_subscription.subscription_end_date < current_date:
+                    subscription_end_date = current_date
+                else:
+                    subscription_end_date = admin_subscription.subscription_end_date
+                new_end_date = subscription_end_date + timedelta(days=365)
+                subscription_end_date = new_end_date
+            
+            bundle_price = 0
+            module_price = 0
+            bundle_module = []
+            for i in bundle_ids:
+                bundle_obj = BundleDetails.objects.get(id=i)
+                bundle_modules = list(bundle_obj.modules.all().values_list("id", flat=True))
+                bundle_module.extend(bundle_modules)
+                if subscription_type == "WEEK":
+                    bundle_price = float(bundle_price) + float(bundle_obj.weekly_price)
+                    subscription_end_date = current_date + timedelta(days=7)
+                elif subscription_type == "MONTH":
+                    bundle_price = float(bundle_price) + float(bundle_obj.monthly_price)
+                    subscription_end_date = current_date + timedelta(days=30)
+                elif subscription_type == "YEAR":
+                    bundle_price = float(bundle_price) + float(bundle_obj.yearly_price)
+                    subscription_end_date = current_date + timedelta(days=365)
+
+            for i in modules_ids:
+                if i not in bundle_module:
+                    module_obj = ModuleDetails.objects.get(id=i)
+                    if subscription_type == "WEEK":
+                        module_price = float(module_price) + float(module_obj.weekly_price)
+                        subscription_end_date = current_date + timedelta(days=7)
+
+                    elif subscription_type == "MONTH":
+                        module_price = float(module_price) + float(module_obj.monthly_price)
+                        subscription_end_date = current_date + timedelta(days=30)
+                    elif subscription_type == "YEAR":
+                        module_price = float(module_price) + float(module_obj.yearly_price)
+                        subscription_end_date = current_date + timedelta(days=365)
+
+
+        elif action_type == "module_bundle_upgrade":
+            subscription_end_date = admin_subscription.subscription_end_date
+            pending = (subscription_end_date - current_date).days
+            bundle_price = 0
+            module_price = 0
+            bundle_module = []
+            already_added_module = admin_subscription.module.all().values_list("id", flat=True)
+            already_added_bundle = admin_subscription.bundle.all().values_list("id", flat=True)
+            if admin_subscription.subscription_type == "WEEK":
+                for i in bundle_ids:
+                    if i not in already_added_bundle:
+                        bundle_obj = BundleDetails.objects.get(id=i)
+                        bundle_modules = list(bundle_obj.modules.all().values_list("id", flat=True))
+                        bundle_module.extend(bundle_modules)
+                        amount = (bundle_obj.weekly_price / 7) * pending
+                        bundle_price = bundle_price + amount
+                for i in modules_ids:
+                    if i not in bundle_module and i not in already_added_module:
+                        module_obj = ModuleDetails.objects.get(id=i)
+                        amount = (module_obj.weekly_price / 7) * pending
+                        module_price = module_price + amount
+
+            elif subscription_type == "MONTH":
+                for i in bundle_ids:
+                    bundle_obj = BundleDetails.objects.get(id=i)
+                    bundle_modules = list(bundle_obj.modules.all().values_list("id", flat=True))
+                    bundle_module.extend(bundle_modules)
+                    amount = (bundle_obj.monthly_price / 30) * pending
+                    bundle_price = bundle_price + amount
+                for i in modules_ids:
+                    if i not in bundle_module:
+                        module_obj = ModuleDetails.objects.get(id=i)
+                        amount = (module_obj.monthly_price / 30) * pending
+                        module_price = module_price + amount
+
+            elif subscription_type == "YEAR":
+                for i in bundle_ids:
+                    bundle_obj = BundleDetails.objects.get(id=i)
+                    bundle_modules = list(bundle_obj.modules.all().values_list("id", flat=True))
+                    bundle_module.extend(bundle_modules)
+                    amount = (bundle_obj.yearly_price / 365) * pending
+                    bundle_price = bundle_price + amount
+                for i in modules_ids:
+                    if i not in bundle_module:
+                        module_obj = ModuleDetails.objects.get(id=i)
+                        amount = (module_obj.yearly_price / 365) * pending
+                        module_price = module_price + amount
+
+            amount = bundle_price + module_price
+
+        elif action_type == "plan_upgrade":
+            bundle_price = 0
+            module_price = 0
+            already_added_module = admin_subscription.module.all().values_list("id", flat=True)
+            already_added_bundle = admin_subscription.bundle.all().values_list("id", flat=True)
+            
+            if admin_subscription.subscription_type == "WEEK":
+                if subscription_type == "MONTH":
+                    subscription_end_date = admin_subscription.subscription_end_date
+                    new_end_date = current_date + timedelta(days=30)
+                    pending = (new_end_date - subscription_end_date).days
+                    bundle_module = []
+                    for i in bundle_ids:
+                        bundle_obj = BundleDetails.objects.get(id=i)
+                        bundle_modules = list(bundle_obj.modules.all().values_list("id", flat=True))
+                        bundle_module.extend(bundle_modules)
+                        pending_amount = (bundle_obj.monthly_price / 30) * pending
+                        pending_amount_t = pending_amount * user_count
+                        bundle_price = bundle_price + pending_amount_t
+                    for i in modules_ids:
+                        module_obj = ModuleDetails.objects.get(id=i)
+                        if i not in bundle_module:
+                            pending_amount = (module_obj.monthly_price / 30) * pending
+                            pending_amount_t = pending_amount * user_count
+                            module_price = module_price + pending_amount_t
+                elif subscription_type == "YEAR":
+                    subscription_end_date = admin_subscription.subscription_end_date
+                    new_end_date = current_date + timedelta(days=365)
+                    pending = (new_end_date - subscription_end_date).days
+                    bundle_module = []
+                    for i in bundle_ids:
+                        bundle_obj = BundleDetails.objects.get(id=i)
+                        bundle_modules = list(bundle_obj.modules.all().values_list("id", flat=True))
+                        bundle_module.extend(bundle_modules)
+                        pending_amount = (bundle_obj.monthly_price / 365) * pending
+                        pending_amount_t = pending_amount * user_count
+                        bundle_price = bundle_price + pending_amount_t
+                    for i in modules_ids:
+                        if i not in bundle_module:
+                            pending_amount = (module_obj.monthly_price / 365) * pending
+                            pending_amount_t = pending_amount * user_count
+                            module_price = module_price + pending_amount_t
+                amount = module_price + bundle_price
+                subscription_end_date = new_end_date
+            elif admin_subscription.subscription_type == "MONTH":
+                if subscription_type == "YEAR":
+                    subscription_end_date = admin_subscription.subscription_end_date
+                    new_end_date = current_date + timedelta(days=365)
+                    pending = (new_end_date - subscription_end_date).days
+                    bundle_module = []
+                    for i in bundle_ids:
+                        bundle_obj = BundleDetails.objects.get(id=i)
+                        bundle_modules = list(bundle_obj.modules.all().values_list("id", flat=True))
+                        bundle_module.extend(bundle_modules)
+                        pending_amount = (bundle_obj.monthly_price / 365) * pending
+                        pending_amount_t = pending_amount * user_count
+                        bundle_price = bundle_price + pending_amount_t
+                    for i in modules_ids:
+                        module_obj = ModuleDetails.objects.get(id=i)
+                        if i not in bundle_module:
+                            pending_amount = (module_obj.monthly_price / 365) * pending
+                            pending_amount_t = pending_amount * user_count
+                            module_price = module_price + pending_amount_t
+
+                amount = module_price + bundle_price
+                subscription_end_date = new_end_date
+
+        elif action_type == "both_upgrade":
+            current_date = datetime.now().date()
+            bundle_price = 0
+            module_price = 0
+            already_added_module = admin_subscription.module.all().values_list("id", flat=True)
+            already_added_bundle = admin_subscription.bundle.all().values_list("id", flat=True)
+            if admin_subscription.subscription_type == "WEEK":
+                if subscription_type == "MONTH":
+                    subscription_end_date = admin_subscription.subscription_end_date
+                    new_end_date = current_date + timedelta(days=30)
+                    pending = (new_end_date - subscription_end_date).days
+                    for i in bundle_ids:
+                        bundle_obj = BundleDetails.objects.get(id=i)
+                        if i not in already_added_bundle:
+                            bundle_modules = list(bundle_obj.modules.all().values_list("id", flat=True))
+                            bundle_module.extend(bundle_modules)
+                            amount = (bundle_obj.monthly_price / 30) * pending
+                            bundle_price = bundle_price + amount
+                        else:
+                            pending_amount = (bundle_obj.monthly_price / 30) * pending
+                            pending_amount_t = pending_amount * user_count
+                            bundle_price = bundle_price + pending_amount_t
+                    for i in modules_ids:
+                        module_obj = ModuleDetails.objects.get(id=i)
+                        if i not in bundle_module and i not in already_added_module:
+                            amount = (module_obj.monthly_price / 30) * pending
+                            module_price = module_price + amount
+                        elif i in already_added_module:
+                            pending_amount = (module_obj.monthly_price / 30) * pending
+                            pending_amount_t = pending_amount * user_count
+                            module_price = module_price + pending_amount_t
+
+                elif subscription_type == "YEAR":
+                    subscription_end_date = admin_subscription.subscription_end_date
+                    new_end_date = current_date + timedelta(days=365)
+                    pending = (new_end_date - subscription_end_date).days
+                    for i in bundle_ids:
+                        bundle_obj = BundleDetails.objects.get(id=i)
+                        if i not in already_added_bundle:
+                            bundle_modules = list(bundle_obj.modules.all().values_list("id", flat=True))
+                            bundle_module.extend(bundle_modules)
+                            amount = (bundle_obj.yearly_price / 365) * pending
+                            bundle_price = bundle_price + amount
+                        else:
+                            pending_amount = (bundle_obj.yearly_price / 365) * pending
+                            pending_amount_t = pending_amount * user_count
+                            bundle_price = bundle_price + pending_amount_t
+                    for i in modules_ids:
+                        module_obj = ModuleDetails.objects.get(id=i)
+                        if i not in bundle_module and i not in already_added_module:
+                            amount = (module_obj.yearly_price / 365) * pending
+                            module_price = module_price + amount
+                        elif i in already_added_module:
+                            pending_amount = (module_obj.yearly_price / 365) * pending
+                            pending_amount_t = pending_amount * user_count
+                            module_price = module_price + pending_amount_t
+
+                amount = module_price + bundle_price
+                subscription_end_date = new_end_date
+            
+            elif admin_subscription.subscription_type == "MONTH":
+                if subscription_type == "YEAR":
+                    subscription_end_date = admin_subscription.subscription_end_date
+                    new_end_date = current_date + timedelta(days=365)
+                    pending = (new_end_date - subscription_end_date).days
+                    for i in bundle_ids:
+                        bundle_obj = BundleDetails.objects.get(id=i)
+                        if i not in already_added_bundle:
+                            bundle_modules = list(bundle_obj.modules.all().values_list("id", flat=True))
+                            bundle_module.extend(bundle_modules)
+                            amount = (bundle_obj.yearly_price / 365) * pending
+                            bundle_price = bundle_price + amount
+                        else:
+                            pending_amount = (bundle_obj.yearly_price / 365) * pending
+                            pending_amount_t = pending_amount * user_count
+                            bundle_price = bundle_price + pending_amount_t
+                    for i in modules_ids:
+                        module_obj = ModuleDetails.objects.get(id=i)
+                        if i not in bundle_module and i not in already_added_module:
+                            amount = (module_obj.yearly_price / 365) * pending
+                            module_price = module_price + amount
+                        elif i in already_added_module:
+                            pending_amount = (module_obj.yearly_price / 365) * pending
+                            pending_amount_t = pending_amount * user_count
+                            module_price = module_price + pending_amount_t
+
+                amount = module_price + bundle_price
+                subscription_end_date = new_end_date
+        else:
+            bundle_price = 0
+            module_price = 0
+            bundle_module = []
+            for i in bundle_ids:
+                bundle_obj = BundleDetails.objects.get(id=i)
+                bundle_modules = list(bundle_obj.modules.all().values_list("id", flat=True))
+                bundle_module.extend(bundle_modules)
+                if subscription_type == "WEEK":
+                    bundle_price = float(bundle_price) + float(bundle_obj.weekly_price)
+                    subscription_end_date = current_date + timedelta(days=7)
+                elif subscription_type == "MONTH":
+                    bundle_price = float(bundle_price) + float(bundle_obj.monthly_price)
+                    subscription_end_date = current_date + timedelta(days=30)
+                elif subscription_type == "YEAR":
+                    bundle_price = float(bundle_price) + float(bundle_obj.yearly_price)
+                    subscription_end_date = current_date + timedelta(days=365)
+            for i in modules_ids:
+                if i not in bundle_module:
+                    module_obj = ModuleDetails.objects.get(id=i)
+                    if subscription_type == "WEEK":
+                        module_price = float(module_price) + float(module_obj.weekly_price)
+                        subscription_end_date = current_date + timedelta(days=7)
+
+                    elif subscription_type == "MONTH":
+                        module_price = float(module_price) + float(module_obj.monthly_price)
+                        subscription_end_date = current_date + timedelta(days=30)
+                    elif subscription_type == "YEAR":
+                        module_price = float(module_price) + float(module_obj.yearly_price)
+                        subscription_end_date = current_date + timedelta(days=365)
+
+        price_data = {
+            "added_by": {"id": admin_user.id}, 
+            "amount": amount, 
+        }
+
+        response_dict["price_data"] = price_data
+        response_dict["subscription_end_date"] = subscription_end_date
+        return Response(response_dict, status=status.HTTP_200_OK)

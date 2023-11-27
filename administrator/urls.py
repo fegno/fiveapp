@@ -40,6 +40,7 @@ urlpatterns = [
     re_path(r'^user-purchase-price/', api.UserPurchasePrice.as_view(), name='user-purchase-price'),
     re_path(r'^added-to-cart/', api.AddToCartView.as_view(), name='add-to-cart'),
     re_path(r'^user-purchase-price-v2/', api.UserPurchasePriceV2.as_view(), name='user-purchase-price-v2'),
+    re_path(r'^module-purchase-price-v2/', api.ModulePurchasePriceV2.as_view(), name='module-purchase-price-v2'),
 
     re_path(r'^module-purchase-history/', api.ModulePurchaseHistory.as_view(), name='module-purchase-history'),
     re_path(r'^user-purchase-history/', api.UserPurchaseHistory.as_view(), name='user-purchase-history'),
