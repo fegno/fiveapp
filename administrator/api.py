@@ -3142,9 +3142,9 @@ class UserPurchasePrice(APIView):
 
         response_dict["Subscription_type"] = subscription_type
 
-        weekly_price = 18
-        monthly_price = 69
-        yearly_price = 800
+        weekly_price = 4
+        monthly_price = 14
+        yearly_price = 160
 
         if subscription_type == "WEEK":
             amount = (weekly_price / 7) * remaining_days
@@ -3183,9 +3183,9 @@ class UserPurchasePriceV2(APIView):
         if action_type == "renew":            
             subscription_type = admin_subscription.subscription_type
             total_count = admin_subscription.user_count
-            weekly_price = 18
-            monthly_price = 69
-            yearly_price = 800
+            weekly_price = 4
+            monthly_price = 14
+            yearly_price = 160
             if subscription_type == "WEEK":
                 if admin_subscription.subscription_end_date < current_date:
                     subscription_end_date = current_date
@@ -3223,19 +3223,19 @@ class UserPurchasePriceV2(APIView):
             subscription_end_date = admin_subscription.subscription_end_date
             if admin_subscription.subscription_type == "WEEK":
                 pending = (subscription_end_date - current_date).days
-                pending_amount = (18 / 7) * pending
+                pending_amount = (4 / 7) * pending
                 user_count = admin_subscription.user_count
                 total_count = total_count - user_count
                 amount = total_count * pending_amount
             elif subscription_type == "MONTH":
                 pending = (subscription_end_date - current_date).days
-                pending_amount = (69 / 30) * pending
+                pending_amount = (14 / 30) * pending
                 user_count = admin_subscription.user_count
                 total_count = total_count - user_count
                 amount = total_count * pending_amount
             elif subscription_type == "YEAR":
                 pending = (subscription_end_date - current_date).days
-                pending_amount = (800 / 365) * pending
+                pending_amount = (160 / 365) * pending
                 user_count = admin_subscription.user_count
                 total_count = total_count - user_count
                 amount = total_count * pending_amount
@@ -3247,18 +3247,18 @@ class UserPurchasePriceV2(APIView):
                 if subscription_type == "WEEK":
                     new_end_date = current_date + timedelta(days=7)
                     pending = (new_end_date - subscription_end_date).days
-                    pending_amount = (18 / 7) * pending
+                    pending_amount = (4 / 7) * pending
                     amount = pending_amount * user_count
 
                 elif subscription_type == "MONTH":
                     new_end_date = current_date + timedelta(days=30)
                     pending = (new_end_date - subscription_end_date).days
-                    amount = (69 / 30) * pending
+                    amount = (14 / 30) * pending
 
                 elif subscription_type == "YEAR":
                     new_end_date = current_date + timedelta(days=365)
                     pending = (new_end_date - subscription_end_date).days
-                    amount = (800 / 365) * pending
+                    amount = (160 / 365) * pending
                 subscription_end_date = new_end_date
 
             elif admin_subscription.subscription_type == "WEEK":
@@ -3267,7 +3267,7 @@ class UserPurchasePriceV2(APIView):
                     subscription_end_date = admin_subscription.subscription_end_date
                     new_end_date = current_date + timedelta(days=30)
                     pending = (new_end_date - subscription_end_date).days
-                    pending_amount = (69 / 30) * pending
+                    pending_amount = (14 / 30) * pending
                     amount = pending_amount * user_count
 
                 elif subscription_type == "YEAR":
@@ -3275,7 +3275,7 @@ class UserPurchasePriceV2(APIView):
                     subscription_end_date = admin_subscription.subscription_end_date
                     new_end_date = current_date + timedelta(days=365)
                     pending = (new_end_date - subscription_end_date).days
-                    pending_amount = (800 / 365) * pending
+                    pending_amount = (160 / 365) * pending
                     amount = pending_amount * user_count
                 subscription_end_date = new_end_date
             elif admin_subscription.subscription_type == "MONTH":
@@ -3284,10 +3284,10 @@ class UserPurchasePriceV2(APIView):
                     subscription_end_date = admin_subscription.subscription_end_date
                     new_end_date = current_date + timedelta(days=365)
                     pending = (new_end_date - subscription_end_date).days
-                    pending_amount = (800 / 365) * pending
+                    pending_amount = (160 / 365) * pending
                     pending_amount_t = pending_amount * user_count
                     total_c = total_count - user_count
-                    actual_amount_t = 800 * total_c
+                    actual_amount_t = 160 * total_c
                     amount = pending_amount_t + actual_amount_t
                 subscription_end_date = new_end_date
 
@@ -3299,28 +3299,28 @@ class UserPurchasePriceV2(APIView):
                 if subscription_type == "WEEK":
                     new_end_date = current_date + timedelta(days=7)
                     pending = (new_end_date - subscription_end_date).days
-                    pending_amount = (18 / 7) * pending
+                    pending_amount = (4 / 7) * pending
                     pending_amount_t = pending_amount * user_count
                     total_c = total_count - user_count
-                    actual_amount_t = 18 * total_c
+                    actual_amount_t = 4 * total_c
                     amount = pending_amount_t + actual_amount_t
 
                 elif subscription_type == "MONTH":
                     new_end_date = current_date + timedelta(days=30)
                     pending = (new_end_date - subscription_end_date).days
-                    pending_amount = (69 / 30) * pending
+                    pending_amount = (14 / 30) * pending
                     pending_amount_t = pending_amount * user_count
                     total_c = total_count - user_count
-                    actual_amount_t = 69 * total_c
+                    actual_amount_t = 14 * total_c
                     amount = pending_amount_t + actual_amount_t
 
                 elif subscription_type == "YEAR":
                     new_end_date = current_date + timedelta(days=365)
                     pending = (new_end_date - subscription_end_date).days
-                    pending_amount = (800 / 365) * pending
+                    pending_amount = (160 / 365) * pending
                     pending_amount_t = pending_amount * user_count
                     total_c = total_count - user_count
-                    actual_amount_t = 800 * total_c
+                    actual_amount_t = 160 * total_c
                     amount = pending_amount_t + actual_amount_t
 
                 subscription_end_date = new_end_date
@@ -3330,10 +3330,10 @@ class UserPurchasePriceV2(APIView):
                     subscription_end_date = admin_subscription.subscription_end_date
                     new_end_date = current_date + timedelta(days=30)
                     pending = (new_end_date - subscription_end_date).days
-                    pending_amount = (69 / 30) * pending
+                    pending_amount = (14 / 30) * pending
                     pending_amount_t = pending_amount * user_count
                     total_c = total_count - user_count
-                    actual_amount_t = 69 * total_c
+                    actual_amount_t = 14 * total_c
                     amount = pending_amount_t + actual_amount_t
 
                 elif subscription_type == "YEAR":
@@ -3341,10 +3341,10 @@ class UserPurchasePriceV2(APIView):
                     subscription_end_date = admin_subscription.subscription_end_date
                     new_end_date = current_date + timedelta(days=365)
                     pending = (new_end_date - subscription_end_date).days
-                    pending_amount = (800 / 365) * pending
+                    pending_amount = (160 / 365) * pending
                     pending_amount_t = pending_amount * user_count
                     total_c = total_count - user_count
-                    actual_amount_t = 800 * total_c
+                    actual_amount_t = 160 * total_c
                     amount = pending_amount_t + actual_amount_t
 
                 subscription_end_date = new_end_date
@@ -3355,18 +3355,18 @@ class UserPurchasePriceV2(APIView):
                     subscription_end_date = admin_subscription.subscription_end_date
                     new_end_date = current_date + timedelta(days=365)
                     pending = (new_end_date - subscription_end_date).days
-                    pending_amount = (800 / 365) * pending
+                    pending_amount = (160 / 365) * pending
                     pending_amount_t = pending_amount * user_count
                     total_c = total_count - user_count
-                    actual_amount_t = 800 * total_c
+                    actual_amount_t = 160 * total_c
                     amount = pending_amount_t + actual_amount_t
 
                 subscription_end_date = new_end_date
         else:
             
-            weekly_price = 18
-            monthly_price = 69
-            yearly_price = 800
+            weekly_price = 4
+            monthly_price = 14
+            yearly_price = 160
             if subscription_type == "WEEK":
                 amount = weekly_price * total_count
                 subscription_end_date = current_date + timedelta(days=7)
