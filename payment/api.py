@@ -234,6 +234,7 @@ class StripePaymentWebhook(APIView):
 						subscription = SubscriptionDetails.objects.filter(user=order.user).last()
 						subscription.subscription_start_date = order.subscription_start_date
 						subscription.subscription_end_date = order.subscription_end_date
+						subscription.subscription_type =order.subscription_type
 						subscription.is_subscribed = True
 						subscription.module.clear()
 						subscription.bundle.clear()
@@ -310,6 +311,7 @@ class StripePaymentWebhook(APIView):
 						user_subscription.user_count = user_subscription.user_count + order.user_count
 						user_subscription.subscription_start_date = order.subscription_start_date
 						user_subscription.subscription_end_date = order.subscription_end_date
+						user_subscription.subscription_type =order.subscription_type
 						user_subscription.save()
 						first_count_users = list(UserProfile.objects.filter(
 							created_admin=user,
@@ -373,6 +375,7 @@ class StripePaymentWebhook(APIView):
 					elif order.action_type == "renew":
 						user_subscription.current_purchase = order
 						user_subscription.total_price = order.total_price
+						user_subscription.subscription_type =order.subscription_type
 						user_subscription.is_subscribed = True
 						user_subscription.subscription_start_date = order.subscription_start_date
 						user_subscription.subscription_end_date = order.subscription_end_date
