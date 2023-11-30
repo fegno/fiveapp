@@ -232,42 +232,26 @@ class StripePaymentWebhook(APIView):
 					user.save()
 					if SubscriptionDetails.objects.filter(user=order.user):
 						subscription = SubscriptionDetails.objects.filter(user=order.user).last()
-						if subscription.subscription_end_date < timezone.now().date():
-							subscription.subscription_start_date = order.subscription_start_date
-							subscription.subscription_end_date = order.subscription_end_date
-							subscription.is_subscribed = True
-							subscription.module.clear()
-							subscription.bundle.clear()
-							if order.module:
-								subscription.module.add(*list(order.module.values_list("id", flat=True)))      
-							if order.bundle:
-								subscription.bundle.add(*list(order.bundle.values_list("id", flat=True)))    
-							subscription.save()
-
-							try:
-								module_list = list(order.module.values_list("id", flat=True))
-								for i in module_list:
-									FreeSubscriptionDetails.objects.filter(user=user, module__id=i).update(
-										free_subscription_end_date=timezone.now().date()
-									)
-							except Exception as e:
-								print(f"An error occurred: {e}")
+						subscription.subscription_start_date = order.subscription_start_date
+						subscription.subscription_end_date = order.subscription_end_date
+						subscription.is_subscribed = True
+						subscription.module.clear()
+						subscription.bundle.clear()
+						if order.module:
+							subscription.module.add(*list(order.module.values_list("id", flat=True)))      
+						if order.bundle:
+							subscription.bundle.add(*list(order.bundle.values_list("id", flat=True)))    
+						subscription.save()
+						try:
+							module_list = list(order.module.values_list("id", flat=True))
+							for i in module_list:
+								FreeSubscriptionDetails.objects.filter(user=user, module__id=i).update(
+									free_subscription_end_date=timezone.now().date()
+								)
+						except Exception as e:
+							print(f"An error occurred: {e}")
 						
-						else:
-							if order.module:
-								subscription.module.add(*list(order.module.values_list("id", flat=True)))      
-							if order.bundle:
-								subscription.bundle.add(*list(order.bundle.values_list("id", flat=True)))    
-							subscription.save()
-
-							try:
-								module_list = list(order.module.values_list("id", flat=True))
-								for i in module_list:
-									FreeSubscriptionDetails.objects.filter(user=user, module__id=i).update(
-										free_subscription_end_date=timezone.now().date()
-									)
-							except Exception as e:
-								print(f"An error occurred: {e}")
+					
 					else:
 						subscription = SubscriptionDetails.objects.create(
 							user=order.user,
@@ -281,6 +265,14 @@ class StripePaymentWebhook(APIView):
 						if order.bundle:
 							subscription.bundle.add(*list(order.bundle.values_list("id", flat=True)))     
 						subscription.save()
+						try:
+							module_list = list(order.module.values_list("id", flat=True))
+							for i in module_list:
+								FreeSubscriptionDetails.objects.filter(user=user, module__id=i).update(
+									free_subscription_end_date=timezone.now().date()
+								)
+						except Exception as e:
+							print(f"An error occurred: {e}")
 				else:
 					user = order.user
 					user_subscription = UserSubscriptionDetails.objects.filter(
@@ -777,7 +769,8 @@ class InitiatePaymentV2(APIView):
 			status="Pending",
 			subscription_type=subscription_type,
 			total_price=total_price,
-			is_subscribed=False
+			is_subscribed=False,
+			action_type=action_type
 		)
 		if billing_id:
 			billing = BillingDetails.objects.filter(id=billing_id, user=request.user).last()
