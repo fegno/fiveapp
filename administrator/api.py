@@ -3617,27 +3617,27 @@ class ModulePurchasePriceV2(APIView):
                 bundle_module.extend(bundle_modules)
                 if subscription_type == "WEEK":
                     bundle_price = float(bundle_price) + float(bundle_obj.weekly_price)
-                    subscription_end_date = current_date + timedelta(days=7)
+                    
                 elif subscription_type == "MONTH":
                     bundle_price = float(bundle_price) + float(bundle_obj.monthly_price)
-                    subscription_end_date = current_date + timedelta(days=30)
+                    
                 elif subscription_type == "YEAR":
                     bundle_price = float(bundle_price) + float(bundle_obj.yearly_price)
-                    subscription_end_date = current_date + timedelta(days=365)
+                    
 
             for i in modules_ids:
                 if i not in bundle_module:
                     module_obj = ModuleDetails.objects.get(id=i)
                     if subscription_type == "WEEK":
                         module_price = float(module_price) + float(module_obj.weekly_price)
-                        subscription_end_date = current_date + timedelta(days=7)
+                        
 
                     elif subscription_type == "MONTH":
                         module_price = float(module_price) + float(module_obj.monthly_price)
-                        subscription_end_date = current_date + timedelta(days=30)
+                        
                     elif subscription_type == "YEAR":
                         module_price = float(module_price) + float(module_obj.yearly_price)
-                        subscription_end_date = current_date + timedelta(days=365)
+                        
             amount = module_price + bundle_price
 
         elif action_type == "module_bundle_upgrade":

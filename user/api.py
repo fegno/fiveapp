@@ -552,6 +552,7 @@ class CheckLoginMethod(APIView):
                 created_admin_email = user.created_admin.email if user.created_admin else None
                 response_dict["Created_by"] = created_admin_email
         elif invited_user:
+            response_dict["password_set"] = False
             response_dict["user_type"] = "USER"
             created_admin_email = invited_user.user.email if invited_user.user else None
             response_dict["Created_by"] = created_admin_email
