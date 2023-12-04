@@ -144,7 +144,7 @@ class Homepage(APIView):
                 response_dict["status"] = True
                 response_dict["take_subscription"] = True
                 response_dict["assigned_user"] = user_c
-                response_dict["total_users"] = user.total_users
+                response_dict["total_users"] = user.available_free_users + user.available_paid_users
                 return Response(response_dict, status=status.HTTP_200_OK)
             elif expired_subscription:
                 if expired_subscription:
@@ -2543,6 +2543,8 @@ class AdminModules(APIView):
                     "email": logined_user.email,
                 
                 }
+                total_users = logined_user.available_free_users + logined_user.available_paid_users
+                response_dict["available_users"] = total_users
                 response_dict["status"] = True
                 response_dict["modules"] = ModuleDetailsSerializer(all_modules, context={'request':request}, many=True).data
                 response_dict["additional_users"] = self.get_users_with_password()
