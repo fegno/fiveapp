@@ -2921,7 +2921,17 @@ class UserModuleList(APIView):
     def get(self, request, pk):
         response_dict = {"status": False}
         user_obj = UserAssignedModules.objects.filter(user__id=pk, module__isnull=False).last()
-
+        response_dict["admin_have_module"] = False
+        current_date = timezone.now().date()
+        subscribed_module = SubscriptionDetails.objects.filter(subscription_end_date__gte=current_date, user=request.user.created_admin).exists()
+        if subscribed_module:
+            response_dict["admin_have_module"] = True
+        free_subscribed_modules = FreeSubscriptionDetails.objects.filter(
+            user=request.user.created_admin,
+            free_subscription_end_date__gte=current_date
+        ).exists()
+        if subscribed_module:
+            response_dict["admin_have_module"] = True
         if user_obj:
             serializer = UserAssignedModuleSerializers(user_obj)
             response_dict["status"] = True
