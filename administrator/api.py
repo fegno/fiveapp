@@ -93,6 +93,8 @@ class Homepage(APIView):
         response_dict["bundles"] = []
         response_dict["modules"] = []
         current_date = timezone.now().date()
+        response_dict["total_modules"] = ModuleDetails.objects.filter(is_active=True).count()
+        response_dict["total_bundles"] = BundleDetails.objects.filter(is_active=True).count()
         if user.user_type == "ADMIN":
             free_subscribed_modules = FreeSubscriptionDetails.objects.filter(
                 user=request.user,
@@ -3740,6 +3742,7 @@ class ModulePurchasePriceV2(APIView):
                         pending_amount = (bundle_obj.monthly_price / 365) * pending
                         bundle_price = bundle_price + pending_amount
                     for i in modules_ids:
+                        module_obj = ModuleDetails.objects.get(id=i)
                         if i not in bundle_module:
                             pending_amount = (module_obj.monthly_price / 365) * pending
                             module_price = module_price + pending_amount
