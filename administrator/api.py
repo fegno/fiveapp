@@ -2923,26 +2923,9 @@ class UserModuleList(APIView):
     def get(self, request, pk):
         response_dict = {"status": True}
         user_obj = UserAssignedModules.objects.filter(user__id=pk, module__isnull=False).last()
-        response_dict["total_modules"] = 0
+        response_dict["total_modules"] = ModuleDetails.objects.filter(is_active=True).count()
         current_date = timezone.now().date()
-        subscribed_module = SubscriptionDetails.objects.filter(subscription_end_date__gte=current_date, user=request.user).last()
-        c = 0
-        modules_c = []
-        if subscribed_module:
-            c = c + subscribed_module.module.all().count()
-            modules_c = list(subscribed_module.module.all().values_list("id", flat=True))
-        free_subscribed_modules = FreeSubscriptionDetails.objects.filter(
-            user=request.user.created_admin,
-            free_subscription_end_date__gte=current_date
-        )
-        free_subscribed_modules_ids = []
-        for i in free_subscribed_modules:
-            if i.module.all():
-                free_subscribed_modules_ids.extend(
-                    list(i.module.exclude(id__in=modules_c).values_list("id", flat=True))
-                )
-        c = c + len(free_subscribed_modules_ids)
-        response_dict["total_modules"] = c
+        
         if user_obj:
             serializer = UserAssignedModuleSerializers(user_obj)
             response_dict["status"] = True
