@@ -2921,19 +2921,28 @@ class UserModuleList(APIView):
     authentication_classes = (CustomTokenAuthentication,)
 
     def get(self, request, pk):
-        response_dict = {"status": False}
+        response_dict = {"status": True}
         user_obj = UserAssignedModules.objects.filter(user__id=pk, module__isnull=False).last()
-        response_dict["admin_have_module"] = False
+        response_dict["total_modules"] = 0
         current_date = timezone.now().date()
-        subscribed_module = SubscriptionDetails.objects.filter(subscription_end_date__gte=current_date, user=request.user.created_admin).exists()
+        subscribed_module = SubscriptionDetails.objects.filter(subscription_end_date__gte=current_date, user=request.user).last()
+        c = 0
+        modules_c = []
         if subscribed_module:
-            response_dict["admin_have_module"] = True
+            c = c + subscribed_module.module.all().count()
+            modules_c = list(subscribed_module.module.all().values_list("id", flat=True))
         free_subscribed_modules = FreeSubscriptionDetails.objects.filter(
             user=request.user.created_admin,
             free_subscription_end_date__gte=current_date
-        ).exists()
-        if subscribed_module:
-            response_dict["admin_have_module"] = True
+        )
+        free_subscribed_modules_ids = []
+        for i in free_subscribed_modules:
+            if i.module.all():
+                free_subscribed_modules_ids.extend(
+                    list(i.module.exclude(id__in=modules_c).values_list("id", flat=True))
+                )
+        c = c + len(free_subscribed_modules_ids)
+        response_dict["total_modules"] = c
         if user_obj:
             serializer = UserAssignedModuleSerializers(user_obj)
             response_dict["status"] = True
@@ -3739,12 +3748,12 @@ class ModulePurchasePriceV2(APIView):
                         bundle_obj = BundleDetails.objects.get(id=i)
                         bundle_modules = list(bundle_obj.modules.all().values_list("id", flat=True))
                         bundle_module.extend(bundle_modules)
-                        pending_amount = (bundle_obj.monthly_price / 365) * pending
+                        pending_amount = (bundle_obj.yearly_price / 365) * pending
                         bundle_price = bundle_price + pending_amount
                     for i in modules_ids:
                         module_obj = ModuleDetails.objects.get(id=i)
                         if i not in bundle_module:
-                            pending_amount = (module_obj.monthly_price / 365) * pending
+                            pending_amount = (module_obj.yearly_price / 365) * pending
                             module_price = module_price + pending_amount
                 amount = module_price + bundle_price
                 subscription_end_date = new_end_date
@@ -3758,12 +3767,12 @@ class ModulePurchasePriceV2(APIView):
                         bundle_obj = BundleDetails.objects.get(id=i)
                         bundle_modules = list(bundle_obj.modules.all().values_list("id", flat=True))
                         bundle_module.extend(bundle_modules)
-                        pending_amount = (bundle_obj.monthly_price / 365) * pending
+                        pending_amount = (bundle_obj.yearly_price / 365) * pending
                         bundle_price = bundle_price + pending_amount
                     for i in modules_ids:
                         module_obj = ModuleDetails.objects.get(id=i)
                         if i not in bundle_module:
-                            pending_amount = (module_obj.monthly_price / 365) * pending
+                            pending_amount = (module_obj.yearly_price / 365) * pending
                             module_price = module_price + pending_amount
 
                 amount = module_price + bundle_price
