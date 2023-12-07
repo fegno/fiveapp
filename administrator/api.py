@@ -2922,10 +2922,31 @@ class UserModuleList(APIView):
 
     def get(self, request, pk):
         response_dict = {"status": True}
-        user_obj = UserAssignedModules.objects.filter(user__id=pk, module__isnull=False).last()
-        response_dict["total_modules"] = ModuleDetails.objects.filter(is_active=True).count()
         current_date = timezone.now().date()
-        
+        user_obj = UserAssignedModules.objects.filter(user__id=pk, module__isnull=False).last()
+        total_c = 0
+        module_ids = []
+        subscription = SubscriptionDetails.objects.filter(
+            user=request.user, 
+            is_subscribed=True,
+            subscription_end_date__gte=current_date
+        ).order_by("-id").first()
+        if subscription:
+            module_ids = list(subscription.module.all().values_list("id", flat=True))
+            total_c = total_c + len(module_ids)
+
+        free_subscribed_modules = FreeSubscriptionDetails.objects.filter(
+            user=request.user,
+            free_subscription_end_date__gte=current_date,
+        )
+        free_subscribed_modules_ids = []
+        for i in free_subscribed_modules:
+            if i.module.all():
+                free_subscribed_modules_ids.extend(
+                    list(i.module.exclude(id__in=module_ids).values_list("id", flat=True))
+                )
+        total_c = total_c + len(free_subscribed_modules_ids)
+        response_dict["total_modules"] = total_c
         if user_obj:
             serializer = UserAssignedModuleSerializers(user_obj)
             response_dict["status"] = True
@@ -3778,7 +3799,7 @@ class ModulePurchasePriceV2(APIView):
                         bundle_modules = list(bundle_obj.modules.all().values_list("id", flat=True))
                         bundle_module.extend(bundle_modules)
                         if i not in already_added_bundle:
-                            amount = bundle_obj.monthly_price / 30
+                            amount = bundle_obj.monthly_price
                             bundle_price = bundle_price + amount
                         else:
                             pending_amount = (bundle_obj.monthly_price / 30) * pending
@@ -3786,7 +3807,7 @@ class ModulePurchasePriceV2(APIView):
                     for i in modules_ids:
                         module_obj = ModuleDetails.objects.get(id=i)
                         if i not in bundle_module and i not in already_added_module:
-                            amount = module_obj.monthly_price / 30
+                            amount = module_obj.monthly_price
                             module_price = module_price + amount
                         elif i in already_added_module:
                             pending_amount = (module_obj.monthly_price / 30) * pending
@@ -3801,7 +3822,7 @@ class ModulePurchasePriceV2(APIView):
                         bundle_modules = list(bundle_obj.modules.all().values_list("id", flat=True))
                         bundle_module.extend(bundle_modules)
                         if i not in already_added_bundle:
-                            amount = bundle_obj.yearly_price / 365
+                            amount = bundle_obj.yearly_price
                             bundle_price = bundle_price + amount
                         else:
                             pending_amount = (bundle_obj.yearly_price / 365) * pending
@@ -3809,7 +3830,7 @@ class ModulePurchasePriceV2(APIView):
                     for i in modules_ids:
                         module_obj = ModuleDetails.objects.get(id=i)
                         if i not in bundle_module and i not in already_added_module:
-                            amount = module_obj.yearly_price / 365
+                            amount = module_obj.yearly_price
                             module_price = module_price + amount
                         elif i in already_added_module:
                             pending_amount = (module_obj.yearly_price / 365) * pending
@@ -3828,7 +3849,7 @@ class ModulePurchasePriceV2(APIView):
                         bundle_modules = list(bundle_obj.modules.all().values_list("id", flat=True))
                         bundle_module.extend(bundle_modules)
                         if i not in already_added_bundle:
-                            amount = bundle_obj.yearly_price / 365
+                            amount = bundle_obj.yearly_price
                             bundle_price = bundle_price + amount
                         else:
                             pending_amount = (bundle_obj.yearly_price / 365) * pending
@@ -3836,7 +3857,7 @@ class ModulePurchasePriceV2(APIView):
                     for i in modules_ids:
                         module_obj = ModuleDetails.objects.get(id=i)
                         if i not in bundle_module and i not in already_added_module:
-                            amount = module_obj.yearly_price / 365
+                            amount = module_obj.yearly_price
                             module_price = module_price + amount
                         elif i in already_added_module:
                             pending_amount = (module_obj.yearly_price / 365) * pending
