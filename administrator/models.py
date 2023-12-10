@@ -138,6 +138,16 @@ class UploadedCsvFiles(models.Model):
     cost_per_shipment = models.FloatField(null=True, blank=True, default=0)
     delay_duration = models.FloatField(null=True, blank=True,  default=0)
 
+    # module7
+    average_call_per_day = models.FloatField(null=True, blank=True,  default=0)
+    working_days = models.FloatField(null=True, blank=True, default=0)
+    no_of_days_left = models.FloatField(null=True, blank=True, default=0)
+    completed_days = models.FloatField(null=True, blank=True, default=0)
+    required_availability = models.FloatField(null=True, blank=True, default=0)
+    working_hour_per_day = models.FloatField(null=True, blank=True, default=0)
+    sales_target_in_terms = models.FloatField(null=True, blank=True, default=0)
+    average_rate_per_sale = models.FloatField(null=True, blank=True,  default=0)
+
     is_active = models.BooleanField(null=False, blank=True, default=True)
     created = models.DateTimeField(auto_now_add=True)
     updated = models.DateTimeField(auto_now=True)
@@ -189,6 +199,18 @@ class CsvLogDetails(models.Model):
     total_required_capacity = models.FloatField(null=True, blank=True, default=0)
     location = models.CharField(null=True, blank=True, max_length=1000)
     actual_calculated = models.FloatField(null=True, blank=True, default=0)
+
+    center_name = models.CharField(null=True, blank=True, max_length=1000)
+    no_of_days_per_week = models.CharField(null=True, blank=True, max_length=1000)
+    employee_availability = models.FloatField(null=True, blank=True, default=0)
+    calls_per_hour = models.FloatField(null=True, blank=True, default=0)
+    conversion_rate = models.FloatField(null=True, blank=True, default=0)
+    call_drop_rate = models.FloatField(null=True, blank=True, default=0)
+    transaction_rate = models.FloatField(null=True, blank=True, default=0)
+    non_resloution = models.FloatField(null=True, blank=True, default=0)
+    cx_call_no_response = models.FloatField(null=True, blank=True, default=0)
+    impression_drop = models.FloatField(null=True, blank=True, default=0)
+    total_impression_per_hour = models.FloatField(null=True, blank=True, default=0)
 
     is_active = models.BooleanField(null=False, blank=True, default=True)
     created = models.DateTimeField(auto_now_add=True)

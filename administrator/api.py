@@ -832,6 +832,42 @@ class UploadCsv(APIView):
                     )
                 )
 
+        elif module.module_identifier == 7:
+            # call center
+            c = 0
+            for row in reader:
+                employee_availability = 0
+                calls_per_hour = 0
+                conversion_rate = 0
+                call_drop_rate = 0
+                transaction_rate = 0
+                if row.get("Employee Availability"):
+                    employee_availability = str(row.get("Employee Availability").replace("%",""))
+                if row.get("Calls per hour "):
+                    calls_per_hour = row.get("Calls per hour")
+                if row.get("conversion rate"):
+                    conversion_rate = str(row.get("conversion rate").replace("%",""))
+                if row.get("call drop rate"):
+                    call_drop_rate = str(row.get("call drop rate").replace("%",""))
+                if row.get("Transaction drop rates"):
+                    transaction_rate = str(row.get("Transaction drop rates").replace("%",""))
+
+                c = c + 1
+                to_save.append(
+                    CsvLogDetails(
+                        uploaded_file=upload_log,
+                        sl_no=c,
+                        center_name=row.get("Center name"),
+                        employee_name=row.get("Empoyee name"),
+                        no_of_days_per_week=row.get("no of days per week ( 6days)"),
+                        employee_availability=employee_availability,
+                        calls_per_hour=calls_per_hour,
+                        conversion_rate=conversion_rate,
+                        call_drop_rate=call_drop_rate,
+                        transaction_rate=transaction_rate,
+                    )
+                )
+
         if module.module_identifier != 9:
             if (len(to_save)) < 1:
                 upload_log.delete()
@@ -938,9 +974,9 @@ class GenerateReport(APIView):
             Q(uploaded_file__uploaded_by__created_admin=request.user)
         ).order_by("id")
 
-        if csv_file.is_report_generated:
-            response_dict["error"] = "Report Already generated"
-            return Response(response_dict, status=status.HTTP_200_OK)
+        # if csv_file.is_report_generated:
+        #     response_dict["error"] = "Report Already generated"
+        #     return Response(response_dict, status=status.HTTP_200_OK)
         
         if csv_file.modules.module_identifier == 1 or csv_file.modules.module_identifier == 2:
             try:
@@ -1093,6 +1129,35 @@ class GenerateReport(APIView):
             try:
                 csv_file.is_report_generated = True
                 csv_file.save()
+                response_dict["status"] = True
+                response_dict["message"] = "Generated"
+            except Exception as e:
+                response_dict["error"] = str(e)
+
+        elif csv_file.modules.module_identifier == 7:
+            try:
+                total_working_days = request.data.get("total_working_days")
+                average_call_per_day = request.data.get("average_call_per_day")
+                working_days = request.data.get("working_days")
+                no_of_days_left = request.data.get("no_of_days_left")
+                completed_days = request.data.get("completed_days")
+                required_availability = request.data.get("required_availability")
+                working_hour_per_day = request.data.get("working_hour_per_day")
+                sales_target_in_terms = request.data.get("sales_target_in_terms")
+                average_rate_per_sale = request.data.get("average_rate_per_sale")
+
+                csv_file.is_report_generated = True
+                csv_file.total_working_days = total_working_days
+                csv_file.average_call_per_day = average_call_per_day
+                csv_file.working_days = working_days
+                csv_file.no_of_days_left = no_of_days_left
+                csv_file.completed_days = completed_days
+                csv_file.required_availability = required_availability
+                csv_file.working_hour_per_day = working_hour_per_day
+                csv_file.sales_target_in_terms = sales_target_in_terms
+                csv_file.average_rate_per_sale = average_rate_per_sale
+                csv_file.save()
+
                 response_dict["status"] = True
                 response_dict["message"] = "Generated"
             except Exception as e:
