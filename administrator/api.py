@@ -3537,6 +3537,9 @@ class ModulePurchaseHistory(APIView):
                 response_dict["subscription-details"] = PurchaseHistorySerializer(subscription_details, context={'request': request}, many=True).data
                 # response_dict["module"] = module_data
                 return Response(response_dict, status=status.HTTP_200_OK)
+            else:
+                response_dict["subscription-details"] = []
+                return Response(response_dict, status=status.HTTP_200_OK)
         else:
             response_dict = {'status': False}
             response_dict["error"] = "Access denied, Only Admin can access the module list"
