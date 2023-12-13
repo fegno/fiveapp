@@ -1145,6 +1145,8 @@ class GenerateReport(APIView):
                 working_hour_per_day = request.data.get("working_hour_per_day")
                 sales_target_in_terms = request.data.get("sales_target_in_terms")
                 average_rate_per_sale = request.data.get("average_rate_per_sale")
+                process = request.data.get("process")
+                technology = request.data.get("technology")
 
                 csv_file.is_report_generated = True
                 csv_file.total_working_days = total_working_days
@@ -1156,6 +1158,8 @@ class GenerateReport(APIView):
                 csv_file.working_hour_per_day = working_hour_per_day
                 csv_file.sales_target_in_terms = sales_target_in_terms
                 csv_file.average_rate_per_sale = average_rate_per_sale
+                csv_file.process = process
+                csv_file.technology = technology
                 csv_file.save()
 
                 response_dict["status"] = True
@@ -1349,6 +1353,29 @@ class ViewReport(APIView):
                 "per_ton_revenue_loss",
                 "total_required_capacity",
                 "actual_calculated"
+            ).order_by("id"))
+            response_dict["report"] = log
+        elif csv_file.modules.module_identifier == 7:
+            log  = tuple(CsvLogDetails.objects.filter(
+                uploaded_file__id=pk,
+                is_active=True
+            ).filter(
+                Q(uploaded_file__uploaded_by=request.user)|
+                Q(uploaded_file__uploaded_by__created_admin=request.user)
+            ).values(
+                "sl_no", 
+                "employee_name",
+                "center_name",
+                "no_of_days_per_week",
+                "employee_availability",
+                "calls_per_hour",
+                "conversion_rate",
+                "call_drop_rate",
+                "transaction_rate",
+                "non_resloution",
+                "cx_call_no_response",
+                "impression_drop",
+                "total_impression_per_hour"
             ).order_by("id"))
             response_dict["report"] = log
         elif csv_file.modules.module_identifier == 9:
@@ -2474,6 +2501,59 @@ class AnalyticsReport(APIView):
 
             
             response_dict["report"]    = report
+
+        elif csv_file.modules.module_identifier == 7:
+            report1 = {}
+            total_no_of_working_days = csv_file.total_working_days
+            number_of_employees = log  = CsvLogDetails.objects.filter(
+                uploaded_file__id=pk,
+            ).count()
+            avg_availability = CsvLogDetails.objects.filter(
+                uploaded_file__id=pk,
+            ).aggregate(avg=Avg("employee_availability"))
+            avg_conversion = CsvLogDetails.objects.filter(
+                uploaded_file__id=pk,
+            ).aggregate(avg=Avg("conversion_rate"))
+            total_call_per_day = CsvLogDetails.objects.filter(
+                uploaded_file__id=pk,
+            ).aggregate(tot=Sum("calls_per_hour"))
+
+            total_call_per_day = total_call_per_day.get("tot") if total_call_per_day else 0
+            employee_availability = avg_availability.get("avg") if avg_availability else 0
+            avg_conversion =  avg_conversion.get("avg") if avg_conversion else 0
+
+            working_hours_aligned_with_required_availability = number_of_employees * csv_file.working_days * total_no_of_working_days
+            avg_call_per_month = csv_file.average_call_per_day * csv_file.working_days
+            actual_resource_working_hour = number_of_employees * csv_file.working_days * total_no_of_working_days
+            actual_resource_working_hour = (actual_resource_working_hour * employee_availability)/100
+            overtime_hours_required = working_hours_aligned_with_required_availability - actual_resource_working_hour
+            no_of_resource_required = overtime_hours_required/48
+            avg_sale_order_per_day_based_on_availability = total_call_per_day * csv_file.working_days
+            avg_sale_order_per_day_based_on_availability = (avg_sale_order_per_day_based_on_availability * employee_availability)/100
+            avg_sale_order_per_day_based_on_availability_calc = avg_conversion/ csv_file.competeld_days
+            avg_sale_order_per_day_based_on_availability = avg_sale_order_per_day_based_on_availability * avg_sale_order_per_day_based_on_availability_calc
+            
+            actual_daily_call_avg = (csv_file.average_call_per_day * employee_availability)/100
+            actual_daily_call_avg = actual_daily_call_avg * csv_file.process * csv_file.technology
+            order_achieved_till = csv_file.competeld_days * avg_sale_order_per_day_based_on_availability
+            outstanding_order_count = csv_file.sales_target_in_terms - order_achieved_till
+            avg_daily_order_for_target_achievement = outstanding_order_count / csv_file.no_of_days_left
+
+            
+            report1["avg_call_per_day"] = csv_file.average_call_per_day
+            report1["process"] = csv_file.process
+            report1["technology"] = csv_file.technology
+            report1["avg_daily_order_for_target_achievement"] = avg_daily_order_for_target_achievement
+            report1["actual_daily_call_avg"] = actual_daily_call_avg
+            report1["outstanding_order_count"] = outstanding_order_count
+            report1["no_of_resource_required"] = no_of_resource_required
+            report1["overtime_hours_required"] = overtime_hours_required
+            report1["actual_resource_working_hour"] = actual_resource_working_hour
+            report1["avg_call_per_month"] = avg_call_per_month
+            report1["total_no_of_working_days"] = total_no_of_working_days
+            report1["working_hours_aligned_with_required_availability"] = working_hours_aligned_with_required_availability
+
+            response_dict["report1"]    = report1
         response_dict["status"] = True
         return Response(response_dict, status=status.HTTP_200_OK)
 

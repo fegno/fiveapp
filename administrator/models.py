@@ -147,6 +147,9 @@ class UploadedCsvFiles(models.Model):
     working_hour_per_day = models.FloatField(null=True, blank=True, default=0)
     sales_target_in_terms = models.FloatField(null=True, blank=True, default=0)
     average_rate_per_sale = models.FloatField(null=True, blank=True,  default=0)
+    process = models.FloatField(null=True, blank=True, default=0)
+    technology = models.FloatField(null=True, blank=True, default=0)
+    competeld_days = models.FloatField(null=True, blank=True, default=0)
 
     is_active = models.BooleanField(null=False, blank=True, default=True)
     created = models.DateTimeField(auto_now_add=True)
