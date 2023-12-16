@@ -868,6 +868,41 @@ class UploadCsv(APIView):
                     )
                 )
 
+        elif module.module_identifier == 11:
+            # support
+            c = 0
+            for row in reader:
+                print(
+                    row , "pp"
+                )
+                employee_availability = 0
+                calls_per_hour = 0
+                non_resloution = 0
+                cx_call_no_response = 0
+                transaction_rate = 0
+                if row.get("Availability"):
+                    employee_availability = str(row.get("Availability").replace("%",""))
+                if row.get("Calls per hour"):
+                    calls_per_hour = row.get("Calls per hour")
+                if row.get("Non Resloution %"):
+                    non_resloution = str(row.get("Non Resloution %").replace("%",""))
+                if row.get("CX call no response"):
+                    cx_call_no_response = str(row.get("CX call no response").replace("%",""))
+                c = c + 1
+                to_save.append(
+                    CsvLogDetails(
+                        uploaded_file=upload_log,
+                        sl_no=c,
+                        center_name=row.get("Center name"),
+                        employee_name=row.get("Empoyee name"),
+                        no_of_days_per_week=row.get("no of days per week ( 6days)"),
+                        employee_availability=employee_availability,
+                        calls_per_hour=calls_per_hour,
+                        non_resloution=non_resloution,
+                        cx_call_no_response=cx_call_no_response,
+                    )
+                )
+
         if module.module_identifier != 9:
             if (len(to_save)) < 1:
                 upload_log.delete()
@@ -1166,6 +1201,38 @@ class GenerateReport(APIView):
                 response_dict["message"] = "Generated"
             except Exception as e:
                 response_dict["error"] = str(e)
+
+        elif csv_file.modules.module_identifier == 11:
+            try:
+                call_handle_process = request.data.get("call_handle_process")
+                technology = request.data.get("technology")
+                average_call_per_day = request.data.get("average_call_per_day")
+                employee_cost_target = request.data.get("employee_cost_target")
+                working_days_per_week = request.data.get("working_days_per_week")
+                average_cost_employee = request.data.get("average_cost_employee")
+                working_days = request.data.get("working_days")
+                completed_days = request.data.get("completed_days")
+                working_hour_per_day = request.data.get("working_hour_per_day")
+                average_cost_per_Call = request.data.get("average_cost_per_Call")
+                required_availability = request.data.get("required_availability")
+
+                csv_file.is_report_generated = True
+                csv_file.call_handle_process = call_handle_process
+                csv_file.technology = technology
+                csv_file.average_call_per_day = average_call_per_day
+                csv_file.employee_cost_target = employee_cost_target
+                csv_file.average_cost_employee = average_cost_employee
+                csv_file.working_days = working_days
+                csv_file.working_days_per_week = working_days_per_week
+                csv_file.completed_days = completed_days
+                csv_file.working_hour_per_day = working_hour_per_day
+                csv_file.average_cost_per_Call = average_cost_per_Call
+                csv_file.required_availability = required_availability
+                csv_file.save()
+                response_dict["status"] = True
+                response_dict["message"] = "Generated"
+            except Exception as e:
+                response_dict["error"] = str(e)
         else:
             response_dict["error"] = "Module not Valid"
         return Response(response_dict, status=status.HTTP_200_OK)
@@ -1372,10 +1439,24 @@ class ViewReport(APIView):
                 "conversion_rate",
                 "call_drop_rate",
                 "transaction_rate",
-                "non_resloution",
+            ).order_by("id"))
+            response_dict["report"] = log
+        elif csv_file.modules.module_identifier == 11:
+            log  = tuple(CsvLogDetails.objects.filter(
+                uploaded_file__id=pk,
+                is_active=True
+            ).filter(
+                Q(uploaded_file__uploaded_by=request.user)|
+                Q(uploaded_file__uploaded_by__created_admin=request.user)
+            ).values(
+                "sl_no", 
+                "employee_name",
+                "center_name",
+                "no_of_days_per_week",
+                "employee_availability",
+                "calls_per_hour",
                 "cx_call_no_response",
-                "impression_drop",
-                "total_impression_per_hour"
+                "non_resloution"
             ).order_by("id"))
             response_dict["report"] = log
         elif csv_file.modules.module_identifier == 9:
@@ -2593,6 +2674,100 @@ class AnalyticsReport(APIView):
             response_dict["report2"]    = report2
             response_dict["report3"]    = log
 
+        elif csv_file.modules.module_identifier == 11:
+            report1 = {}
+            report2 = {}
+            report3 = {}
+            number_of_employees = CsvLogDetails.objects.filter(
+                uploaded_file__id=pk,
+            ).count()
+            avg_availability = CsvLogDetails.objects.filter(
+                uploaded_file__id=pk,
+            ).aggregate(avg=Avg("employee_availability"))
+            avg_cx = CsvLogDetails.objects.filter(
+                uploaded_file__id=pk,
+            ).aggregate(avg=Avg("cx_call_no_response"))
+            avg_non = CsvLogDetails.objects.filter(
+                uploaded_file__id=pk,
+            ).aggregate(avg=Avg("non_resloution"))
+            total_call_per_day = CsvLogDetails.objects.filter(
+                uploaded_file__id=pk,
+            ).aggregate(tot=Sum("calls_per_hour"))
+            total_call_per_day = total_call_per_day.get("tot") if total_call_per_day else 0
+            working_hours_aligned_with_required_availability = number_of_employees * csv_file.working_hour_per_day * 6
+            avg_cx = avg_cx.get("avg") if avg_cx else 0
+            avg_non = avg_non.get("avg") if avg_non else 0
+
+            employee_availability = avg_availability.get("avg") if avg_availability else 0
+            actual_resource_working_hour = number_of_employees * csv_file.working_hour_per_day * csv_file.working_days_per_week
+            actual_resource_working_hour = (actual_resource_working_hour * employee_availability)/100
+            overtime_hours_required = working_hours_aligned_with_required_availability - actual_resource_working_hour
+            no_of_resource_required = overtime_hours_required/48
+            
+
+            perc = employee_availability/100
+            call_hanlde = csv_file.call_handle_process / 100
+            technology = csv_file.technology / 100
+
+            daily_call_average = total_call_per_day * perc * csv_file.working_hour_per_day
+            process_and_technology_driven = daily_call_average * call_hanlde * technology * perc
+            total_estimated_call = csv_file.average_call_per_day * csv_file.working_days
+            targeted_monthly_cost = csv_file.employee_cost_target * total_estimated_call
+
+            no_of_days_left = csv_file.working_days - csv_file.completed_days
+            call_attenment = 100 - avg_cx 
+            resolution_or_ticket = 100 - avg_non
+            monthly_call_projection = daily_call_average * csv_file.working_days
+            employee_cost_per_month = csv_file.average_cost_employee * number_of_employees * csv_file.working_hour_per_day
+
+            first_cal = employee_cost_per_month / csv_file.working_days if csv_file.working_days != 0  else 0
+            
+            sec_cal = (csv_file.average_cost_per_Call * daily_call_average)*csv_file.completed_days
+            thrd_cal = daily_call_average * csv_file.completed_days
+            cost_per_call_till_date = (first_cal + sec_cal)/thrd_cal  if thrd_cal != 0  else 0
+            
+            cost_target_achieve = (cost_per_call_till_date - csv_file.employee_cost_target)/csv_file.employee_cost_target if csv_file.employee_cost_target != 0 else 0
+            cost_target_achieve = -cost_target_achieve* 100
+
+            report1["working_hours_aligned_with_required_availability"] = working_hours_aligned_with_required_availability
+            report1["actual_resource_working_hour"] = actual_resource_working_hour
+            report1["overtime_hours_required"] = overtime_hours_required
+            report1["no_of_resource_required"] = no_of_resource_required
+            report1["process_and_technology_driven"] = process_and_technology_driven
+            report1["total_estimated_call"] = total_estimated_call
+            report1["targeted_monthly_cost"] = targeted_monthly_cost
+            report1["call_handle_process"] = csv_file.call_handle_process
+            report1["technology"] = csv_file.technology
+            report1["average_call_per_day"] = csv_file.average_call_per_day
+
+            report2["working_days_per_week"] = csv_file.working_days_per_week
+            report2["cost_target"] = csv_file.employee_cost_target
+            report2["average_cost_employee"] = csv_file.average_cost_employee
+            report2["working_days"] = csv_file.working_days
+            report2["working_hour_per_day"] = csv_file.working_hour_per_day
+            report2["completed_days"] = csv_file.completed_days
+            report2["average_cost_per_Call"] = csv_file.average_cost_per_Call
+            report2["no_of_days_left"] = no_of_days_left
+            report2["number_of_employee"] = number_of_employees
+            report2["required_availability"] = csv_file.required_availability
+            report2["call_attenment"] = call_attenment
+            report2["resolution_or_ticket"] = resolution_or_ticket
+            report2["daily_call_average"] = daily_call_average
+            report2["monthly_call_projection"] = monthly_call_projection
+            report2["employee_cost_per_month"] = employee_cost_per_month
+            report2["cost_target_achieve"] = cost_target_achieve
+            report2["cost_per_call_till_date"] = cost_per_call_till_date
+
+            log = CsvLogDetails.objects.filter(
+                uploaded_file__id=pk,
+            ).values("center_name").annotate(
+                varriation_in_resolution=Sum("non_resloution"),
+                varriation_in_cx=Sum("cx_call_no_response"),
+            ).values("center_name", "varriation_in_resolution", "varriation_in_cx")
+
+            response_dict["report1"]    = report1
+            response_dict["report2"]    = report2
+            response_dict["report3"]    = log
         response_dict["status"] = True
         return Response(response_dict, status=status.HTTP_200_OK)
 

@@ -150,6 +150,12 @@ class UploadedCsvFiles(models.Model):
     process = models.FloatField(null=True, blank=True, default=0)
     technology = models.FloatField(null=True, blank=True, default=0)
 
+    # module 11
+    call_handle_process = models.FloatField(null=True, blank=True,  default=0)
+    average_cost_employee = models.FloatField(null=True, blank=True,  default=0)
+    working_days_per_week = models.FloatField(null=True, blank=True, default=0)
+    average_cost_per_Call = models.FloatField(null=True, blank=True,  default=0)
+
     is_active = models.BooleanField(null=False, blank=True, default=True)
     created = models.DateTimeField(auto_now_add=True)
     updated = models.DateTimeField(auto_now=True)
