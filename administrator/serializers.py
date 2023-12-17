@@ -43,6 +43,11 @@ class ModuleDetailsSerializer(serializers.ModelSerializer):
         feature_benifit = tuple(FeatureDetails.objects.filter(
             is_active=True, modules=obj
         ).values("id","benifit","feature"))
+        cd["sub_modules"] = []
+        sub_modules = ModuleDetails.objects.filter(modules=obj)
+        if sub_modules:
+            cd["sub_modules"] = ModuleDetailsSerializer(sub_modules, many=True).data
+
         cd["feature_benifit"] = feature_benifit
         cd["free_subscribed"] = False
         cd["free_subscription_status"] = False

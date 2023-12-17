@@ -93,7 +93,7 @@ class Homepage(APIView):
         response_dict["bundles"] = []
         response_dict["modules"] = []
         current_date = timezone.now().date()
-        response_dict["total_modules"] = ModuleDetails.objects.filter(is_active=True).count()
+        response_dict["total_modules"] = ModuleDetails.objects.filter(is_active=True, is_submodule=False).count()
         response_dict["total_bundles"] = BundleDetails.objects.filter(is_active=True).count()
         if user.user_type == "ADMIN":
             free_subscribed_modules = FreeSubscriptionDetails.objects.filter(
@@ -470,10 +470,15 @@ class ListModules(APIView):
                 Q(id__in=subscription.module.all().values_list("id", flat=True))|
                 Q(id__in=free_subscribed_modules_ids)
             ).order_by("module_identifier")
-            unsubscribed_modules = all_modules.exclude(
+            parent_mod = ModuleDetails.objects.filter(is_submodule=True).filter(
+                Q(id__in=subscription.module.all().values_list("id", flat=True))|
+                Q(id__in=free_subscribed_modules_ids)
+            ).values_list("modules__id", flat=True)
+
+            unsubscribed_modules = all_modules.filter(is_submodule=False).exclude(
                 Q(id__in=modules) |
                 Q(id__in=free_subscribed_modules_ids)
-            ).order_by("module_identifier")
+            ).exclude(id__in=parent_mod).order_by("module_identifier")
             response_dict["unsubscribed_modules"] = ModuleDetailsSerializer(unsubscribed_modules,context={"request": request}, many=True,).data
             response_dict["subscribed_modules"] = ModuleDetailsSerializer(
                 modules,context={"request": request, "from_module":True, "admin":request.user}, many=True,).data
@@ -481,14 +486,20 @@ class ListModules(APIView):
             modules = ModuleDetails.objects.filter(is_active=True).filter(
                 Q(id__in=free_subscribed_modules_ids)
             ).order_by("module_identifier")
-            unsubscribed_modules = all_modules.exclude(
+
+            parent_mod = ModuleDetails.objects.filter(is_submodule=True).filter(
+                Q(id__in=free_subscribed_modules_ids)
+            ).values_list("modules__id", flat=True)
+
+            unsubscribed_modules = all_modules.filter(is_submodule=False).exclude(
                 id__in=free_subscribed_modules_ids
-            ).order_by("module_identifier")
+            ).exclude(id__in=parent_mod).order_by("module_identifier")
             response_dict["subscribed_modules"] = ModuleDetailsSerializer(
                 modules,context={"request": request, "from_module":True, "admin":request.user}, many=True,).data
             response_dict["unsubscribed_modules"] = ModuleDetailsSerializer(unsubscribed_modules,context={"request": request}, many=True,).data
         
         if not subscription and not free_subscribed_modules:
+            all_modules = all_modules.filter(is_submodule=False)
             response_dict["unsubscribed_modules"] = ModuleDetailsSerializer(all_modules,context={"request": request}, many=True,).data
             
         
@@ -2881,17 +2892,21 @@ class AnalyticsReport(APIView):
             impression_costing = impression_target_based_on_daily_avg * csv_file.average_rate_per_impression
             target_achieve = impression_target_based_on_daily_avg / csv_file.online_impression_target if csv_file.online_impression_target != 0 else 0
 
+            working_hours_aligned_with_required_availability = number_of_employees * csv_file.working_hour_per_day * csv_file.working_days_per_week
+            actual_resource_working_hour = number_of_employees * csv_file.working_hour_per_day * csv_file.working_days_per_week * employee_availability
+            overtime_hour_required = working_hours_aligned_with_required_availability - actual_resource_working_hour
 
+            no_of_resource_required = overtime_hour_required / (csv_file.working_days_per_week * csv_file.working_hour_per_day)
 
             report1["accumulated_cost_of_impression"] = accumulated_cost_of_impression_drop
             report1["impression_target_acheved"] = impression_target_acheved
             report1["remaining_impression_target"] = remaining_impression_target
             report1["remaining_impression_expenditure"] = remaining_impression_expenditure
 
-            report2["working_hours_aligned_with_required_availability"] = 0
-            report2["actual_resource_working_hour"] = 0
-            report2["overtime_hour_required"] = 0
-            report2["no_of_resource_required"] = 0
+            report2["working_hours_aligned_with_required_availability"] = working_hours_aligned_with_required_availability
+            report2["actual_resource_working_hour"] = actual_resource_working_hour
+            report2["overtime_hour_required"] = overtime_hour_required
+            report2["no_of_resource_required"] = no_of_resource_required
             report2["working_days_in_week"] = csv_file.working_days_per_week
 
             report3["completed_days"] = csv_file.completed_days
@@ -2907,10 +2922,10 @@ class AnalyticsReport(APIView):
             report3["impression_cost_till_date"] = impression_cost_till_date
             report3["impression_costing"] = impression_costing
             report3["target_achieve"] = target_achieve
-            report3["actual_working_hour"] = 0
-            report3["actual_resource_working_hour"] = 0
-            report3["overtime_hour_required"] = 0
-            report3["no_of_resource_required"] = 0
+            report3["actual_working_hour"] = working_hours_aligned_with_required_availability
+            report3["actual_resource_working_hour"] = actual_resource_working_hour
+            report3["overtime_hour_required"] = overtime_hour_required
+            report3["no_of_resource_required"] = no_of_resource_required
             report3["weekly_overtime"] = 0
 
             log = CsvLogDetails.objects.filter(
