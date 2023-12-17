@@ -156,6 +156,9 @@ class UploadedCsvFiles(models.Model):
     working_days_per_week = models.FloatField(null=True, blank=True, default=0)
     average_cost_per_Call = models.FloatField(null=True, blank=True,  default=0)
 
+    online_impression_target = models.FloatField(null=True, blank=True,  default=0)
+    average_rate_per_impression = models.FloatField(null=True, blank=True,  default=0)
+
     is_active = models.BooleanField(null=False, blank=True, default=True)
     created = models.DateTimeField(auto_now_add=True)
     updated = models.DateTimeField(auto_now=True)

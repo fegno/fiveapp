@@ -903,6 +903,38 @@ class UploadCsv(APIView):
                     )
                 )
 
+        elif module.module_identifier == 12:
+            # support
+            c = 0
+            for row in reader:
+                employee_availability = 0
+                calls_per_hour = 0
+                non_resloution = 0
+                cx_call_no_response = 0
+                transaction_rate = 0
+                if row.get("Availability"):
+                    employee_availability = str(row.get("Availability").replace("%",""))
+                if row.get("Calls per hour"):
+                    calls_per_hour = row.get("Calls per hour")
+                if row.get("conversion rate"):
+                    conversion_rate = str(row.get("conversion rate").replace("%",""))
+                if row.get("Impressions drop"):
+                    impression_drop = str(row.get("Impressions drop").replace("%",""))
+                c = c + 1
+                to_save.append(
+                    CsvLogDetails(
+                        uploaded_file=upload_log,
+                        sl_no=c,
+                        center_name=row.get("Center name"),
+                        employee_name=row.get("Empoyee name"),
+                        no_of_days_per_week=row.get("no of days per week ( 6days)",0),
+                        employee_availability=employee_availability,
+                        total_impression_per_hour=row.get("Total impressions per hour", 0),
+                        conversion_rate=conversion_rate,
+                        impression_drop=impression_drop
+                    )
+                )
+
         if module.module_identifier != 9:
             if (len(to_save)) < 1:
                 upload_log.delete()
@@ -1233,6 +1265,31 @@ class GenerateReport(APIView):
                 response_dict["message"] = "Generated"
             except Exception as e:
                 response_dict["error"] = str(e)
+
+        elif csv_file.modules.module_identifier == 12:
+            try:
+                working_days_per_week = request.data.get("working_days_per_week")
+                working_days = request.data.get("working_days")
+                completed_days = request.data.get("completed_days")
+                working_hour_per_day = request.data.get("working_hour_per_day")
+                online_impression_target = request.data.get("online_impression_target")
+                average_rate_per_impression = request.data.get("average_rate_per_impression")
+                required_availability = request.data.get("required_availability")
+
+                csv_file.is_report_generated = True
+                csv_file.working_days_per_week = working_days_per_week
+                csv_file.working_days = working_days
+                csv_file.completed_days = completed_days
+                csv_file.working_hour_per_day = working_hour_per_day
+                csv_file.online_impression_target = online_impression_target
+                csv_file.average_rate_per_impression = average_rate_per_impression
+                csv_file.required_availability = required_availability
+                csv_file.save()
+                response_dict["status"] = True
+                response_dict["message"] = "Generated"
+            except Exception as e:
+                response_dict["error"] = str(e)
+        
         else:
             response_dict["error"] = "Module not Valid"
         return Response(response_dict, status=status.HTTP_200_OK)
@@ -1457,6 +1514,24 @@ class ViewReport(APIView):
                 "calls_per_hour",
                 "cx_call_no_response",
                 "non_resloution"
+            ).order_by("id"))
+            response_dict["report"] = log
+        elif csv_file.modules.module_identifier == 12:
+            log  = tuple(CsvLogDetails.objects.filter(
+                uploaded_file__id=pk,
+                is_active=True
+            ).filter(
+                Q(uploaded_file__uploaded_by=request.user)|
+                Q(uploaded_file__uploaded_by__created_admin=request.user)
+            ).values(
+                "sl_no", 
+                "employee_name",
+                "center_name",
+                "no_of_days_per_week",
+                "employee_availability",
+                "impression_drop",
+                "total_impression_per_hour",
+                "conversion_rate"
             ).order_by("id"))
             response_dict["report"] = log
         elif csv_file.modules.module_identifier == 9:
@@ -2768,6 +2843,89 @@ class AnalyticsReport(APIView):
             response_dict["report1"]    = report1
             response_dict["report2"]    = report2
             response_dict["report3"]    = log
+
+        elif csv_file.modules.module_identifier == 12:
+            report1 = {}
+            report2 = {}
+            report3 = {}
+            report4 = {}
+            total_impression = CsvLogDetails.objects.filter(
+                uploaded_file__id=pk,
+            ).aggregate(tot=Sum("total_impression_per_hour"))
+            total_impression = total_impression.get("tot") if total_impression else 0
+            avg_availability = CsvLogDetails.objects.filter(
+                uploaded_file__id=pk,
+            ).aggregate(avg=Avg("employee_availability"))
+            employee_availability = avg_availability.get("avg") if avg_availability else 0
+            avg_conversion = CsvLogDetails.objects.filter(
+                uploaded_file__id=pk,
+            ).aggregate(avg=Avg("conversion_rate"))
+            number_of_employees = CsvLogDetails.objects.filter(
+                uploaded_file__id=pk,
+            ).count()
+
+            avg_conversion = avg_conversion.get("avg") if avg_conversion else 0
+            avg_conversion = avg_conversion / 100
+            employee_availability = employee_availability / 100
+            average_daily_impression = (total_impression * employee_availability * avg_conversion) / csv_file.completed_days if csv_file.completed_days !=0  else 0
+
+            impression_target_based_on_daily_avg = average_daily_impression * csv_file.working_days
+            accumulated_cost_of_impression_drop = csv_file.completed_days * impression_target_based_on_daily_avg
+
+            no_of_days_left = csv_file.working_days - csv_file.completed_days
+            impression_target_acheved = csv_file.online_impression_target - accumulated_cost_of_impression_drop
+            remaining_impression_target = impression_target_acheved / no_of_days_left if no_of_days_left != 0 else 0 
+            remaining_impression_expenditure = remaining_impression_target * csv_file.average_rate_per_impression
+            
+            impression_cost_till_date = csv_file.average_rate_per_impression * average_daily_impression * csv_file.completed_days
+            impression_costing = impression_target_based_on_daily_avg * csv_file.average_rate_per_impression
+            target_achieve = impression_target_based_on_daily_avg / csv_file.online_impression_target if csv_file.online_impression_target != 0 else 0
+
+
+
+            report1["accumulated_cost_of_impression"] = accumulated_cost_of_impression_drop
+            report1["impression_target_acheved"] = impression_target_acheved
+            report1["remaining_impression_target"] = remaining_impression_target
+            report1["remaining_impression_expenditure"] = remaining_impression_expenditure
+
+            report2["working_hours_aligned_with_required_availability"] = 0
+            report2["actual_resource_working_hour"] = 0
+            report2["overtime_hour_required"] = 0
+            report2["no_of_resource_required"] = 0
+            report2["working_days_in_week"] = csv_file.working_days_per_week
+
+            report3["completed_days"] = csv_file.completed_days
+            report3["working_days"] = csv_file.working_days
+            report3["no_of_days_left"] = no_of_days_left
+            report3["number_of_employees"] = number_of_employees
+            report3["required_availability"] = csv_file.required_availability
+            report3["working_hour_per_day"] = csv_file.working_hour_per_day
+            report3["online_impression_target"] = csv_file.online_impression_target
+            report3["average_daily_impression"] = average_daily_impression
+            report3["average_impression_target"] = impression_target_based_on_daily_avg
+            report3["average_rate_per_impression"] = csv_file.average_rate_per_impression
+            report3["impression_cost_till_date"] = impression_cost_till_date
+            report3["impression_costing"] = impression_costing
+            report3["target_achieve"] = target_achieve
+            report3["actual_working_hour"] = 0
+            report3["actual_resource_working_hour"] = 0
+            report3["overtime_hour_required"] = 0
+            report3["no_of_resource_required"] = 0
+            report3["weekly_overtime"] = 0
+
+            log = CsvLogDetails.objects.filter(
+                uploaded_file__id=pk,
+            ).values("center_name").annotate(
+                total_conversion_rate=Avg("conversion_rate"),
+                total_impression_drop=Avg("impression_drop"),
+            ).values("center_name", "total_conversion_rate", "total_impression_drop")
+
+
+            response_dict["report1"]    = report1
+            response_dict["report2"]    = report2
+            response_dict["report3"]    = report3
+            response_dict["report4"]    = log
+
         response_dict["status"] = True
         return Response(response_dict, status=status.HTTP_200_OK)
 
