@@ -294,8 +294,11 @@ class ListSubscriptionPlans(APIView):
             subscription_end_date__gte=current_date
         ).last()
         if subscription:
+            parent_mod = ModuleDetails.objects.filter(is_submodule=True).filter(
+                id__in=subscription.module.all().values_list("id", flat=True)
+            ).values_list("modules__id", flat=True)
             bundles = bundles.exclude(id__in=subscription.bundle.all().values_list("id", flat=True))
-            modules = modules.exclude(
+            modules = modules.filter(is_submodule=False).exclude(id__in=parent_mod).exclude(
                 id__in=subscription.module.all().values_list("id", flat=True)
             )
 
