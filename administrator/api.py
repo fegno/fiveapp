@@ -2986,7 +2986,6 @@ class AnalyticsReport(APIView):
             response_dict["report1"]    = report1
             response_dict["report2"]    = report2
             response_dict["report3"]    = log
-
         elif csv_file.modules.module_identifier == 12:
             report1 = {}
             report2 = {}
