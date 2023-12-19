@@ -2626,7 +2626,7 @@ class AnalyticsReport(APIView):
         
         elif csv_file.modules.module_identifier == 8:
             select_department = request.GET.get("select_department")
-            select_level = request.GET.get("select_level")
+            select_level = request.GET.get("select_level", 100)
             perc = 0.1
             if select_level == 100:
                 perc = 0.1
@@ -2637,6 +2637,7 @@ class AnalyticsReport(APIView):
             elif select_level == 30:
                 perc = 0.3
 
+            select_level = int(select_level)
             log  = CsvLogDetails.objects.filter(
                 uploaded_file__id=pk
             )
@@ -2646,20 +2647,30 @@ class AnalyticsReport(APIView):
             if select_level:
                 log = log.filter(level_of_automation_possible=select_level)
 
+            status_list = [
+                When(payback_period__lt=3, then=Value("Green functional area budget")),
+                When(payback_period__gte=3, payback_period__lte=5, then=Value("Green Department Budget")),
+                When(payback_period__gte=5, payback_period__lte=10, then=Value("Green Operational Budget")),
+            ]
+
             log  = log.filter(
                 uploaded_file__id=pk
             ).values("department").annotate(
                 total_employees=Sum("no_of_resource_required"),
-                total_manpower=Count("no_of_man_hours_required"),
                 average_pay=Value(csv_file.average_pay_per_employee),
                 total_software_cost=Sum("software_cost"),
             ).annotate(
+                total_manpower=F("total_employees") * 160 * 12,
                 total_cost_employee=F("total_employees")*F("average_pay")
             ).annotate(
-                resource_savings=F("total_cost_employee")/perc
+                resource_savings=F("total_cost_employee")/select_level
             ).annotate(
                 employee_saved=F("resource_savings")/F("average_pay"),
-                payback_period=F("total_software_cost")/F("resource_savings")
+                payback_period=F("total_software_cost")/F("resource_savings"),
+            ).annotate(
+                status=Case(
+                    *status_list, default=Value(""), output_field=CharField()
+                ),
             ).values(
                 "department", 
                 "total_employees",
@@ -2669,10 +2680,27 @@ class AnalyticsReport(APIView):
                 "resource_savings",
                 "total_cost_employee",
                 "employee_saved",
-                "payback_period"
+                "payback_period",
+                "status"
             )
+            if not log:
+                log = {
+                    "department":select_department,
+                    "total_employees":0,
+                    "total_manpower":0,
+                    "average_pay":0,
+                    "total_software_cost":0,
+                    "resource_savings":0,
+                    "total_cost_employee":0,
+                    "employee_saved":0,
+                    "payback_period":0,
+                    "status":""
+                }
+            else:
+                log = log[0]
             
-
+            
+            response_dict["report"] = log
         elif csv_file.modules.module_identifier == 9:
             report = []
 
@@ -2824,6 +2852,9 @@ class AnalyticsReport(APIView):
                 total_transaction_rate=Avg("transaction_rate")
             ).values("center_name", "total_conversion_rate", "total_call_drop_rate", "total_transaction_rate")
             
+            variation_in_call_drop_rate = 7
+            variation_in_transaction_drop_rate = 7
+
             report1["avg_call_per_day"] = csv_file.average_call_per_day
             report1["process"] = csv_file.process
             report1["technology"] = csv_file.technology
@@ -2857,6 +2888,9 @@ class AnalyticsReport(APIView):
             response_dict["report1"]    = report1
             response_dict["report2"]    = report2
             response_dict["report3"]    = log
+
+            response_dict["variation_in_call_drop_rate"] = variation_in_call_drop_rate
+            response_dict["variation_in_transaction_drop_rate"] = variation_in_transaction_drop_rate
 
         elif csv_file.modules.module_identifier == 11:
             report1 = {}
@@ -3051,8 +3085,20 @@ class GetDepartment(APIView):
         csv_file = UploadedCsvFiles.objects.filter(
             id=pk
         ).first()
+
+        if csv_file.modules.module_identifier == 8:
+            department_dict = []
+            department = list(set(CsvLogDetails.objects.filter(uploaded_file__id=pk).values_list("department", flat=True)))
+            for dep in department:
+                department_dict.append(
+                    {
+                        "name":dep,
+                    }
+                )
+
+            response_dict["department"] = department_dict
         
-        if csv_file.modules.module_identifier == 5:
+        elif csv_file.modules.module_identifier == 5:
             total_countries = []
             countries = list(set(CsvLogDetails.objects.filter(uploaded_file__id=pk).values_list("region", flat=True)))
             for i in countries:
