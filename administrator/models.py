@@ -159,6 +159,8 @@ class UploadedCsvFiles(models.Model):
     online_impression_target = models.FloatField(null=True, blank=True,  default=0)
     average_rate_per_impression = models.FloatField(null=True, blank=True,  default=0)
 
+    average_pay_per_employee = models.FloatField(null=True, blank=True,  default=0)
+
     is_active = models.BooleanField(null=False, blank=True, default=True)
     created = models.DateTimeField(auto_now_add=True)
     updated = models.DateTimeField(auto_now=True)
@@ -222,6 +224,12 @@ class CsvLogDetails(models.Model):
     cx_call_no_response = models.FloatField(null=True, blank=True, default=0)
     impression_drop = models.FloatField(null=True, blank=True, default=0)
     total_impression_per_hour = models.FloatField(null=True, blank=True, default=0)
+
+    no_of_man_hours_required = models.FloatField(null=True, blank=True, default=0)
+    no_of_resource_required = models.FloatField(null=True, blank=True, default=0)
+    software = models.CharField(null=True, blank=True, max_length=1000)
+    software_cost = models.FloatField(null=True, blank=True, default=0)
+    level_of_automation_possible = models.FloatField(null=True, blank=True, default=0)
 
     is_active = models.BooleanField(null=False, blank=True, default=True)
     created = models.DateTimeField(auto_now_add=True)

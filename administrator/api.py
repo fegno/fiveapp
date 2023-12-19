@@ -287,7 +287,7 @@ class ListSubscriptionPlans(APIView):
     def get(self, request):
         response_dict = {"status": False}
         current_date = timezone.now().date()
-        modules = ModuleDetails.objects.filter(is_active=True)
+        modules = ModuleDetails.objects.filter(is_active=True, is_submodule=False)
         bundles = BundleDetails.objects.filter(is_active=True)
         subscription = SubscriptionDetails.objects.filter(
             user=request.user, is_subscribed=True,
@@ -886,9 +886,6 @@ class UploadCsv(APIView):
             # support
             c = 0
             for row in reader:
-                print(
-                    row , "pp"
-                )
                 employee_availability = 0
                 calls_per_hour = 0
                 non_resloution = 0
@@ -946,6 +943,26 @@ class UploadCsv(APIView):
                         total_impression_per_hour=row.get("Total impressions per hour", 0),
                         conversion_rate=conversion_rate,
                         impression_drop=impression_drop
+                    )
+                )
+
+        elif module.module_identifier == 8:
+            c = 0
+            for row in reader:
+                level_of_automation_possible = 0
+                if row.get("level of automation possible in %"):
+                    level_of_automation_possible = str(row.get("level of automation possible in %").replace("%",""))
+                c = c + 1
+                to_save.append(
+                    CsvLogDetails(
+                        uploaded_file=upload_log,
+                        sl_no=c,
+                        department=row.get("departments"),
+                        no_of_man_hours_required=row.get("no. of Man hours required"),
+                        no_of_resource_required=row.get("no. of resources required"),
+                        software=row.get("software"),
+                        software_cost=row.get("software cost"),
+                        level_of_automation_possible=level_of_automation_possible
                     )
                 )
 
@@ -1304,6 +1321,17 @@ class GenerateReport(APIView):
             except Exception as e:
                 response_dict["error"] = str(e)
         
+        elif csv_file.modules.module_identifier == 8:
+            try:
+                average_pay_per_employee = request.data.get("average_pay_per_employee")
+
+                csv_file.is_report_generated = True
+                csv_file.average_pay_per_employee = average_pay_per_employee
+                csv_file.save()
+                response_dict["status"] = True
+                response_dict["message"] = "Generated"
+            except Exception as e:
+                response_dict["error"] = str(e)
         else:
             response_dict["error"] = "Module not Valid"
         return Response(response_dict, status=status.HTTP_200_OK)
@@ -1510,6 +1538,23 @@ class ViewReport(APIView):
                 "conversion_rate",
                 "call_drop_rate",
                 "transaction_rate",
+            ).order_by("id"))
+            response_dict["report"] = log
+        elif csv_file.modules.module_identifier == 8:
+            log  = tuple(CsvLogDetails.objects.filter(
+                uploaded_file__id=pk,
+                is_active=True
+            ).filter(
+                Q(uploaded_file__uploaded_by=request.user)|
+                Q(uploaded_file__uploaded_by__created_admin=request.user)
+            ).values(
+                "sl_no", 
+                "department",
+                "no_of_man_hours_required",
+                "no_of_resource_required",
+                "software",
+                "software_cost",
+                "level_of_automation_possible",
             ).order_by("id"))
             response_dict["report"] = log
         elif csv_file.modules.module_identifier == 11:
@@ -2577,6 +2622,56 @@ class AnalyticsReport(APIView):
             response_dict["revenue_drop"]    = revenue_drop_dict
             response_dict["vehicle_utilisation"]    = vehicle_dict
             response_dict["monthly_vehicle_report"]    = monthly_vehicle_report
+
+        
+        elif csv_file.modules.module_identifier == 8:
+            select_department = request.GET.get("select_department")
+            select_level = request.GET.get("select_level")
+            perc = 0.1
+            if select_level == 100:
+                perc = 0.1
+            elif select_level == 75:
+                perc = 0.9
+            elif select_level == 50:
+                perc = 0.6
+            elif select_level == 30:
+                perc = 0.3
+
+            log  = CsvLogDetails.objects.filter(
+                uploaded_file__id=pk
+            )
+            if select_department:
+                log = log.filter(department=select_department)
+
+            if select_level:
+                log = log.filter(level_of_automation_possible=select_level)
+
+            log  = log.filter(
+                uploaded_file__id=pk
+            ).values("department").annotate(
+                total_employees=Sum("no_of_resource_required"),
+                total_manpower=Count("no_of_man_hours_required"),
+                average_pay=Value(csv_file.average_pay_per_employee),
+                total_software_cost=Sum("software_cost"),
+            ).annotate(
+                total_cost_employee=F("total_employees")*F("average_pay")
+            ).annotate(
+                resource_savings=F("total_cost_employee")/perc
+            ).annotate(
+                employee_saved=F("resource_savings")/F("average_pay"),
+                payback_period=F("total_software_cost")/F("resource_savings")
+            ).values(
+                "department", 
+                "total_employees",
+                "total_manpower",
+                "average_pay",
+                "total_software_cost",
+                "resource_savings",
+                "total_cost_employee",
+                "employee_saved",
+                "payback_period"
+            )
+            
 
         elif csv_file.modules.module_identifier == 9:
             report = []
