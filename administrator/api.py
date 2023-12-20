@@ -31,7 +31,9 @@ from django.db.models import (
     DecimalField,
     ExpressionWrapper,
     Subquery,
-    OuterRef
+    OuterRef,
+    Min,
+    Max
 )
 from fiveapp.utils import PageSerializer, localtime
 
@@ -1324,9 +1326,17 @@ class GenerateReport(APIView):
         elif csv_file.modules.module_identifier == 8:
             try:
                 average_pay_per_employee = request.data.get("average_pay_per_employee")
+                automation_100 = request.data.get("automation_100")
+                automation_75 = request.data.get("automation_75")
+                automation_50 = request.data.get("automation_50")
+                automation_30 = request.data.get("automation_30")
 
                 csv_file.is_report_generated = True
                 csv_file.average_pay_per_employee = average_pay_per_employee
+                csv_file.automation_100 = automation_100
+                csv_file.automation_75 = automation_75
+                csv_file.automation_50 = automation_50
+                csv_file.automation_30 = automation_30
                 csv_file.save()
                 response_dict["status"] = True
                 response_dict["message"] = "Generated"
@@ -2627,25 +2637,23 @@ class AnalyticsReport(APIView):
         elif csv_file.modules.module_identifier == 8:
             select_department = request.GET.get("select_department")
             select_level = request.GET.get("select_level", 100)
-            perc = 0.1
-            if select_level == 100:
-                perc = 0.1
-            elif select_level == 75:
-                perc = 0.9
-            elif select_level == 50:
-                perc = 0.6
-            elif select_level == 30:
-                perc = 0.3
+            
+            perc = 1
+            if select_level == 100 or select_level == "100":
+                perc = csv_file.automation_100/100
+            if select_level == 75 or select_level == "75":
+                perc = csv_file.automation_75/100
+            if select_level == 50 or select_level == "50":
+                perc = csv_file.automation_50/100
+            if select_level == 30 or select_level == "30":
+                perc = csv_file.automation_30/100
 
-            select_level = int(select_level)
+
             log  = CsvLogDetails.objects.filter(
                 uploaded_file__id=pk
             )
             if select_department:
                 log = log.filter(department=select_department)
-
-            if select_level:
-                log = log.filter(level_of_automation_possible=select_level)
 
             status_list = [
                 When(payback_period__lt=3, then=Value("Green functional area budget")),
@@ -2663,7 +2671,7 @@ class AnalyticsReport(APIView):
                 total_manpower=F("total_employees") * 160 * 12,
                 total_cost_employee=F("total_employees")*F("average_pay")
             ).annotate(
-                resource_savings=F("total_cost_employee")/select_level
+                resource_savings=F("total_cost_employee")*perc
             ).annotate(
                 employee_saved=F("resource_savings")/F("average_pay"),
                 payback_period=F("total_software_cost")/F("resource_savings"),
@@ -2837,7 +2845,7 @@ class AnalyticsReport(APIView):
             order_achieved_till = csv_file.completed_days * avg_sale_order_per_day_based_on_availability
     
             outstanding_order_count = csv_file.sales_target_in_terms - order_achieved_till
-            avg_daily_order_for_target_achievement = outstanding_order_count / csv_file.no_of_days_left
+            avg_daily_order_for_target_achievement = outstanding_order_count / csv_file.no_of_days_left if csv_file.no_of_days_left != 0 else 0
             sale_estimate = avg_sale_order_per_day_based_on_availability * csv_file.working_days
             revenue = sale_estimate / csv_file.sales_target_in_terms if csv_file.sales_target_in_terms != 0 else 0
             revenue = revenue * 100
@@ -2849,8 +2857,10 @@ class AnalyticsReport(APIView):
             ).values("center_name").annotate(
                 total_conversion_rate=Avg("conversion_rate"),
                 total_call_drop_rate=Avg("call_drop_rate"),
-                total_transaction_rate=Avg("transaction_rate")
-            ).values("center_name", "total_conversion_rate", "total_call_drop_rate", "total_transaction_rate")
+                total_transaction_rate=Avg("transaction_rate"),
+                varriation_in_call_drop_rate=Max("call_drop_rate") - Min("call_drop_rate"),
+                variation_in_transaction_drop_rate=Max("transaction_rate") - Min("transaction_rate")
+            ).values("center_name", "total_conversion_rate", "total_call_drop_rate", "total_transaction_rate", "varriation_in_call_drop_rate", "variation_in_transaction_drop_rate")
             
             variation_in_call_drop_rate = 7
             variation_in_transaction_drop_rate = 7
@@ -2889,8 +2899,8 @@ class AnalyticsReport(APIView):
             response_dict["report2"]    = report2
             response_dict["report3"]    = log
 
-            response_dict["variation_in_call_drop_rate"] = variation_in_call_drop_rate
-            response_dict["variation_in_transaction_drop_rate"] = variation_in_transaction_drop_rate
+            response_dict["variation_in_call_drop_rate"] = 0
+            response_dict["variation_in_transaction_drop_rate"] = 0
 
         elif csv_file.modules.module_identifier == 11:
             report1 = {}
@@ -2979,10 +2989,9 @@ class AnalyticsReport(APIView):
             log = CsvLogDetails.objects.filter(
                 uploaded_file__id=pk,
             ).values("center_name").annotate(
-                varriation_in_resolution=Sum("non_resloution"),
-                varriation_in_cx=Sum("cx_call_no_response"),
+                varriation_in_resolution=Max("non_resloution") - Min("non_resloution"),
+                varriation_in_cx=Max("cx_call_no_response") - Min("cx_call_no_response")
             ).values("center_name", "varriation_in_resolution", "varriation_in_cx")
-
             response_dict["report1"]    = report1
             response_dict["report2"]    = report2
             response_dict["report3"]    = log
@@ -3029,6 +3038,8 @@ class AnalyticsReport(APIView):
 
             no_of_resource_required = overtime_hour_required / (csv_file.working_days_per_week * csv_file.working_hour_per_day)
 
+            weekly_overtime = csv_file.working_hour_per_day * csv_file.working_days_per_week * employee_availability
+             
             report1["accumulated_cost_of_impression"] = accumulated_cost_of_impression_drop
             report1["impression_target_acheved"] = impression_target_acheved
             report1["remaining_impression_target"] = remaining_impression_target
@@ -3057,7 +3068,7 @@ class AnalyticsReport(APIView):
             report3["actual_resource_working_hour"] = actual_resource_working_hour
             report3["overtime_hour_required"] = overtime_hour_required
             report3["no_of_resource_required"] = no_of_resource_required
-            report3["weekly_overtime"] = 0
+            report3["weekly_overtime"] = weekly_overtime
 
             log = CsvLogDetails.objects.filter(
                 uploaded_file__id=pk,

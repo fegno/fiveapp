@@ -160,6 +160,10 @@ class UploadedCsvFiles(models.Model):
     average_rate_per_impression = models.FloatField(null=True, blank=True,  default=0)
 
     average_pay_per_employee = models.FloatField(null=True, blank=True,  default=0)
+    automation_100 = models.FloatField(null=True, blank=True,  default=0)
+    automation_75 = models.FloatField(null=True, blank=True,  default=0)
+    automation_50 = models.FloatField(null=True, blank=True,  default=0)
+    automation_30 = models.FloatField(null=True, blank=True,  default=0)
 
     is_active = models.BooleanField(null=False, blank=True, default=True)
     created = models.DateTimeField(auto_now_add=True)
