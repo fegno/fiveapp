@@ -2658,7 +2658,7 @@ class AnalyticsReport(APIView):
             status_list = [
                 When(payback_period__lt=3, then=Value("Green functional area budget")),
                 When(payback_period__gte=3, payback_period__lte=5, then=Value("Green Department Budget")),
-                When(payback_period__gte=5, payback_period__lte=10, then=Value("Green Operational Budget")),
+                When(payback_period__gt=5 then=Value("Green Operational Budget")),
             ]
 
             log  = log.filter(
