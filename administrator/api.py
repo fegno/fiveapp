@@ -2985,6 +2985,7 @@ class AnalyticsReport(APIView):
             report2["employee_cost_per_month"] = employee_cost_per_month
             report2["cost_target_achieve"] = cost_target_achieve
             report2["cost_per_call_till_date"] = cost_per_call_till_date
+            report2["employee_availability"] = employee_availability
 
             log = CsvLogDetails.objects.filter(
                 uploaded_file__id=pk,

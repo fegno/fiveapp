@@ -46,7 +46,7 @@ class ModuleDetailsSerializer(serializers.ModelSerializer):
         cd["sub_modules"] = []
         sub_modules = ModuleDetails.objects.filter(modules=obj)
         if sub_modules:
-            cd["sub_modules"] = ModuleDetailsSerializer(sub_modules, many=True).data
+            cd["sub_modules"] = ModuleDetailsSerializer(sub_modules, context={'request':self.context.get("request")}, many=True).data
 
         cd["feature_benifit"] = feature_benifit
         cd["free_subscribed"] = False
