@@ -3070,6 +3070,7 @@ class AnalyticsReport(APIView):
             report3["overtime_hour_required"] = overtime_hour_required
             report3["no_of_resource_required"] = no_of_resource_required
             report3["weekly_overtime"] = weekly_overtime
+            report3["employee_availability"] = avg_availability.get("avg") if avg_availability else 0
 
             log = CsvLogDetails.objects.filter(
                 uploaded_file__id=pk,
