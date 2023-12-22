@@ -43,25 +43,31 @@ class ModuleDetailsSerializer(serializers.ModelSerializer):
         feature_benifit = tuple(FeatureDetails.objects.filter(
             is_active=True, modules=obj
         ).values("id","benifit","feature"))
+        cd["sub_modules"] = []
+        sub_modules = ModuleDetails.objects.filter(modules=obj)
+        if sub_modules:
+            cd["sub_modules"] = ModuleDetailsSerializer(sub_modules, context={'request':self.context.get("request")}, many=True).data
+
         cd["feature_benifit"] = feature_benifit
         cd["free_subscribed"] = False
         cd["free_subscription_status"] = False
+        cd["free_subscription_end_date"] = None
         if self.context.get("request"):
             if FreeSubscriptionDetails.objects.filter(
                 module=obj,
-                user=self.context.get("request").user
-            ).exists():
-                cd["free_subscribed"] = True
-
-                free_subscription = FreeSubscriptionDetails.objects.filter(
-                module=obj,
                 user=self.context.get("request").user,
                 is_active=True,
-            ).order_by('-free_subscription_end_date').first()
+            ).exists():
+                cd["free_subscribed"] = True
+                free_subscription = FreeSubscriptionDetails.objects.filter(
+                    module=obj,
+                    user=self.context.get("request").user,
+                    is_active=True,
+                ).order_by('-free_subscription_end_date').first()
                 if free_subscription.free_subscription_end_date >= date.today():
                     cd["free_subscription_status"] = True
                     subscription_end_date = free_subscription.free_subscription_end_date
-                cd["free_subscription_end_date"] = subscription_end_date
+                    cd["free_subscription_end_date"] = subscription_end_date
 
             if not cd["free_subscribed"]:
                 if SubscriptionDetails.objects.filter(user=self.context.get("request").user, module=obj).exists():
@@ -263,7 +269,7 @@ class UserPurchaseHistorySerializer(serializers.ModelSerializer):
     user = UserSerializer()
     class Meta:
         model = PurchaseDetails
-        fields = ('user', 'total_price', 'subscription_start_date', 'subscription_end_date', 'subscription_type', 'status', 'user_count', 'is_renewed')
+        fields = ('id','user', 'total_price', 'subscription_start_date', 'subscription_end_date', 'subscription_type', 'status', 'user_count', 'is_renewed')
 
     def to_representation(self, instance):
         representation = super().to_representation(instance)
@@ -288,7 +294,7 @@ class UserPurchaseHistorySerializers(serializers.ModelSerializer):
             'subscription_end_date', 'is_subscribed', 
             'subscription_type', 'received_amounts', 
             'payment_dates', 'parchase_user_type',
-            'user_count', 'status', 'is_renewed'
+            'user_count', 'status', 'is_renewed', 'id'
             )
     def to_representation(self, obj, *args, **kwargs):
         cd = super(UserPurchaseHistorySerializers, self).to_representation(
@@ -304,7 +310,7 @@ class UserPaymentAttemptsSerializer(serializers.ModelSerializer):
     parchase = UserPurchaseHistorySerializers()
     class Meta:
         model = PaymentAttempt
-        fields = ('parchase', 'payment_intent_id', 'amount', 'total_charge', 'client_secret', 'last_attempt_date')
+        fields = ('id','parchase', 'payment_intent_id', 'amount', 'total_charge', 'client_secret', 'last_attempt_date')
 
 
 class InvitedUserSerializer(serializers.ModelSerializer):

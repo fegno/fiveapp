@@ -31,7 +31,9 @@ from django.db.models import (
     DecimalField,
     ExpressionWrapper,
     Subquery,
-    OuterRef
+    OuterRef,
+    Min,
+    Max
 )
 from fiveapp.utils import PageSerializer, localtime
 
@@ -93,6 +95,8 @@ class Homepage(APIView):
         response_dict["bundles"] = []
         response_dict["modules"] = []
         current_date = timezone.now().date()
+        response_dict["total_modules"] = ModuleDetails.objects.filter(is_active=True, is_submodule=False).count()
+        response_dict["total_bundles"] = BundleDetails.objects.filter(is_active=True).count()
         if user.user_type == "ADMIN":
             free_subscribed_modules = FreeSubscriptionDetails.objects.filter(
                 user=request.user,
@@ -144,7 +148,7 @@ class Homepage(APIView):
                 response_dict["status"] = True
                 response_dict["take_subscription"] = True
                 response_dict["assigned_user"] = user_c
-                response_dict["total_users"] = user.total_users
+                response_dict["total_users"] = user.available_free_users + user.available_paid_users
                 return Response(response_dict, status=status.HTTP_200_OK)
             elif expired_subscription:
                 if expired_subscription:
@@ -285,15 +289,18 @@ class ListSubscriptionPlans(APIView):
     def get(self, request):
         response_dict = {"status": False}
         current_date = timezone.now().date()
-        modules = ModuleDetails.objects.filter(is_active=True)
+        modules = ModuleDetails.objects.filter(is_active=True, is_submodule=False)
         bundles = BundleDetails.objects.filter(is_active=True)
         subscription = SubscriptionDetails.objects.filter(
             user=request.user, is_subscribed=True,
             subscription_end_date__gte=current_date
         ).last()
         if subscription:
+            parent_mod = ModuleDetails.objects.filter(is_submodule=True).filter(
+                id__in=subscription.module.all().values_list("id", flat=True)
+            ).values_list("modules__id", flat=True)
             bundles = bundles.exclude(id__in=subscription.bundle.all().values_list("id", flat=True))
-            modules = modules.exclude(
+            modules = modules.filter(is_submodule=False).exclude(id__in=parent_mod).exclude(
                 id__in=subscription.module.all().values_list("id", flat=True)
             )
 
@@ -468,10 +475,15 @@ class ListModules(APIView):
                 Q(id__in=subscription.module.all().values_list("id", flat=True))|
                 Q(id__in=free_subscribed_modules_ids)
             ).order_by("module_identifier")
-            unsubscribed_modules = all_modules.exclude(
+            parent_mod = ModuleDetails.objects.filter(is_submodule=True).filter(
+                Q(id__in=subscription.module.all().values_list("id", flat=True))|
+                Q(id__in=free_subscribed_modules_ids)
+            ).values_list("modules__id", flat=True)
+
+            unsubscribed_modules = all_modules.filter(is_submodule=False).exclude(
                 Q(id__in=modules) |
                 Q(id__in=free_subscribed_modules_ids)
-            ).order_by("module_identifier")
+            ).exclude(id__in=parent_mod).order_by("module_identifier")
             response_dict["unsubscribed_modules"] = ModuleDetailsSerializer(unsubscribed_modules,context={"request": request}, many=True,).data
             response_dict["subscribed_modules"] = ModuleDetailsSerializer(
                 modules,context={"request": request, "from_module":True, "admin":request.user}, many=True,).data
@@ -479,14 +491,20 @@ class ListModules(APIView):
             modules = ModuleDetails.objects.filter(is_active=True).filter(
                 Q(id__in=free_subscribed_modules_ids)
             ).order_by("module_identifier")
-            unsubscribed_modules = all_modules.exclude(
+
+            parent_mod = ModuleDetails.objects.filter(is_submodule=True).filter(
+                Q(id__in=free_subscribed_modules_ids)
+            ).values_list("modules__id", flat=True)
+
+            unsubscribed_modules = all_modules.filter(is_submodule=False).exclude(
                 id__in=free_subscribed_modules_ids
-            ).order_by("module_identifier")
+            ).exclude(id__in=parent_mod).order_by("module_identifier")
             response_dict["subscribed_modules"] = ModuleDetailsSerializer(
                 modules,context={"request": request, "from_module":True, "admin":request.user}, many=True,).data
             response_dict["unsubscribed_modules"] = ModuleDetailsSerializer(unsubscribed_modules,context={"request": request}, many=True,).data
         
         if not subscription and not free_subscribed_modules:
+            all_modules = all_modules.filter(is_submodule=False)
             response_dict["unsubscribed_modules"] = ModuleDetailsSerializer(all_modules,context={"request": request}, many=True,).data
             
         
@@ -830,6 +848,126 @@ class UploadCsv(APIView):
                     )
                 )
 
+        elif module.module_identifier == 7:
+            # call center
+            c = 0
+            for row in reader:
+                employee_availability = 0
+                calls_per_hour = 0
+                conversion_rate = 0
+                call_drop_rate = 0
+                transaction_rate = 0
+                if row.get("Employee Availability"):
+                    employee_availability = str(row.get("Employee Availability").replace("%",""))
+                if row.get("Calls per hour"):
+                    calls_per_hour = row.get("Calls per hour")
+                if row.get("conversion rate"):
+                    conversion_rate = str(row.get("conversion rate").replace("%",""))
+                if row.get("call drop rate"):
+                    call_drop_rate = str(row.get("call drop rate").replace("%",""))
+                if row.get("Transaction drop rates"):
+                    transaction_rate = str(row.get("Transaction drop rates").replace("%",""))
+
+                c = c + 1
+                to_save.append(
+                    CsvLogDetails(
+                        uploaded_file=upload_log,
+                        sl_no=c,
+                        center_name=row.get("Center name"),
+                        employee_name=row.get("Empoyee name"),
+                        no_of_days_per_week=row.get("no of days per week ( 6days)"),
+                        employee_availability=employee_availability,
+                        calls_per_hour=calls_per_hour,
+                        conversion_rate=conversion_rate,
+                        call_drop_rate=call_drop_rate,
+                        transaction_rate=transaction_rate,
+                    )
+                )
+
+        elif module.module_identifier == 11:
+            # support
+            c = 0
+            for row in reader:
+                employee_availability = 0
+                calls_per_hour = 0
+                non_resloution = 0
+                cx_call_no_response = 0
+                transaction_rate = 0
+                if row.get("Availability"):
+                    employee_availability = str(row.get("Availability").replace("%",""))
+                if row.get("Calls per hour"):
+                    calls_per_hour = row.get("Calls per hour")
+                if row.get("Non Resloution %"):
+                    non_resloution = str(row.get("Non Resloution %").replace("%",""))
+                if row.get("CX call no response"):
+                    cx_call_no_response = str(row.get("CX call no response").replace("%",""))
+                c = c + 1
+                to_save.append(
+                    CsvLogDetails(
+                        uploaded_file=upload_log,
+                        sl_no=c,
+                        center_name=row.get("Center name"),
+                        employee_name=row.get("Empoyee name"),
+                        no_of_days_per_week=row.get("no of days per week ( 6days)"),
+                        employee_availability=employee_availability,
+                        calls_per_hour=calls_per_hour,
+                        non_resloution=non_resloution,
+                        cx_call_no_response=cx_call_no_response,
+                    )
+                )
+
+        elif module.module_identifier == 12:
+            # support
+            c = 0
+            for row in reader:
+                employee_availability = 0
+                calls_per_hour = 0
+                non_resloution = 0
+                cx_call_no_response = 0
+                transaction_rate = 0
+                if row.get("Availability"):
+                    employee_availability = str(row.get("Availability").replace("%",""))
+                if row.get("Calls per hour"):
+                    calls_per_hour = row.get("Calls per hour")
+                if row.get("conversion rate"):
+                    conversion_rate = str(row.get("conversion rate").replace("%",""))
+                if row.get("Impressions drop"):
+                    impression_drop = str(row.get("Impressions drop").replace("%",""))
+                c = c + 1
+                to_save.append(
+                    CsvLogDetails(
+                        uploaded_file=upload_log,
+                        sl_no=c,
+                        center_name=row.get("Center name"),
+                        employee_name=row.get("Empoyee name"),
+                        no_of_days_per_week=row.get("no of days per week ( 6days)",0),
+                        employee_availability=employee_availability,
+                        total_impression_per_hour=row.get("Total impressions per hour", 0),
+                        conversion_rate=conversion_rate,
+                        impression_drop=impression_drop
+                    )
+                )
+
+        elif module.module_identifier == 8:
+            c = 0
+            for row in reader:
+                level_of_automation_possible = 0
+                if row.get("level of automation possible in %"):
+                    level_of_automation_possible = str(row.get("level of automation possible in %").replace("%",""))
+                c = c + 1
+                to_save.append(
+                    CsvLogDetails(
+                        uploaded_file=upload_log,
+                        sl_no=c,
+                        department=row.get("departments"),
+                        no_of_man_hours_required=row.get("no. of Man hours required"),
+                        no_of_resource_required=row.get("no. of resources required"),
+                        software=row.get("software"),
+                        software_cost=row.get("software cost"),
+                        level_of_automation_possible=level_of_automation_possible
+                    )
+                )
+
         if module.module_identifier != 9:
             if (len(to_save)) < 1:
                 upload_log.delete()
@@ -936,9 +1074,9 @@ class GenerateReport(APIView):
             Q(uploaded_file__uploaded_by__created_admin=request.user)
         ).order_by("id")
 
-        if csv_file.is_report_generated:
-            response_dict["error"] = "Report Already generated"
-            return Response(response_dict, status=status.HTTP_200_OK)
+        # if csv_file.is_report_generated:
+        #     response_dict["error"] = "Report Already generated"
+        #     return Response(response_dict, status=status.HTTP_200_OK)
         
         if csv_file.modules.module_identifier == 1 or csv_file.modules.module_identifier == 2:
             try:
@@ -1090,6 +1228,115 @@ class GenerateReport(APIView):
         elif csv_file.modules.module_identifier == 9:
             try:
                 csv_file.is_report_generated = True
+                csv_file.save()
+                response_dict["status"] = True
+                response_dict["message"] = "Generated"
+            except Exception as e:
+                response_dict["error"] = str(e)
+
+        elif csv_file.modules.module_identifier == 7:
+            try:
+                total_working_days = request.data.get("total_working_days")
+                average_call_per_day = request.data.get("average_call_per_day")
+                working_days = request.data.get("working_days")
+                no_of_days_left = request.data.get("no_of_days_left")
+                completed_days = request.data.get("completed_days")
+                required_availability = request.data.get("required_availability")
+                working_hour_per_day = request.data.get("working_hour_per_day")
+                sales_target_in_terms = request.data.get("sales_target_in_terms")
+                average_rate_per_sale = request.data.get("average_rate_per_sale")
+                process = request.data.get("process")
+                technology = request.data.get("technology")
+
+                csv_file.is_report_generated = True
+                csv_file.total_working_days = total_working_days
+                csv_file.average_call_per_day = average_call_per_day
+                csv_file.working_days = working_days
+                csv_file.no_of_days_left = no_of_days_left
+                csv_file.completed_days = completed_days
+                csv_file.required_availability = required_availability
+                csv_file.working_hour_per_day = working_hour_per_day
+                csv_file.sales_target_in_terms = sales_target_in_terms
+                csv_file.average_rate_per_sale = average_rate_per_sale
+                csv_file.process = process
+                csv_file.technology = technology
+                csv_file.save()
+
+                response_dict["status"] = True
+                response_dict["message"] = "Generated"
+            except Exception as e:
+                response_dict["error"] = str(e)
+
+        elif csv_file.modules.module_identifier == 11:
+            try:
+                call_handle_process = request.data.get("call_handle_process")
+                technology = request.data.get("technology")
+                average_call_per_day = request.data.get("average_call_per_day")
+                employee_cost_target = request.data.get("employee_cost_target")
+                working_days_per_week = request.data.get("working_days_per_week")
+                average_cost_employee = request.data.get("average_cost_employee")
+                working_days = request.data.get("working_days")
+                completed_days = request.data.get("completed_days")
+                working_hour_per_day = request.data.get("working_hour_per_day")
+                average_cost_per_Call = request.data.get("average_cost_per_Call")
+                required_availability = request.data.get("required_availability")
+
+                csv_file.is_report_generated = True
+                csv_file.call_handle_process = call_handle_process
+                csv_file.technology = technology
+                csv_file.average_call_per_day = average_call_per_day
+                csv_file.employee_cost_target = employee_cost_target
+                csv_file.average_cost_employee = average_cost_employee
+                csv_file.working_days = working_days
+                csv_file.working_days_per_week = working_days_per_week
+                csv_file.completed_days = completed_days
+                csv_file.working_hour_per_day = working_hour_per_day
+                csv_file.average_cost_per_Call = average_cost_per_Call
+                csv_file.required_availability = required_availability
+                csv_file.save()
+                response_dict["status"] = True
+                response_dict["message"] = "Generated"
+            except Exception as e:
+                response_dict["error"] = str(e)
+
+        elif csv_file.modules.module_identifier == 12:
+            try:
+                working_days_per_week = request.data.get("working_days_per_week")
+                working_days = request.data.get("working_days")
+                completed_days = request.data.get("completed_days")
+                working_hour_per_day = request.data.get("working_hour_per_day")
+                online_impression_target = request.data.get("online_impression_target")
+                average_rate_per_impression = request.data.get("average_rate_per_impression")
+                required_availability = request.data.get("required_availability")
+
+                csv_file.is_report_generated = True
+                csv_file.working_days_per_week = working_days_per_week
+                csv_file.working_days = working_days
+                csv_file.completed_days = completed_days
+                csv_file.working_hour_per_day = working_hour_per_day
+                csv_file.online_impression_target = online_impression_target
+                csv_file.average_rate_per_impression = average_rate_per_impression
+                csv_file.required_availability = required_availability
+                csv_file.save()
+                response_dict["status"] = True
+                response_dict["message"] = "Generated"
+            except Exception as e:
+                response_dict["error"] = str(e)
+        
+        elif csv_file.modules.module_identifier == 8:
+            try:
+                average_pay_per_employee = request.data.get("average_pay_per_employee")
+                automation_100 = request.data.get("automation_100")
+                automation_75 = request.data.get("automation_75")
+                automation_50 = request.data.get("automation_50")
+                automation_30 = request.data.get("automation_30")
+
+                csv_file.is_report_generated = True
+                csv_file.average_pay_per_employee = average_pay_per_employee
+                csv_file.automation_100 = automation_100
+                csv_file.automation_75 = automation_75
+                csv_file.automation_50 = automation_50
+                csv_file.automation_30 = automation_30
                 csv_file.save()
                 response_dict["status"] = True
                 response_dict["message"] = "Generated"
@@ -1282,6 +1529,78 @@ class ViewReport(APIView):
                 "per_ton_revenue_loss",
                 "total_required_capacity",
                 "actual_calculated"
+            ).order_by("id"))
+            response_dict["report"] = log
+        elif csv_file.modules.module_identifier == 7:
+            log  = tuple(CsvLogDetails.objects.filter(
+                uploaded_file__id=pk,
+                is_active=True
+            ).filter(
+                Q(uploaded_file__uploaded_by=request.user)|
+                Q(uploaded_file__uploaded_by__created_admin=request.user)
+            ).values(
+                "sl_no", 
+                "employee_name",
+                "center_name",
+                "no_of_days_per_week",
+                "employee_availability",
+                "calls_per_hour",
+                "conversion_rate",
+                "call_drop_rate",
+                "transaction_rate",
+            ).order_by("id"))
+            response_dict["report"] = log
+        elif csv_file.modules.module_identifier == 8:
+            log  = tuple(CsvLogDetails.objects.filter(
+                uploaded_file__id=pk,
+                is_active=True
+            ).filter(
+                Q(uploaded_file__uploaded_by=request.user)|
+                Q(uploaded_file__uploaded_by__created_admin=request.user)
+            ).values(
+                "sl_no", 
+                "department",
+                "no_of_man_hours_required",
+                "no_of_resource_required",
+                "software",
+                "software_cost",
+                "level_of_automation_possible",
+            ).order_by("id"))
+            response_dict["report"] = log
+        elif csv_file.modules.module_identifier == 11:
+            log  = tuple(CsvLogDetails.objects.filter(
+                uploaded_file__id=pk,
+                is_active=True
+            ).filter(
+                Q(uploaded_file__uploaded_by=request.user)|
+                Q(uploaded_file__uploaded_by__created_admin=request.user)
+            ).values(
+                "sl_no", 
+                "employee_name",
+                "center_name",
+                "no_of_days_per_week",
+                "employee_availability",
+                "calls_per_hour",
+                "cx_call_no_response",
+                "non_resloution"
+            ).order_by("id"))
+            response_dict["report"] = log
+        elif csv_file.modules.module_identifier == 12:
+            log  = tuple(CsvLogDetails.objects.filter(
+                uploaded_file__id=pk,
+                is_active=True
+            ).filter(
+                Q(uploaded_file__uploaded_by=request.user)|
+                Q(uploaded_file__uploaded_by__created_admin=request.user)
+            ).values(
+                "sl_no", 
+                "employee_name",
+                "center_name",
+                "no_of_days_per_week",
+                "employee_availability",
+                "impression_drop",
+                "total_impression_per_hour",
+                "conversion_rate"
             ).order_by("id"))
             response_dict["report"] = log
         elif csv_file.modules.module_identifier == 9:
@@ -2314,6 +2633,82 @@ class AnalyticsReport(APIView):
             response_dict["vehicle_utilisation"]    = vehicle_dict
             response_dict["monthly_vehicle_report"]    = monthly_vehicle_report
 
+        
+        elif csv_file.modules.module_identifier == 8:
+            select_department = request.GET.get("select_department")
+            select_level = request.GET.get("select_level", 100)
+            
+            perc = 1
+            if select_level == 100 or select_level == "100":
+                perc = csv_file.automation_100/100
+            if select_level == 75 or select_level == "75":
+                perc = csv_file.automation_75/100
+            if select_level == 50 or select_level == "50":
+                perc = csv_file.automation_50/100
+            if select_level == 30 or select_level == "30":
+                perc = csv_file.automation_30/100
+
+
+            log  = CsvLogDetails.objects.filter(
+                uploaded_file__id=pk
+            )
+            if select_department:
+                log = log.filter(department=select_department)
+
+            status_list = [
+                When(payback_period__lt=3, then=Value("Green functional area budget")),
+                When(payback_period__gte=3, payback_period__lte=5, then=Value("Green Department Budget")),
+                When(payback_period__gt=5 ,then=Value("Green Operational Budget")),
+            ]
+
+            log  = log.filter(
+                uploaded_file__id=pk
+            ).values("department").annotate(
+                total_employees=Sum("no_of_resource_required"),
+                average_pay=Value(csv_file.average_pay_per_employee),
+                total_software_cost=Sum("software_cost"),
+            ).annotate(
+                total_manpower=F("total_employees") * 160 * 12,
+                total_cost_employee=F("total_employees")*F("average_pay")
+            ).annotate(
+                resource_savings=F("total_cost_employee")*perc
+            ).annotate(
+                employee_saved=F("resource_savings")/F("average_pay"),
+                payback_period=F("total_software_cost")/F("resource_savings"),
+            ).annotate(
+                status=Case(
+                    *status_list, default=Value(""), output_field=CharField()
+                ),
+            ).values(
+                "department", 
+                "total_employees",
+                "total_manpower",
+                "average_pay",
+                "total_software_cost",
+                "resource_savings",
+                "total_cost_employee",
+                "employee_saved",
+                "payback_period",
+                "status"
+            )
+            if not log:
+                log = {
+                    "department":select_department,
+                    "total_employees":0,
+                    "total_manpower":0,
+                    "average_pay":0,
+                    "total_software_cost":0,
+                    "resource_savings":0,
+                    "total_cost_employee":0,
+                    "employee_saved":0,
+                    "payback_period":0,
+                    "status":""
+                }
+            else:
+                log = log[0]
+            
+            
+            response_dict["report"] = log
         elif csv_file.modules.module_identifier == 9:
             report = []
 
@@ -2407,6 +2802,289 @@ class AnalyticsReport(APIView):
 
             
             response_dict["report"]    = report
+
+        elif csv_file.modules.module_identifier == 7:
+            report1 = {}
+            report2 = {}
+            report3 = {}
+
+            total_no_of_working_days = csv_file.total_working_days
+            number_of_employees = log  = CsvLogDetails.objects.filter(
+                uploaded_file__id=pk,
+            ).count()
+            avg_availability = CsvLogDetails.objects.filter(
+                uploaded_file__id=pk,
+            ).aggregate(avg=Avg("employee_availability"))
+            avg_conversion = CsvLogDetails.objects.filter(
+                uploaded_file__id=pk,
+            ).aggregate(avg=Avg("conversion_rate"))
+            total_call_per_day = CsvLogDetails.objects.filter(
+                uploaded_file__id=pk,
+            ).aggregate(tot=Sum("calls_per_hour"))
+
+            total_call_per_day = total_call_per_day.get("tot") if total_call_per_day else 0
+            employee_availability = avg_availability.get("avg") if avg_availability else 0
+            avg_conversion =  avg_conversion.get("avg") if avg_conversion else 0
+
+            working_hours_aligned_with_required_availability = number_of_employees * csv_file.working_hour_per_day * total_no_of_working_days
+            avg_call_per_month = csv_file.average_call_per_day * csv_file.working_days
+            actual_resource_working_hour = number_of_employees * csv_file.working_hour_per_day * total_no_of_working_days
+            actual_resource_working_hour = (actual_resource_working_hour * employee_availability)/100
+            overtime_hours_required = working_hours_aligned_with_required_availability - actual_resource_working_hour
+            no_of_resource_required = overtime_hours_required/48
+
+        
+            avg_sale_order_per_day_based_on_availability = total_call_per_day * csv_file.working_hour_per_day
+            avg_sale_order_per_day_based_on_availability = (avg_sale_order_per_day_based_on_availability * employee_availability)/100
+            avg_conversion = (avg_sale_order_per_day_based_on_availability * avg_conversion )/100
+            avg_sale_order_per_day_based_on_availability = avg_conversion/ csv_file.completed_days if csv_file.completed_days != 0 else 0
+ 
+            actual_daily_call_avg = (csv_file.average_call_per_day * employee_availability)/100
+            actual_daily_call_avg = (actual_daily_call_avg * csv_file.process)/100
+            actual_daily_call_avg = (actual_daily_call_avg * csv_file.technology)/100 
+            order_achieved_till = csv_file.completed_days * avg_sale_order_per_day_based_on_availability
+    
+            outstanding_order_count = csv_file.sales_target_in_terms - order_achieved_till
+            avg_daily_order_for_target_achievement = outstanding_order_count / csv_file.no_of_days_left if csv_file.no_of_days_left != 0 else 0
+            sale_estimate = avg_sale_order_per_day_based_on_availability * csv_file.working_days
+            revenue = sale_estimate / csv_file.sales_target_in_terms if csv_file.sales_target_in_terms != 0 else 0
+            revenue = revenue * 100
+
+            revenue_till_date = csv_file.average_rate_per_sale * avg_sale_order_per_day_based_on_availability * csv_file.completed_days
+            revenue_estimate = csv_file.average_rate_per_sale * sale_estimate
+            log = CsvLogDetails.objects.filter(
+                uploaded_file__id=pk,
+            ).values("center_name").annotate(
+                total_conversion_rate=Avg("conversion_rate"),
+                total_call_drop_rate=Avg("call_drop_rate"),
+                total_transaction_rate=Avg("transaction_rate"),
+                varriation_in_call_drop_rate=Max("call_drop_rate") - Min("call_drop_rate"),
+                variation_in_transaction_drop_rate=Max("transaction_rate") - Min("transaction_rate")
+            ).values("center_name", "total_conversion_rate", "total_call_drop_rate", "total_transaction_rate", "varriation_in_call_drop_rate", "variation_in_transaction_drop_rate")
+            
+            variation_in_call_drop_rate = 7
+            variation_in_transaction_drop_rate = 7
+
+            report1["avg_call_per_day"] = csv_file.average_call_per_day
+            report1["process"] = csv_file.process
+            report1["technology"] = csv_file.technology
+            report1["avg_daily_order_for_target_achievement"] = avg_daily_order_for_target_achievement
+            report1["actual_daily_call_avg"] = actual_daily_call_avg
+            report1["outstanding_order_count"] = outstanding_order_count
+            report1["no_of_resource_required"] = no_of_resource_required
+            report1["overtime_hours_required"] = overtime_hours_required
+            report1["actual_resource_working_hour"] = actual_resource_working_hour
+            report1["avg_call_per_month"] = avg_call_per_month
+            report1["total_no_of_working_days"] = total_no_of_working_days
+            report1["working_hours_aligned_with_required_availability"] = working_hours_aligned_with_required_availability
+            
+
+            report2["working_days"] = csv_file.working_days
+            report2["no_of_days_left"] = csv_file.no_of_days_left
+            report2["working_hour_per_day"] = csv_file.working_hour_per_day
+            report2["sales_target_in_terms"] = csv_file.sales_target_in_terms
+            report2["average_rate_per_sale"] = csv_file.average_rate_per_sale
+            report2["number_of_employee"] = number_of_employees
+            report2["required_availability"] = csv_file.required_availability
+            report2["avg_sale_order_per_day_based_on_availability"] = avg_sale_order_per_day_based_on_availability
+            report2["employee_availability"] = employee_availability
+            report2["completed_days"] = csv_file.completed_days
+            report2["order_achieved_till_date"] = order_achieved_till
+            report2["sale_estimate"] = sale_estimate
+            report2["target_achieve"] = revenue
+            report2["revenue_till_date"] = revenue_till_date
+            report2["revenue_estimate"] = revenue_estimate
+
+            response_dict["report1"]    = report1
+            response_dict["report2"]    = report2
+            response_dict["report3"]    = log
+
+            response_dict["variation_in_call_drop_rate"] = 0
+            response_dict["variation_in_transaction_drop_rate"] = 0
+
+        elif csv_file.modules.module_identifier == 11:
+            report1 = {}
+            report2 = {}
+            report3 = {}
+            number_of_employees = CsvLogDetails.objects.filter(
+                uploaded_file__id=pk,
+            ).count()
+            avg_availability = CsvLogDetails.objects.filter(
+                uploaded_file__id=pk,
+            ).aggregate(avg=Avg("employee_availability"))
+            avg_cx = CsvLogDetails.objects.filter(
+                uploaded_file__id=pk,
+            ).aggregate(avg=Avg("cx_call_no_response"))
+            avg_non = CsvLogDetails.objects.filter(
+                uploaded_file__id=pk,
+            ).aggregate(avg=Avg("non_resloution"))
+            total_call_per_day = CsvLogDetails.objects.filter(
+                uploaded_file__id=pk,
+            ).aggregate(tot=Sum("calls_per_hour"))
+            total_call_per_day = total_call_per_day.get("tot") if total_call_per_day else 0
+            working_hours_aligned_with_required_availability = number_of_employees * csv_file.working_hour_per_day * 6
+            avg_cx = avg_cx.get("avg") if avg_cx else 0
+            avg_non = avg_non.get("avg") if avg_non else 0
+
+            employee_availability = avg_availability.get("avg") if avg_availability else 0
+            actual_resource_working_hour = number_of_employees * csv_file.working_hour_per_day * csv_file.working_days_per_week
+            actual_resource_working_hour = (actual_resource_working_hour * employee_availability)/100
+            overtime_hours_required = working_hours_aligned_with_required_availability - actual_resource_working_hour
+            no_of_resource_required = overtime_hours_required/48
+            
+
+            perc = employee_availability/100
+            call_hanlde = csv_file.call_handle_process / 100
+            technology = csv_file.technology / 100
+
+            daily_call_average = total_call_per_day * perc * csv_file.working_hour_per_day
+            process_and_technology_driven = daily_call_average * call_hanlde * technology * perc
+            total_estimated_call = csv_file.average_call_per_day * csv_file.working_days
+            targeted_monthly_cost = csv_file.employee_cost_target * total_estimated_call
+
+            no_of_days_left = csv_file.working_days - csv_file.completed_days
+            call_attenment = 100 - avg_cx 
+            resolution_or_ticket = 100 - avg_non
+            monthly_call_projection = daily_call_average * csv_file.working_days
+            employee_cost_per_month = csv_file.average_cost_employee * number_of_employees * csv_file.working_hour_per_day
+
+            first_cal = employee_cost_per_month / csv_file.working_days if csv_file.working_days != 0  else 0
+            
+            sec_cal = (csv_file.average_cost_per_Call * daily_call_average)*csv_file.completed_days
+            thrd_cal = daily_call_average * csv_file.completed_days
+            cost_per_call_till_date = (first_cal + sec_cal)/thrd_cal  if thrd_cal != 0  else 0
+            
+            cost_target_achieve = (cost_per_call_till_date - csv_file.employee_cost_target)/csv_file.employee_cost_target if csv_file.employee_cost_target != 0 else 0
+            cost_target_achieve = -cost_target_achieve* 100
+
+            report1["working_hours_aligned_with_required_availability"] = working_hours_aligned_with_required_availability
+            report1["actual_resource_working_hour"] = actual_resource_working_hour
+            report1["overtime_hours_required"] = overtime_hours_required
+            report1["no_of_resource_required"] = no_of_resource_required
+            report1["process_and_technology_driven"] = process_and_technology_driven
+            report1["total_estimated_call"] = total_estimated_call
+            report1["targeted_monthly_cost"] = targeted_monthly_cost
+            report1["call_handle_process"] = csv_file.call_handle_process
+            report1["technology"] = csv_file.technology
+            report1["average_call_per_day"] = csv_file.average_call_per_day
+
+            report2["working_days_per_week"] = csv_file.working_days_per_week
+            report2["cost_target"] = csv_file.employee_cost_target
+            report2["average_cost_employee"] = csv_file.average_cost_employee
+            report2["working_days"] = csv_file.working_days
+            report2["working_hour_per_day"] = csv_file.working_hour_per_day
+            report2["completed_days"] = csv_file.completed_days
+            report2["average_cost_per_Call"] = csv_file.average_cost_per_Call
+            report2["no_of_days_left"] = no_of_days_left
+            report2["number_of_employee"] = number_of_employees
+            report2["required_availability"] = csv_file.required_availability
+            report2["call_attenment"] = call_attenment
+            report2["resolution_or_ticket"] = resolution_or_ticket
+            report2["daily_call_average"] = daily_call_average
+            report2["monthly_call_projection"] = monthly_call_projection
+            report2["employee_cost_per_month"] = employee_cost_per_month
+            report2["cost_target_achieve"] = cost_target_achieve
+            report2["cost_per_call_till_date"] = cost_per_call_till_date
+            report2["employee_availability"] = employee_availability
+
+            log = CsvLogDetails.objects.filter(
+                uploaded_file__id=pk,
+            ).values("center_name").annotate(
+                varriation_in_resolution=Max("non_resloution") - Min("non_resloution"),
+                varriation_in_cx=Max("cx_call_no_response") - Min("cx_call_no_response")
+            ).values("center_name", "varriation_in_resolution", "varriation_in_cx")
+            response_dict["report1"]    = report1
+            response_dict["report2"]    = report2
+            response_dict["report3"]    = log
+        elif csv_file.modules.module_identifier == 12:
+            report1 = {}
+            report2 = {}
+            report3 = {}
+            report4 = {}
+            total_impression = CsvLogDetails.objects.filter(
+                uploaded_file__id=pk,
+            ).aggregate(tot=Sum("total_impression_per_hour"))
+            total_impression = total_impression.get("tot") if total_impression else 0
+            avg_availability = CsvLogDetails.objects.filter(
+                uploaded_file__id=pk,
+            ).aggregate(avg=Avg("employee_availability"))
+            employee_availability = avg_availability.get("avg") if avg_availability else 0
+            avg_conversion = CsvLogDetails.objects.filter(
+                uploaded_file__id=pk,
+            ).aggregate(avg=Avg("conversion_rate"))
+            number_of_employees = CsvLogDetails.objects.filter(
+                uploaded_file__id=pk,
+            ).count()
+
+            avg_conversion = avg_conversion.get("avg") if avg_conversion else 0
+            avg_conversion = avg_conversion / 100
+            employee_availability = employee_availability / 100
+            average_daily_impression = (total_impression * employee_availability * avg_conversion) / csv_file.completed_days if csv_file.completed_days !=0  else 0
+
+            impression_target_based_on_daily_avg = average_daily_impression * csv_file.working_days
+            accumulated_cost_of_impression_drop = csv_file.completed_days * impression_target_based_on_daily_avg
+
+            no_of_days_left = csv_file.working_days - csv_file.completed_days
+            impression_target_acheved = csv_file.online_impression_target - accumulated_cost_of_impression_drop
+            remaining_impression_target = impression_target_acheved / no_of_days_left if no_of_days_left != 0 else 0 
+            remaining_impression_expenditure = remaining_impression_target * csv_file.average_rate_per_impression
+            
+            impression_cost_till_date = csv_file.average_rate_per_impression * average_daily_impression * csv_file.completed_days
+            impression_costing = impression_target_based_on_daily_avg * csv_file.average_rate_per_impression
+            target_achieve = impression_target_based_on_daily_avg / csv_file.online_impression_target if csv_file.online_impression_target != 0 else 0
+
+            working_hours_aligned_with_required_availability = number_of_employees * csv_file.working_hour_per_day * csv_file.working_days_per_week
+            actual_resource_working_hour = number_of_employees * csv_file.working_hour_per_day * csv_file.working_days_per_week * employee_availability
+            overtime_hour_required = working_hours_aligned_with_required_availability - actual_resource_working_hour
+
+            no_of_resource_required = overtime_hour_required / (csv_file.working_days_per_week * csv_file.working_hour_per_day)
+
+            weekly_overtime = csv_file.working_hour_per_day * csv_file.working_days_per_week * employee_availability
+             
+            report1["accumulated_cost_of_impression"] = accumulated_cost_of_impression_drop
+            report1["impression_target_acheved"] = impression_target_acheved
+            report1["remaining_impression_target"] = remaining_impression_target
+            report1["remaining_impression_expenditure"] = remaining_impression_expenditure
+
+            report2["working_hours_aligned_with_required_availability"] = working_hours_aligned_with_required_availability
+            report2["actual_resource_working_hour"] = actual_resource_working_hour
+            report2["overtime_hour_required"] = overtime_hour_required
+            report2["no_of_resource_required"] = no_of_resource_required
+            report2["working_days_in_week"] = csv_file.working_days_per_week
+
+            report3["completed_days"] = csv_file.completed_days
+            report3["working_days"] = csv_file.working_days
+            report3["no_of_days_left"] = no_of_days_left
+            report3["number_of_employees"] = number_of_employees
+            report3["required_availability"] = csv_file.required_availability
+            report3["working_hour_per_day"] = csv_file.working_hour_per_day
+            report3["online_impression_target"] = csv_file.online_impression_target
+            report3["average_daily_impression"] = average_daily_impression
+            report3["average_impression_target"] = impression_target_based_on_daily_avg
+            report3["average_rate_per_impression"] = csv_file.average_rate_per_impression
+            report3["impression_cost_till_date"] = impression_cost_till_date
+            report3["impression_costing"] = impression_costing
+            report3["target_achieve"] = target_achieve
+            report3["actual_working_hour"] = working_hours_aligned_with_required_availability
+            report3["actual_resource_working_hour"] = actual_resource_working_hour
+            report3["overtime_hour_required"] = overtime_hour_required
+            report3["no_of_resource_required"] = no_of_resource_required
+            report3["weekly_overtime"] = weekly_overtime
+            report3["employee_availability"] = avg_availability.get("avg") if avg_availability else 0
+
+            log = CsvLogDetails.objects.filter(
+                uploaded_file__id=pk,
+            ).values("center_name").annotate(
+                total_conversion_rate=Avg("conversion_rate"),
+                total_impression_drop=Avg("impression_drop"),
+            ).values("center_name", "total_conversion_rate", "total_impression_drop")
+
+
+            response_dict["report1"]    = report1
+            response_dict["report2"]    = report2
+            response_dict["report3"]    = report3
+            response_dict["report4"]    = log
+
         response_dict["status"] = True
         return Response(response_dict, status=status.HTTP_200_OK)
 
@@ -2419,8 +3097,20 @@ class GetDepartment(APIView):
         csv_file = UploadedCsvFiles.objects.filter(
             id=pk
         ).first()
+
+        if csv_file.modules.module_identifier == 8:
+            department_dict = []
+            department = list(set(CsvLogDetails.objects.filter(uploaded_file__id=pk).values_list("department", flat=True)))
+            for dep in department:
+                department_dict.append(
+                    {
+                        "name":dep,
+                    }
+                )
+
+            response_dict["department"] = department_dict
         
-        if csv_file.modules.module_identifier == 5:
+        elif csv_file.modules.module_identifier == 5:
             total_countries = []
             countries = list(set(CsvLogDetails.objects.filter(uploaded_file__id=pk).values_list("region", flat=True)))
             for i in countries:
@@ -2543,6 +3233,8 @@ class AdminModules(APIView):
                     "email": logined_user.email,
                 
                 }
+                total_users = logined_user.available_free_users + logined_user.available_paid_users
+                response_dict["available_users"] = total_users
                 response_dict["status"] = True
                 response_dict["modules"] = ModuleDetailsSerializer(all_modules, context={'request':request}, many=True).data
                 response_dict["additional_users"] = self.get_users_with_password()
@@ -2917,9 +3609,32 @@ class UserModuleList(APIView):
     authentication_classes = (CustomTokenAuthentication,)
 
     def get(self, request, pk):
-        response_dict = {"status": False}
+        response_dict = {"status": True}
+        current_date = timezone.now().date()
         user_obj = UserAssignedModules.objects.filter(user__id=pk, module__isnull=False).last()
+        total_c = 0
+        module_ids = []
+        subscription = SubscriptionDetails.objects.filter(
+            user=request.user, 
+            is_subscribed=True,
+            subscription_end_date__gte=current_date
+        ).order_by("-id").first()
+        if subscription:
+            module_ids = list(subscription.module.all().values_list("id", flat=True))
+            total_c = total_c + len(module_ids)
 
+        free_subscribed_modules = FreeSubscriptionDetails.objects.filter(
+            user=request.user,
+            free_subscription_end_date__gte=current_date,
+        )
+        free_subscribed_modules_ids = []
+        for i in free_subscribed_modules:
+            if i.module.all():
+                free_subscribed_modules_ids.extend(
+                    list(i.module.exclude(id__in=module_ids).values_list("id", flat=True))
+                )
+        total_c = total_c + len(free_subscribed_modules_ids)
+        response_dict["total_modules"] = total_c
         if user_obj:
             serializer = UserAssignedModuleSerializers(user_obj)
             response_dict["status"] = True
@@ -3445,6 +4160,9 @@ class ModulePurchaseHistory(APIView):
                 response_dict["subscription-details"] = PurchaseHistorySerializer(subscription_details, context={'request': request}, many=True).data
                 # response_dict["module"] = module_data
                 return Response(response_dict, status=status.HTTP_200_OK)
+            else:
+                response_dict["subscription-details"] = []
+                return Response(response_dict, status=status.HTTP_200_OK)
         else:
             response_dict = {'status': False}
             response_dict["error"] = "Access denied, Only Admin can access the module list"
@@ -3582,7 +4300,7 @@ class ModulePurchasePriceV2(APIView):
         response_dict = {"status":True}
         admin_user = request.user
         current_date = datetime.now().date()
-        admin_subscription = SubscriptionDetails.objects.filter(user=admin_user, is_active=True).first()
+        admin_subscription = SubscriptionDetails.objects.filter(user=admin_user, is_active=True).last()
         
         if action_type == "renew":            
             subscription_type = admin_subscription.subscription_type
@@ -3650,9 +4368,9 @@ class ModulePurchasePriceV2(APIView):
             already_added_bundle = admin_subscription.bundle.all().values_list("id", flat=True)
             if admin_subscription.subscription_type == "WEEK":
                 for i in bundle_ids:
+                    bundle_obj = BundleDetails.objects.get(id=i)
+                    bundle_modules = list(bundle_obj.modules.all().values_list("id", flat=True))
                     if i not in already_added_bundle:
-                        bundle_obj = BundleDetails.objects.get(id=i)
-                        bundle_modules = list(bundle_obj.modules.all().values_list("id", flat=True))
                         bundle_module.extend(bundle_modules)
                         amount = (bundle_obj.weekly_price / 7) * pending
                         bundle_price = bundle_price + amount
@@ -3666,11 +4384,12 @@ class ModulePurchasePriceV2(APIView):
                 for i in bundle_ids:
                     bundle_obj = BundleDetails.objects.get(id=i)
                     bundle_modules = list(bundle_obj.modules.all().values_list("id", flat=True))
-                    bundle_module.extend(bundle_modules)
-                    amount = (bundle_obj.monthly_price / 30) * pending
-                    bundle_price = bundle_price + amount
+                    if i not in already_added_bundle:
+                        bundle_module.extend(bundle_modules)
+                        amount = (bundle_obj.monthly_price / 30) * pending
+                        bundle_price = bundle_price + amount
                 for i in modules_ids:
-                    if i not in bundle_module:
+                    if i not in bundle_module and i not in already_added_module:
                         module_obj = ModuleDetails.objects.get(id=i)
                         amount = (module_obj.monthly_price / 30) * pending
                         module_price = module_price + amount
@@ -3679,11 +4398,12 @@ class ModulePurchasePriceV2(APIView):
                 for i in bundle_ids:
                     bundle_obj = BundleDetails.objects.get(id=i)
                     bundle_modules = list(bundle_obj.modules.all().values_list("id", flat=True))
-                    bundle_module.extend(bundle_modules)
-                    amount = (bundle_obj.yearly_price / 365) * pending
-                    bundle_price = bundle_price + amount
+                    if i not in already_added_bundle:
+                        bundle_module.extend(bundle_modules)
+                        amount = (bundle_obj.yearly_price / 365) * pending
+                        bundle_price = bundle_price + amount
                 for i in modules_ids:
-                    if i not in bundle_module:
+                    if i not in bundle_module and i not in already_added_module:
                         module_obj = ModuleDetails.objects.get(id=i)
                         amount = (module_obj.yearly_price / 365) * pending
                         module_price = module_price + amount
@@ -3723,11 +4443,12 @@ class ModulePurchasePriceV2(APIView):
                         bundle_obj = BundleDetails.objects.get(id=i)
                         bundle_modules = list(bundle_obj.modules.all().values_list("id", flat=True))
                         bundle_module.extend(bundle_modules)
-                        pending_amount = (bundle_obj.monthly_price / 365) * pending
+                        pending_amount = (bundle_obj.yearly_price / 365) * pending
                         bundle_price = bundle_price + pending_amount
                     for i in modules_ids:
+                        module_obj = ModuleDetails.objects.get(id=i)
                         if i not in bundle_module:
-                            pending_amount = (module_obj.monthly_price / 365) * pending
+                            pending_amount = (module_obj.yearly_price / 365) * pending
                             module_price = module_price + pending_amount
                 amount = module_price + bundle_price
                 subscription_end_date = new_end_date
@@ -3741,12 +4462,12 @@ class ModulePurchasePriceV2(APIView):
                         bundle_obj = BundleDetails.objects.get(id=i)
                         bundle_modules = list(bundle_obj.modules.all().values_list("id", flat=True))
                         bundle_module.extend(bundle_modules)
-                        pending_amount = (bundle_obj.monthly_price / 365) * pending
+                        pending_amount = (bundle_obj.yearly_price / 365) * pending
                         bundle_price = bundle_price + pending_amount
                     for i in modules_ids:
                         module_obj = ModuleDetails.objects.get(id=i)
                         if i not in bundle_module:
-                            pending_amount = (module_obj.monthly_price / 365) * pending
+                            pending_amount = (module_obj.yearly_price / 365) * pending
                             module_price = module_price + pending_amount
 
                 amount = module_price + bundle_price
@@ -3769,7 +4490,7 @@ class ModulePurchasePriceV2(APIView):
                         bundle_modules = list(bundle_obj.modules.all().values_list("id", flat=True))
                         bundle_module.extend(bundle_modules)
                         if i not in already_added_bundle:
-                            amount = (bundle_obj.monthly_price / 30) * pending
+                            amount = bundle_obj.monthly_price
                             bundle_price = bundle_price + amount
                         else:
                             pending_amount = (bundle_obj.monthly_price / 30) * pending
@@ -3777,7 +4498,7 @@ class ModulePurchasePriceV2(APIView):
                     for i in modules_ids:
                         module_obj = ModuleDetails.objects.get(id=i)
                         if i not in bundle_module and i not in already_added_module:
-                            amount = (module_obj.monthly_price / 30) * pending
+                            amount = module_obj.monthly_price
                             module_price = module_price + amount
                         elif i in already_added_module:
                             pending_amount = (module_obj.monthly_price / 30) * pending
@@ -3792,7 +4513,7 @@ class ModulePurchasePriceV2(APIView):
                         bundle_modules = list(bundle_obj.modules.all().values_list("id", flat=True))
                         bundle_module.extend(bundle_modules)
                         if i not in already_added_bundle:
-                            amount = (bundle_obj.yearly_price / 365) * pending
+                            amount = bundle_obj.yearly_price
                             bundle_price = bundle_price + amount
                         else:
                             pending_amount = (bundle_obj.yearly_price / 365) * pending
@@ -3800,7 +4521,7 @@ class ModulePurchasePriceV2(APIView):
                     for i in modules_ids:
                         module_obj = ModuleDetails.objects.get(id=i)
                         if i not in bundle_module and i not in already_added_module:
-                            amount = (module_obj.yearly_price / 365) * pending
+                            amount = module_obj.yearly_price
                             module_price = module_price + amount
                         elif i in already_added_module:
                             pending_amount = (module_obj.yearly_price / 365) * pending
@@ -3819,7 +4540,7 @@ class ModulePurchasePriceV2(APIView):
                         bundle_modules = list(bundle_obj.modules.all().values_list("id", flat=True))
                         bundle_module.extend(bundle_modules)
                         if i not in already_added_bundle:
-                            amount = (bundle_obj.yearly_price / 365) * pending
+                            amount = bundle_obj.yearly_price
                             bundle_price = bundle_price + amount
                         else:
                             pending_amount = (bundle_obj.yearly_price / 365) * pending
@@ -3827,7 +4548,7 @@ class ModulePurchasePriceV2(APIView):
                     for i in modules_ids:
                         module_obj = ModuleDetails.objects.get(id=i)
                         if i not in bundle_module and i not in already_added_module:
-                            amount = (module_obj.yearly_price / 365) * pending
+                            amount = module_obj.yearly_price
                             module_price = module_price + amount
                         elif i in already_added_module:
                             pending_amount = (module_obj.yearly_price / 365) * pending
