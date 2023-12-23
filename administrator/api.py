@@ -4392,10 +4392,10 @@ class ModulePurchasePriceV2(APIView):
                         bundle_price = bundle_price + amount
                 for i in modules_ids:
                     if i not in bundle_module and i not in already_added_module:
-                            module_obj = ModuleDetails.objects.get(id=i)
-                            if module_obj.is_submodule == False:
-                                amount = (module_obj.monthly_price / 30) * pending
-                                module_price = module_price + amount
+                        module_obj = ModuleDetails.objects.get(id=i)
+                        if module_obj.is_submodule == False:
+                            amount = (module_obj.monthly_price / 30) * pending
+                            module_price = module_price + amount
 
             elif subscription_type == "YEAR":
                 for i in bundle_ids:
