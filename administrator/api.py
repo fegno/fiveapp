@@ -1237,7 +1237,6 @@ class GenerateReport(APIView):
         elif csv_file.modules.module_identifier == 7:
             try:
                 total_working_days = request.data.get("total_working_days")
-                average_call_per_day = request.data.get("average_call_per_day")
                 working_days = request.data.get("working_days")
                 no_of_days_left = request.data.get("no_of_days_left")
                 completed_days = request.data.get("completed_days")
@@ -1250,7 +1249,6 @@ class GenerateReport(APIView):
 
                 csv_file.is_report_generated = True
                 csv_file.total_working_days = total_working_days
-                csv_file.average_call_per_day = average_call_per_day
                 csv_file.working_days = working_days
                 csv_file.no_of_days_left = no_of_days_left
                 csv_file.completed_days = completed_days
@@ -1271,7 +1269,6 @@ class GenerateReport(APIView):
             try:
                 call_handle_process = request.data.get("call_handle_process")
                 technology = request.data.get("technology")
-                average_call_per_day = request.data.get("average_call_per_day")
                 employee_cost_target = request.data.get("employee_cost_target")
                 working_days_per_week = request.data.get("working_days_per_week")
                 average_cost_employee = request.data.get("average_cost_employee")
@@ -1284,7 +1281,6 @@ class GenerateReport(APIView):
                 csv_file.is_report_generated = True
                 csv_file.call_handle_process = call_handle_process
                 csv_file.technology = technology
-                csv_file.average_call_per_day = average_call_per_day
                 csv_file.employee_cost_target = employee_cost_target
                 csv_file.average_cost_employee = average_cost_employee
                 csv_file.working_days = working_days
@@ -2826,8 +2822,10 @@ class AnalyticsReport(APIView):
             employee_availability = avg_availability.get("avg") if avg_availability else 0
             avg_conversion =  avg_conversion.get("avg") if avg_conversion else 0
 
+            average_call_per_day = number_of_employees * total_call_per_day * csv_file.working_hour_per_day
+             
             working_hours_aligned_with_required_availability = number_of_employees * csv_file.working_hour_per_day * total_no_of_working_days
-            avg_call_per_month = csv_file.average_call_per_day * csv_file.working_days
+            avg_call_per_month = average_call_per_day * csv_file.working_days
             actual_resource_working_hour = number_of_employees * csv_file.working_hour_per_day * total_no_of_working_days
             actual_resource_working_hour = (actual_resource_working_hour * employee_availability)/100
             overtime_hours_required = working_hours_aligned_with_required_availability - actual_resource_working_hour
@@ -2839,7 +2837,7 @@ class AnalyticsReport(APIView):
             avg_conversion = (avg_sale_order_per_day_based_on_availability * avg_conversion )/100
             avg_sale_order_per_day_based_on_availability = avg_conversion/ csv_file.completed_days if csv_file.completed_days != 0 else 0
  
-            actual_daily_call_avg = (csv_file.average_call_per_day * employee_availability)/100
+            actual_daily_call_avg = (average_call_per_day * employee_availability)/100
             actual_daily_call_avg = (actual_daily_call_avg * csv_file.process)/100
             actual_daily_call_avg = (actual_daily_call_avg * csv_file.technology)/100 
             order_achieved_till = csv_file.completed_days * avg_sale_order_per_day_based_on_availability
@@ -2865,7 +2863,7 @@ class AnalyticsReport(APIView):
             variation_in_call_drop_rate = 7
             variation_in_transaction_drop_rate = 7
 
-            report1["avg_call_per_day"] = csv_file.average_call_per_day
+            report1["avg_call_per_day"] = average_call_per_day
             report1["process"] = csv_file.process
             report1["technology"] = csv_file.technology
             report1["avg_daily_order_for_target_achievement"] = avg_daily_order_for_target_achievement
@@ -2921,6 +2919,12 @@ class AnalyticsReport(APIView):
             total_call_per_day = CsvLogDetails.objects.filter(
                 uploaded_file__id=pk,
             ).aggregate(tot=Sum("calls_per_hour"))
+
+            avg_total_call_per_day = CsvLogDetails.objects.filter(
+                uploaded_file__id=pk,
+            ).aggregate(tot=Avg("calls_per_hour"))
+            avg_total_call_per_day = avg_total_call_per_day.get("tot") if avg_total_call_per_day else 0
+
             total_call_per_day = total_call_per_day.get("tot") if total_call_per_day else 0
             working_hours_aligned_with_required_availability = number_of_employees * csv_file.working_hour_per_day * 6
             avg_cx = avg_cx.get("avg") if avg_cx else 0
@@ -2937,25 +2941,28 @@ class AnalyticsReport(APIView):
             call_hanlde = csv_file.call_handle_process / 100
             technology = csv_file.technology / 100
 
+            average_call_per_day = number_of_employees * avg_total_call_per_day * csv_file.working_hour_per_day
             daily_call_average = total_call_per_day * perc * csv_file.working_hour_per_day
             process_and_technology_driven = daily_call_average * call_hanlde * technology * perc
-            total_estimated_call = csv_file.average_call_per_day * csv_file.working_days
+            total_estimated_call = average_call_per_day * csv_file.working_days * call_hanlde * technology * perc
             targeted_monthly_cost = csv_file.employee_cost_target * total_estimated_call
 
             no_of_days_left = csv_file.working_days - csv_file.completed_days
             call_attenment = 100 - avg_cx 
             resolution_or_ticket = 100 - avg_non
             monthly_call_projection = daily_call_average * csv_file.working_days
-            employee_cost_per_month = csv_file.average_cost_employee * number_of_employees * csv_file.working_hour_per_day
+            employee_cost_per_month = csv_file.average_cost_employee * number_of_employees * csv_file.working_hour_per_day * csv_file.working_days
 
-            first_cal = employee_cost_per_month / csv_file.working_days if csv_file.working_days != 0  else 0
-            
-            sec_cal = (csv_file.average_cost_per_Call * daily_call_average)*csv_file.completed_days
-            thrd_cal = daily_call_average * csv_file.completed_days
-            cost_per_call_till_date = (first_cal + sec_cal)/thrd_cal  if thrd_cal != 0  else 0
-            
-            cost_target_achieve = (cost_per_call_till_date - csv_file.employee_cost_target)/csv_file.employee_cost_target if csv_file.employee_cost_target != 0 else 0
-            cost_target_achieve = -cost_target_achieve* 100
+            first_cal_2 = (csv_file.working_days * csv_file.working_hour_per_day * number_of_employees * avg_total_call_per_day)
+            sec = csv_file.average_cost_per_Call * daily_call_average
+            sec_cal = number_of_employees * csv_file.working_hour_per_day * avg_total_call_per_day
+            sec_cal_2 = sec / sec_cal if sec_cal != 0 else 0
+            first_cal_2 = first_cal_2
+            cost_per_call_till_date = employee_cost_per_month/first_cal_2 if first_cal_2 != 0 else 0
+            cost_per_call_till_date = cost_per_call_till_date + sec_cal_2
+
+            cost_target_achieve = (csv_file.employee_cost_target - cost_per_call_till_date)/csv_file.employee_cost_target if csv_file.employee_cost_target != 0 else 0
+            cost_target_achieve = cost_target_achieve* 100
 
             report1["working_hours_aligned_with_required_availability"] = working_hours_aligned_with_required_availability
             report1["actual_resource_working_hour"] = actual_resource_working_hour
@@ -2966,7 +2973,7 @@ class AnalyticsReport(APIView):
             report1["targeted_monthly_cost"] = targeted_monthly_cost
             report1["call_handle_process"] = csv_file.call_handle_process
             report1["technology"] = csv_file.technology
-            report1["average_call_per_day"] = csv_file.average_call_per_day
+            report1["average_call_per_day"] = average_call_per_day
 
             report2["working_days_per_week"] = csv_file.working_days_per_week
             report2["cost_target"] = csv_file.employee_cost_target
@@ -3019,7 +3026,7 @@ class AnalyticsReport(APIView):
             avg_conversion = avg_conversion.get("avg") if avg_conversion else 0
             avg_conversion = avg_conversion / 100
             employee_availability = employee_availability / 100
-            average_daily_impression = (total_impression * employee_availability * avg_conversion) / csv_file.completed_days if csv_file.completed_days !=0  else 0
+            average_daily_impression = (total_impression * employee_availability) / csv_file.completed_days if csv_file.completed_days !=0  else 0
 
             impression_target_based_on_daily_avg = average_daily_impression * csv_file.working_days
             accumulated_cost_of_impression_drop = csv_file.completed_days * impression_target_based_on_daily_avg
@@ -3032,7 +3039,7 @@ class AnalyticsReport(APIView):
             impression_cost_till_date = csv_file.average_rate_per_impression * average_daily_impression * csv_file.completed_days
             impression_costing = impression_target_based_on_daily_avg * csv_file.average_rate_per_impression
             target_achieve = impression_target_based_on_daily_avg / csv_file.online_impression_target if csv_file.online_impression_target != 0 else 0
-
+            target_achieve = target_achieve * 100
             working_hours_aligned_with_required_availability = number_of_employees * csv_file.working_hour_per_day * csv_file.working_days_per_week
             actual_resource_working_hour = number_of_employees * csv_file.working_hour_per_day * csv_file.working_days_per_week * employee_availability
             overtime_hour_required = working_hours_aligned_with_required_availability - actual_resource_working_hour
