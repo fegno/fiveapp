@@ -563,7 +563,8 @@ class UserInModule(APIView):
         user_assigned = UserAssignedModules.objects.filter(
             module=module, user__created_admin=request.user
         )
-        deleted_user = DeleteUsersLog.objects.filter(module=module,deleted_by=request.user)
+        add_users = list(user_assigned.filter(user__isnull=False).values_list("user__id", flat=True))
+        deleted_user = DeleteUsersLog.objects.filter(module=module,deleted_by=request.user).exclude(user__id__in=add_users)
         response_dict["users"] = UserAssignedModuleSerializers(user_assigned, context={"request": request}, many=True).data
         response_dict["deleted-users"] = DeletedUserLogSerializers(deleted_user, context={"request":request}, many=True).data
         response_dict["status"] = True
@@ -4222,6 +4223,14 @@ class PurchaseDetailsView(APIView):
                     'legal_company_name':payment_details.parchase.bill.legal_company_name,
                     'tax_id':payment_details.parchase.bill.tax_id
                 }
+                response_dict["card-details"] = {}
+                if payment_details.parchase.card:
+                    response_dict["card-details"] = {
+                        'holder_name':payment_details.parchase.card.holder_name,
+                        'card_number':payment_details.parchase.card.card_number,
+                        'expiration_date':payment_details.parchase.card.expiration_date,
+                        'ccv':payment_details.parchase.card.ccv,
+                    }
                 return Response(response_dict, status=status.HTTP_200_OK)
             
             elif payment_details.parchase_user_type == 'User':
@@ -4235,6 +4244,14 @@ class PurchaseDetailsView(APIView):
                     'legal_company_name':payment_details.parchase.bill.legal_company_name,
                     'tax_id':payment_details.parchase.bill.tax_id
                 }
+                response_dict["card-details"] = {}
+                if payment_details.parchase.card:
+                    response_dict["card-details"] = {
+                        'holder_name':payment_details.parchase.card.holder_name,
+                        'card_number':payment_details.parchase.card.card_number,
+                        'expiration_date':payment_details.parchase.card.expiration_date,
+                        'ccv':payment_details.parchase.card.ccv,
+                    }
                 return Response(response_dict, status=status.HTTP_200_OK)
             
             else:
@@ -4339,6 +4356,14 @@ class ModulePurchasePriceV2(APIView):
             for i in bundle_ids:
                 bundle_obj = BundleDetails.objects.get(id=i)
                 bundle_modules = list(bundle_obj.modules.all().values_list("id", flat=True))
+                
+                bundle_module_submodule = list(ModuleDetails.objects.filter(
+                    modules__id__in=bundle_modules, 
+                ).values_list("id", flat=True))
+                if bundle_module_submodule:
+                    bundle_module.extend(bundle_module_submodule)
+                
+                
                 bundle_module.extend(bundle_modules)
                 if subscription_type == "WEEK":
                     bundle_price = float(bundle_price) + float(bundle_obj.weekly_price)
@@ -4353,16 +4378,15 @@ class ModulePurchasePriceV2(APIView):
             for i in modules_ids:
                 if i not in bundle_module:
                     module_obj = ModuleDetails.objects.get(id=i)
-                    if module_obj.is_submodule == False:
-                        if subscription_type == "WEEK":
-                            module_price = float(module_price) + float(module_obj.weekly_price)
-                            
+                    if subscription_type == "WEEK":
+                        module_price = float(module_price) + float(module_obj.weekly_price)
+                        
 
-                        elif subscription_type == "MONTH":
-                            module_price = float(module_price) + float(module_obj.monthly_price)
-                            
-                        elif subscription_type == "YEAR":
-                            module_price = float(module_price) + float(module_obj.yearly_price)
+                    elif subscription_type == "MONTH":
+                        module_price = float(module_price) + float(module_obj.monthly_price)
+                        
+                    elif subscription_type == "YEAR":
+                        module_price = float(module_price) + float(module_obj.yearly_price)
                         
             amount = module_price + bundle_price
 
@@ -4378,46 +4402,59 @@ class ModulePurchasePriceV2(APIView):
                 for i in bundle_ids:
                     bundle_obj = BundleDetails.objects.get(id=i)
                     bundle_modules = list(bundle_obj.modules.all().values_list("id", flat=True))
+                    bundle_module_submodule = list(ModuleDetails.objects.filter(
+                        modules__id__in=bundle_modules, 
+                    ).values_list("id", flat=True))
+    
                     if i not in already_added_bundle:
                         bundle_module.extend(bundle_modules)
+                        if bundle_module_submodule:
+                            bundle_module.extend(bundle_module_submodule)
                         amount = (bundle_obj.weekly_price / 7) * pending
                         bundle_price = bundle_price + amount
                 for i in modules_ids:
                     if i not in bundle_module and i not in already_added_module:
                         module_obj = ModuleDetails.objects.get(id=i)
-                        if module_obj.is_submodule == False:
-                            amount = (module_obj.weekly_price / 7) * pending
-                            module_price = module_price + amount
+                        amount = (module_obj.weekly_price / 7) * pending
+                        module_price = module_price + amount
 
             elif subscription_type == "MONTH":
                 for i in bundle_ids:
                     bundle_obj = BundleDetails.objects.get(id=i)
                     bundle_modules = list(bundle_obj.modules.all().values_list("id", flat=True))
+                    bundle_module_submodule = list(ModuleDetails.objects.filter(
+                        modules__id__in=bundle_modules, 
+                    ).values_list("id", flat=True))
                     if i not in already_added_bundle:
                         bundle_module.extend(bundle_modules)
+                        if bundle_module_submodule:
+                            bundle_module.extend(bundle_module_submodule)
                         amount = (bundle_obj.monthly_price / 30) * pending
                         bundle_price = bundle_price + amount
                 for i in modules_ids:
                     if i not in bundle_module and i not in already_added_module:
                         module_obj = ModuleDetails.objects.get(id=i)
-                        if module_obj.is_submodule == False:
-                            amount = (module_obj.monthly_price / 30) * pending
-                            module_price = module_price + amount
+                        amount = (module_obj.monthly_price / 30) * pending
+                        module_price = module_price + amount
 
             elif subscription_type == "YEAR":
                 for i in bundle_ids:
                     bundle_obj = BundleDetails.objects.get(id=i)
                     bundle_modules = list(bundle_obj.modules.all().values_list("id", flat=True))
+                    bundle_module_submodule = list(ModuleDetails.objects.filter(
+                        modules__id__in=bundle_modules, 
+                    ).values_list("id", flat=True))
                     if i not in already_added_bundle:
                         bundle_module.extend(bundle_modules)
+                        if bundle_module_submodule:
+                            bundle_module.extend(bundle_module_submodule)
                         amount = (bundle_obj.yearly_price / 365) * pending
                         bundle_price = bundle_price + amount
                 for i in modules_ids:
                     if i not in bundle_module and i not in already_added_module:
                         module_obj = ModuleDetails.objects.get(id=i)
-                        if module_obj.is_submodule == False:
-                            amount = (module_obj.yearly_price / 365) * pending
-                            module_price = module_price + amount
+                        amount = (module_obj.yearly_price / 365) * pending
+                        module_price = module_price + amount
 
             amount = bundle_price + module_price
 
@@ -4437,15 +4474,19 @@ class ModulePurchasePriceV2(APIView):
                     for i in bundle_ids:
                         bundle_obj = BundleDetails.objects.get(id=i)
                         bundle_modules = list(bundle_obj.modules.all().values_list("id", flat=True))
+                        bundle_module_submodule = list(ModuleDetails.objects.filter(
+                            modules__id__in=bundle_modules, 
+                        ).values_list("id", flat=True))
+                        if bundle_module_submodule:
+                            bundle_module.extend(bundle_module_submodule)
                         bundle_module.extend(bundle_modules)
                         pending_amount = (bundle_obj.monthly_price / 30) * pending
                         bundle_price = bundle_price + pending_amount
                     for i in modules_ids:
                         module_obj = ModuleDetails.objects.get(id=i)
-                        if module_obj.is_submodule == False:
-                            if i not in bundle_module:
-                                pending_amount = (module_obj.monthly_price / 30) * pending
-                                module_price = module_price + pending_amount
+                        if i not in bundle_module:
+                            pending_amount = (module_obj.monthly_price / 30) * pending
+                            module_price = module_price + pending_amount
                 elif subscription_type == "YEAR":
                     subscription_end_date = admin_subscription.subscription_end_date
                     new_end_date = current_date + timedelta(days=365)
@@ -4454,15 +4495,19 @@ class ModulePurchasePriceV2(APIView):
                     for i in bundle_ids:
                         bundle_obj = BundleDetails.objects.get(id=i)
                         bundle_modules = list(bundle_obj.modules.all().values_list("id", flat=True))
+                        bundle_module_submodule = list(ModuleDetails.objects.filter(
+                            modules__id__in=bundle_modules, 
+                        ).values_list("id", flat=True))
+                        if bundle_module_submodule:
+                            bundle_module.extend(bundle_module_submodule)
                         bundle_module.extend(bundle_modules)
                         pending_amount = (bundle_obj.yearly_price / 365) * pending
                         bundle_price = bundle_price + pending_amount
                     for i in modules_ids:
                         module_obj = ModuleDetails.objects.get(id=i)
                         if i not in bundle_module:
-                            if module_obj.is_submodule == False:
-                                pending_amount = (module_obj.yearly_price / 365) * pending
-                                module_price = module_price + pending_amount
+                            pending_amount = (module_obj.yearly_price / 365) * pending
+                            module_price = module_price + pending_amount
                 amount = module_price + bundle_price
                 subscription_end_date = new_end_date
             elif admin_subscription.subscription_type == "MONTH":
@@ -4474,15 +4519,19 @@ class ModulePurchasePriceV2(APIView):
                     for i in bundle_ids:
                         bundle_obj = BundleDetails.objects.get(id=i)
                         bundle_modules = list(bundle_obj.modules.all().values_list("id", flat=True))
+                        bundle_module_submodule = list(ModuleDetails.objects.filter(
+                            modules__id__in=bundle_modules, 
+                        ).values_list("id", flat=True))
+                        if bundle_module_submodule:
+                            bundle_module.extend(bundle_module_submodule)
                         bundle_module.extend(bundle_modules)
                         pending_amount = (bundle_obj.yearly_price / 365) * pending
                         bundle_price = bundle_price + pending_amount
                     for i in modules_ids:
                         module_obj = ModuleDetails.objects.get(id=i)
                         if i not in bundle_module:
-                            if module_obj.is_submodule == False:
-                                pending_amount = (module_obj.yearly_price / 365) * pending
-                                module_price = module_price + pending_amount
+                            pending_amount = (module_obj.yearly_price / 365) * pending
+                            module_price = module_price + pending_amount
 
                 amount = module_price + bundle_price
                 subscription_end_date = new_end_date
@@ -4502,6 +4551,11 @@ class ModulePurchasePriceV2(APIView):
                     for i in bundle_ids:
                         bundle_obj = BundleDetails.objects.get(id=i)
                         bundle_modules = list(bundle_obj.modules.all().values_list("id", flat=True))
+                        bundle_module_submodule = list(ModuleDetails.objects.filter(
+                            modules__id__in=bundle_modules, 
+                        ).values_list("id", flat=True))
+                        if bundle_module_submodule:
+                            bundle_module.extend(bundle_module_submodule)
                         bundle_module.extend(bundle_modules)
                         if i not in already_added_bundle:
                             amount = bundle_obj.monthly_price
@@ -4511,13 +4565,12 @@ class ModulePurchasePriceV2(APIView):
                             bundle_price = bundle_price + pending_amount
                     for i in modules_ids:
                         module_obj = ModuleDetails.objects.get(id=i)
-                        if module_obj.is_submodule == False:
-                            if i not in bundle_module and i not in already_added_module:
-                                amount = module_obj.monthly_price
-                                module_price = module_price + amount
-                            elif i in already_added_module:
-                                pending_amount = (module_obj.monthly_price / 30) * pending
-                                module_price = module_price + pending_amount
+                        if i not in bundle_module and i not in already_added_module:
+                            amount = module_obj.monthly_price
+                            module_price = module_price + amount
+                        elif i in already_added_module:
+                            pending_amount = (module_obj.monthly_price / 30) * pending
+                            module_price = module_price + pending_amount
 
                 elif subscription_type == "YEAR":
                     subscription_end_date = admin_subscription.subscription_end_date
@@ -4526,6 +4579,11 @@ class ModulePurchasePriceV2(APIView):
                     for i in bundle_ids:
                         bundle_obj = BundleDetails.objects.get(id=i)
                         bundle_modules = list(bundle_obj.modules.all().values_list("id", flat=True))
+                        bundle_module_submodule = list(ModuleDetails.objects.filter(
+                            modules__id__in=bundle_modules, 
+                        ).values_list("id", flat=True))
+                        if bundle_module_submodule:
+                            bundle_module.extend(bundle_module_submodule)
                         bundle_module.extend(bundle_modules)
                         if i not in already_added_bundle:
                             amount = bundle_obj.yearly_price
@@ -4535,13 +4593,12 @@ class ModulePurchasePriceV2(APIView):
                             bundle_price = bundle_price + pending_amount
                     for i in modules_ids:
                         module_obj = ModuleDetails.objects.get(id=i)
-                        if module_obj.is_submodule == False:
-                            if i not in bundle_module and i not in already_added_module:
-                                amount = module_obj.yearly_price
-                                module_price = module_price + amount
-                            elif i in already_added_module:
-                                pending_amount = (module_obj.yearly_price / 365) * pending
-                                module_price = module_price + pending_amount
+                        if i not in bundle_module and i not in already_added_module:
+                            amount = module_obj.yearly_price
+                            module_price = module_price + amount
+                        elif i in already_added_module:
+                            pending_amount = (module_obj.yearly_price / 365) * pending
+                            module_price = module_price + pending_amount
 
                 amount = module_price + bundle_price
                 subscription_end_date = new_end_date
@@ -4554,6 +4611,11 @@ class ModulePurchasePriceV2(APIView):
                     for i in bundle_ids:
                         bundle_obj = BundleDetails.objects.get(id=i)
                         bundle_modules = list(bundle_obj.modules.all().values_list("id", flat=True))
+                        bundle_module_submodule = list(ModuleDetails.objects.filter(
+                            modules__id__in=bundle_modules, 
+                        ).values_list("id", flat=True))
+                        if bundle_module_submodule:
+                            bundle_module.extend(bundle_module_submodule)
                         bundle_module.extend(bundle_modules)
                         if i not in already_added_bundle:
                             amount = bundle_obj.yearly_price
@@ -4563,13 +4625,12 @@ class ModulePurchasePriceV2(APIView):
                             bundle_price = bundle_price + pending_amount
                     for i in modules_ids:
                         module_obj = ModuleDetails.objects.get(id=i)
-                        if module_obj.is_submodule == False:
-                            if i not in bundle_module and i not in already_added_module:
-                                amount = module_obj.yearly_price
-                                module_price = module_price + amount
-                            elif i in already_added_module:
-                                pending_amount = (module_obj.yearly_price / 365) * pending
-                                module_price = module_price + pending_amount
+                        if i not in bundle_module and i not in already_added_module:
+                            amount = module_obj.yearly_price
+                            module_price = module_price + amount
+                        elif i in already_added_module:
+                            pending_amount = (module_obj.yearly_price / 365) * pending
+                            module_price = module_price + pending_amount
 
                 amount = module_price + bundle_price
                 subscription_end_date = new_end_date
@@ -4581,6 +4642,11 @@ class ModulePurchasePriceV2(APIView):
                 bundle_obj = BundleDetails.objects.get(id=i)
                 bundle_modules = list(bundle_obj.modules.all().values_list("id", flat=True))
                 bundle_module.extend(bundle_modules)
+                bundle_module_submodule = list(ModuleDetails.objects.filter(
+                    modules__id__in=bundle_modules, 
+                ).values_list("id", flat=True))
+                if bundle_module_submodule:
+                    bundle_module.extend(bundle_module_submodule)
                 if subscription_type == "WEEK":
                     bundle_price = float(bundle_price) + float(bundle_obj.weekly_price)
                     subscription_end_date = current_date + timedelta(days=7)
@@ -4593,17 +4659,16 @@ class ModulePurchasePriceV2(APIView):
             for i in modules_ids:
                 if i not in bundle_module:
                     module_obj = ModuleDetails.objects.get(id=i)
-                    if module_obj.is_submodule == False:
-                        if subscription_type == "WEEK":
-                            module_price = float(module_price) + float(module_obj.weekly_price)
-                            subscription_end_date = current_date + timedelta(days=7)
+                    if subscription_type == "WEEK":
+                        module_price = float(module_price) + float(module_obj.weekly_price)
+                        subscription_end_date = current_date + timedelta(days=7)
 
-                        elif subscription_type == "MONTH":
-                            module_price = float(module_price) + float(module_obj.monthly_price)
-                            subscription_end_date = current_date + timedelta(days=30)
-                        elif subscription_type == "YEAR":
-                            module_price = float(module_price) + float(module_obj.yearly_price)
-                            subscription_end_date = current_date + timedelta(days=365)
+                    elif subscription_type == "MONTH":
+                        module_price = float(module_price) + float(module_obj.monthly_price)
+                        subscription_end_date = current_date + timedelta(days=30)
+                    elif subscription_type == "YEAR":
+                        module_price = float(module_price) + float(module_obj.yearly_price)
+                        subscription_end_date = current_date + timedelta(days=365)
             amount = module_price + bundle_price
 
         price_data = {
