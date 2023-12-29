@@ -728,7 +728,7 @@ class UploadCsv(APIView):
                             employee_id=row.get("EMPLOYEE ID"),
                             employee_name=row.get("EMPLOYEE NAME"),
                             team=row.get("TEAM"),
-                            working_hour=row.get("WORKING HOURS/WEEK/ MONTHLY")
+                            working_hour=row.get("WORKING HOURS/WEEK/ MONTHLY", 0)
                         )
                     )
                 else:
@@ -747,7 +747,7 @@ class UploadCsv(APIView):
                         team=row.get("TEAM"),
                         designation=row.get("DESIGNATION"),
                         department=row.get("DEPARTMENTS"),
-                        working_hour=row.get("WORKING HOUR")
+                        working_hour=row.get("WORKING HOUR", 0)
                     )
                 )
 
@@ -1084,6 +1084,8 @@ class GenerateReport(APIView):
                 week_working_hour = float(week_working_hour) * 5.0
                 if csv_file.working_type == "WEEK":
                     for i in log:
+                        if not i.working_hour:
+                            i.working_hour = 0
                         working_hr = float(i.working_hour)
 
                         
@@ -1100,6 +1102,8 @@ class GenerateReport(APIView):
                 elif csv_file.working_type == "MONTH":
                     week_working_hour =float(week_working_hour) *4
                     for i in log:
+                        if not i.working_hour:
+                            i.working_hour = 0
                         working_hr = float(i.working_hour)
                     
                         extra_hr = float(i.working_hour) - float(week_working_hour)
