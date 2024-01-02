@@ -720,17 +720,17 @@ class UploadCsv(APIView):
         if module.module_identifier == 1:
             for row in reader:
                 if "S.NO"in row and "EMPLOYEE ID" in row and  "EMPLOYEE NAME"  in row and "TEAM" in row and "WORKING HOURS/WEEK/ MONTHLY":
-
-                    to_save.append(
-                        CsvLogDetails(
-                            uploaded_file=upload_log,
-                            sl_no=row.get("S.NO"),
-                            employee_id=row.get("EMPLOYEE ID"),
-                            employee_name=row.get("EMPLOYEE NAME"),
-                            team=row.get("TEAM"),
-                            working_hour=row.get("WORKING HOURS/WEEK/ MONTHLY", 0)
+                    if row.get("EMPLOYEE ID"):
+                        to_save.append(
+                            CsvLogDetails(
+                                uploaded_file=upload_log,
+                                sl_no=row.get("S.NO"),
+                                employee_id=row.get("EMPLOYEE ID"),
+                                employee_name=row.get("EMPLOYEE NAME"),
+                                team=row.get("TEAM"),
+                                working_hour=row.get("WORKING HOURS/WEEK/ MONTHLY", 0)
+                            )
                         )
-                    )
                 else:
                     upload_log.delete()
                     response_dict["error"] = "Field Mismatch"
@@ -738,36 +738,38 @@ class UploadCsv(APIView):
                     
         elif module.module_identifier == 2:
             for row in reader:
-                to_save.append(
-                    CsvLogDetails(
-                        uploaded_file=upload_log,
-                        sl_no=row.get("S.NO"),
-                        employee_id=row.get("EMPLOYEE ID"),
-                        employee_name=row.get("EMPLOYEE NAME"),
-                        team=row.get("TEAM"),
-                        designation=row.get("DESIGNATION"),
-                        department=row.get("DEPARTMENTS"),
-                        working_hour=row.get("WORKING HOUR", 0)
-                    )
-                )
-
-        elif module.module_identifier == 3:
-            for row in reader:
-                if "S.NO" in row and "EMPLOYEE ID" in row and  "EMPLOYEE NAME" in row and "DESIGNATION" in row and "DEPARTMENTS" in row and "WORKING HOURS/MONTHLY" in row:
+                if row.get("EMPLOYEE ID"):
                     to_save.append(
                         CsvLogDetails(
                             uploaded_file=upload_log,
                             sl_no=row.get("S.NO"),
                             employee_id=row.get("EMPLOYEE ID"),
                             employee_name=row.get("EMPLOYEE NAME"),
+                            team=row.get("TEAM"),
                             designation=row.get("DESIGNATION"),
-                            department=row.get("DEPARTMENTS") if row.get("DEPARTMENTS") else row.get("DEPARTMENT"),
-                            working_hour=row.get("WORKING HOURS/MONTHLY"),
-                            hourly_rate=row.get("HOURLY RATE"),
-                            total_pay=round(float(row.get("WORKING HOURS/MONTHLY", 0)) * float(row.get("HOURLY RATE", 0)), 2)
-
+                            department=row.get("DEPARTMENTS"),
+                            working_hour=row.get("WORKING HOUR", 0)
                         )
                     )
+
+        elif module.module_identifier == 3:
+            for row in reader:
+                if "S.NO" in row and "EMPLOYEE ID" in row and  "EMPLOYEE NAME" in row and "DESIGNATION" in row and "DEPARTMENTS" in row and "WORKING HOURS/MONTHLY" in row:
+                    if row.get("EMPLOYEE ID"):
+                        to_save.append(
+                            CsvLogDetails(
+                                uploaded_file=upload_log,
+                                sl_no=row.get("S.NO"),
+                                employee_id=row.get("EMPLOYEE ID"),
+                                employee_name=row.get("EMPLOYEE NAME"),
+                                designation=row.get("DESIGNATION"),
+                                department=row.get("DEPARTMENTS") if row.get("DEPARTMENTS") else row.get("DEPARTMENT"),
+                                working_hour=row.get("WORKING HOURS/MONTHLY"),
+                                hourly_rate=row.get("HOURLY RATE"),
+                                total_pay=round(float(row.get("WORKING HOURS/MONTHLY", 0)) * float(row.get("HOURLY RATE", 0)), 2)
+
+                            )
+                        )
                 else:
                     upload_log.delete()
                     response_dict["error"] = "Field Mismatch"
@@ -780,6 +782,28 @@ class UploadCsv(APIView):
                     if row.get("INDIVIDUAL ACH. IN %") and "%" in row.get("INDIVIDUAL ACH. IN %"):
                         individual_ach_in = str(row.get("INDIVIDUAL ACH. IN %")).replace("%","")
                         individual_ach_in = float(individual_ach_in)
+                    if row.get("EMPLOYEE ID"):
+                        to_save.append(
+                            CsvLogDetails(
+                                uploaded_file=upload_log,
+                                sl_no=row.get("S.NO"),
+                                employee_id=row.get("EMPLOYEE ID"),
+                                employee_name=row.get("EMPLOYEE NAME"),
+                                designation=row.get("DESIGNATION"),
+                                department=row.get("Department") if row.get("Department") else row.get("DEPARTMENT"),
+                                working_hour=row.get("WORKING HOURS/MONTH", 0),
+                                hourly_rate=row.get("HOURLY RATE"),
+                                extra_hour = row.get("EXTRA WORKING HOURS", 0),
+                                fixed_pay =row.get("FIXED PAY", 0),
+                                individual_ach_in =individual_ach_in
+                            )
+                        )
+        elif module.module_identifier == 5:
+            for row in reader:
+                gender = ""
+                if row.get("Gender"):
+                    gender = row.get("Gender").replace(" ","")
+                if row.get("EMPLOYEE ID"):
                     to_save.append(
                         CsvLogDetails(
                             uploaded_file=upload_log,
@@ -787,67 +811,49 @@ class UploadCsv(APIView):
                             employee_id=row.get("EMPLOYEE ID"),
                             employee_name=row.get("EMPLOYEE NAME"),
                             designation=row.get("DESIGNATION"),
-                            department=row.get("Department") if row.get("Department") else row.get("DEPARTMENT"),
-                            working_hour=row.get("WORKING HOURS/MONTH", 0),
-                            hourly_rate=row.get("HOURLY RATE"),
-                            extra_hour = row.get("EXTRA WORKING HOURS", 0),
+                            department=row.get("department"),
+                            working_hour=row.get("WORKING HOURS/ MONTH", 0),
+                            age=row.get("AGE"),
                             fixed_pay =row.get("FIXED PAY", 0),
-                            individual_ach_in =individual_ach_in
+                            experience=row.get("experience"),
+                            region=row.get("Region"),
+                            gender=gender,
+
                         )
                     )
-        elif module.module_identifier == 5:
-            for row in reader:
-                gender = ""
-                if row.get("Gender"):
-                    gender = row.get("Gender").replace(" ","")
-                to_save.append(
-                    CsvLogDetails(
-                        uploaded_file=upload_log,
-                        sl_no=row.get("S.NO"),
-                        employee_id=row.get("EMPLOYEE ID"),
-                        employee_name=row.get("EMPLOYEE NAME"),
-                        designation=row.get("DESIGNATION"),
-                        department=row.get("department"),
-                        working_hour=row.get("WORKING HOURS/ MONTH"),
-                        age=row.get("AGE"),
-                        fixed_pay =row.get("FIXED PAY", 0),
-                        experience=row.get("experience"),
-                        region=row.get("Region"),
-                        gender=gender,
-
-                    )
-                )
 
         elif module.module_identifier == 6:
             c = 0
             for row in reader:
                 c = c + 1
-                to_save.append(
-                    CsvLogDetails(
-                        uploaded_file=upload_log,
-                        sl_no=c,
-                        department=row.get("DEPARTMENTS"),
-                        system_name=row.get("SYSTEM NAME"),
-                        factors_effected=row.get("FACTORS EFFECTED"),
-                        downtime_week=row.get("DOWN TIME IN WEEK"),
-                        impact_hour=row.get("IMPACT HOUR"),
+                if row.get("DEPARTMENTS"):
+                    to_save.append(
+                        CsvLogDetails(
+                            uploaded_file=upload_log,
+                            sl_no=c,
+                            department=row.get("DEPARTMENTS"),
+                            system_name=row.get("SYSTEM NAME"),
+                            factors_effected=row.get("FACTORS EFFECTED"),
+                            downtime_week=row.get("DOWN TIME IN WEEK", 0),
+                            impact_hour=row.get("IMPACT HOUR", 0),
+                        )
                     )
-                )
 
         elif module.module_identifier == 10:
             c = 0
             for row in reader:
                 c = c + 1
-                to_save.append(
-                    CsvLogDetails(
-                        uploaded_file=upload_log,
-                        sl_no=c,
-                        location=row.get("LOCATIONS"),
-                        no_of_truck_required=row.get("No of truckers required"),
-                        actual=row.get("Actual"),
-                        vehicle_utilisation=row.get("Vehicle utilisation/ no of days running."),
+                if row.get("LOCATIONS"):
+                    to_save.append(
+                        CsvLogDetails(
+                            uploaded_file=upload_log,
+                            sl_no=c,
+                            location=row.get("LOCATIONS"),
+                            no_of_truck_required=row.get("No of truckers required", 0),
+                            actual=row.get("Actual"),
+                            vehicle_utilisation=row.get("Vehicle utilisation/ no of days running.", 0),
+                        )
                     )
-                )
 
         elif module.module_identifier == 7:
             # call center
@@ -870,20 +876,21 @@ class UploadCsv(APIView):
                     transaction_rate = str(row.get("Transaction drop rates").replace("%",""))
 
                 c = c + 1
-                to_save.append(
-                    CsvLogDetails(
-                        uploaded_file=upload_log,
-                        sl_no=c,
-                        center_name=row.get("Center name"),
-                        employee_name=row.get("Empoyee name"),
-                        no_of_days_per_week=row.get("no of days per week ( 6days)"),
-                        employee_availability=employee_availability,
-                        calls_per_hour=calls_per_hour,
-                        conversion_rate=conversion_rate,
-                        call_drop_rate=call_drop_rate,
-                        transaction_rate=transaction_rate,
+                if row.get("Center name"):
+                    to_save.append(
+                        CsvLogDetails(
+                            uploaded_file=upload_log,
+                            sl_no=c,
+                            center_name=row.get("Center name"),
+                            employee_name=row.get("Empoyee name"),
+                            no_of_days_per_week=row.get("no of days per week ( 6days)", 0),
+                            employee_availability=employee_availability,
+                            calls_per_hour=calls_per_hour,
+                            conversion_rate=conversion_rate,
+                            call_drop_rate=call_drop_rate,
+                            transaction_rate=transaction_rate,
+                        )
                     )
-                )
 
         elif module.module_identifier == 11:
             # support
@@ -903,19 +910,20 @@ class UploadCsv(APIView):
                 if row.get("CX call no response"):
                     cx_call_no_response = str(row.get("CX call no response").replace("%",""))
                 c = c + 1
-                to_save.append(
-                    CsvLogDetails(
-                        uploaded_file=upload_log,
-                        sl_no=c,
-                        center_name=row.get("Center name"),
-                        employee_name=row.get("Empoyee name"),
-                        no_of_days_per_week=row.get("no of days per week ( 6days)"),
-                        employee_availability=employee_availability,
-                        calls_per_hour=calls_per_hour,
-                        non_resloution=non_resloution,
-                        cx_call_no_response=cx_call_no_response,
+                if row.get("Center name"):
+                    to_save.append(
+                        CsvLogDetails(
+                            uploaded_file=upload_log,
+                            sl_no=c,
+                            center_name=row.get("Center name"),
+                            employee_name=row.get("Empoyee name"),
+                            no_of_days_per_week=row.get("no of days per week ( 6days)", 0),
+                            employee_availability=employee_availability,
+                            calls_per_hour=calls_per_hour,
+                            non_resloution=non_resloution,
+                            cx_call_no_response=cx_call_no_response,
+                        )
                     )
-                )
 
         elif module.module_identifier == 12:
             # support
@@ -935,19 +943,20 @@ class UploadCsv(APIView):
                 if row.get("Impressions drop"):
                     impression_drop = str(row.get("Impressions drop").replace("%",""))
                 c = c + 1
-                to_save.append(
-                    CsvLogDetails(
-                        uploaded_file=upload_log,
-                        sl_no=c,
-                        center_name=row.get("Center name"),
-                        employee_name=row.get("Empoyee name"),
-                        no_of_days_per_week=row.get("no of days per week ( 6days)",0),
-                        employee_availability=employee_availability,
-                        total_impression_per_hour=row.get("Total impressions per hour", 0),
-                        conversion_rate=conversion_rate,
-                        impression_drop=impression_drop
+                if row.get("Empoyee name"):
+                    to_save.append(
+                        CsvLogDetails(
+                            uploaded_file=upload_log,
+                            sl_no=c,
+                            center_name=row.get("Center name"),
+                            employee_name=row.get("Empoyee name"),
+                            no_of_days_per_week=row.get("no of days per week ( 6days)",0),
+                            employee_availability=employee_availability,
+                            total_impression_per_hour=row.get("Total impressions per hour", 0),
+                            conversion_rate=conversion_rate,
+                            impression_drop=impression_drop
+                        )
                     )
-                )
 
         elif module.module_identifier == 8:
             c = 0
@@ -956,18 +965,19 @@ class UploadCsv(APIView):
                 if row.get("level of automation possible in %"):
                     level_of_automation_possible = str(row.get("level of automation possible in %").replace("%",""))
                 c = c + 1
-                to_save.append(
-                    CsvLogDetails(
-                        uploaded_file=upload_log,
-                        sl_no=c,
-                        department=row.get("departments"),
-                        no_of_man_hours_required=row.get("no. of Man hours required"),
-                        no_of_resource_required=row.get("no. of resources required"),
-                        software=row.get("software"),
-                        software_cost=row.get("software cost"),
-                        level_of_automation_possible=level_of_automation_possible
+                if row.get("departments"):
+                    to_save.append(
+                        CsvLogDetails(
+                            uploaded_file=upload_log,
+                            sl_no=c,
+                            department=row.get("departments"),
+                            no_of_man_hours_required=row.get("no. of Man hours required", 0),
+                            no_of_resource_required=row.get("no. of resources required", 0),
+                            software=row.get("software"),
+                            software_cost=row.get("software cost", 0),
+                            level_of_automation_possible=level_of_automation_possible
+                        )
                     )
-                )
 
         if module.module_identifier != 9:
             if (len(to_save)) < 1:
