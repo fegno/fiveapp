@@ -2029,12 +2029,29 @@ class AnalyticsReport(APIView):
             if my_log_cost:
                 total_my_cost = my_log_cost.get("total_cost")
 
+            total_revenue =  CsvLogDetails.objects.filter(
+                uploaded_file__id=pk
+            ).filter(
+                Q(uploaded_file__uploaded_by=request.user)|
+                Q(uploaded_file__uploaded_by__created_admin=request.user)
+            ).annotate(
+                weightage=Subquery(weightage_data),
+            ).annotate(
+                revenue_contribution=monthly_revenue_cal*F("weightage"),
+            ).aggregate(tot=Sum("revenue_contribution"))
+            total_revenue = total_revenue.get("tot")
+
+
             status_list = [
                 When(rc_coe__gte=0, rc_coe__lte=3, then=Value("Low")),
                 When(rc_coe__gt=3, rc_coe__lte=4, then=Value("Medium")),
                 When(rc_coe__gt=5,then=Value("High")),
             ]
+            v_chain_list = [
+                When(tot_revenue__gte=0.8, then=Value("A")),
+            ]
 
+            
             log  = CsvLogDetails.objects.filter(
                 uploaded_file__id=pk
             ).filter(
@@ -2042,7 +2059,6 @@ class AnalyticsReport(APIView):
                 Q(uploaded_file__uploaded_by__created_admin=request.user)
             ).values("department").annotate(
                 employee_count=Count("id"),
-                v_chain=Value("A"),
                 cost_of_employee=Sum("total_pay"),
                 weightage=Subquery(weightage_data),
                 status=Value("Overloaded")
@@ -2050,10 +2066,15 @@ class AnalyticsReport(APIView):
                 revenue_contribution=monthly_revenue_cal*F("weightage"),
                 cost_contribution=(F("cost_of_employee")/total_my_cost)*100
             ).annotate(
-                rc_coe=F("revenue_contribution")/F("cost_of_employee")
+                rc_coe=F("revenue_contribution")/F("cost_of_employee"),
+                tot_revenue=F("revenue_contribution")*total_revenue
             ).annotate(
                 score=Case(
                     *status_list, default=Value(""), output_field=CharField()
+                ),
+            ).annotate(
+                v_chain=Case(
+                    *v_chain_list, default=Value(""), output_field=CharField()
                 ),
             ).values(
                 "department", 
@@ -2065,8 +2086,9 @@ class AnalyticsReport(APIView):
                 "cost_contribution",
                 "rc_coe",
                 "score",
-                "status"
+                "status",
             )
+
             response_dict["report"] = log.values("department", "status", "score", "rc_coe","cost_contribution", "revenue_contribution", "employee_count", "v_chain", "cost_of_employee", "weightage")
 
         elif csv_file.modules.module_identifier == 4:
