@@ -2030,18 +2030,19 @@ class AnalyticsReport(APIView):
                 total_my_cost = my_log_cost.get("total_cost")
 
             total_revenue =  CsvLogDetails.objects.filter(
-                uploaded_file__id=pk
-            ).filter(
-                Q(uploaded_file__uploaded_by=request.user)|
-                Q(uploaded_file__uploaded_by__created_admin=request.user)
-            ).annotate(
-                weightage=Subquery(weightage_data),
-            ).annotate(
-                revenue_contribution=monthly_revenue_cal*F("weightage"),
-            ).aggregate(tot=Sum("revenue_contribution"))
+                    uploaded_file__id=pk
+                ).filter(
+                    Q(uploaded_file__uploaded_by=request.user)|
+                    Q(uploaded_file__uploaded_by__created_admin=request.user)
+                ).values("department").annotate(
+                    employee_count=Count("id"),
+                    weightage=Subquery(weightage_data),
+                ).annotate(
+                    revenue_contribution=monthly_revenue_cal*F("weightage"),
+                ).aggregate(tot=Sum("revenue_contribution"))
             total_revenue = total_revenue.get("tot")
 
-
+            
             status_list = [
                 When(rc_coe__gte=0, rc_coe__lte=3, then=Value("Low")),
                 When(rc_coe__gt=3, rc_coe__lte=4, then=Value("Medium")),
@@ -2067,7 +2068,7 @@ class AnalyticsReport(APIView):
                 cost_contribution=(F("cost_of_employee")/total_my_cost)*100
             ).annotate(
                 rc_coe=F("revenue_contribution")/F("cost_of_employee"),
-                tot_revenue=F("revenue_contribution")*total_revenue
+                tot_revenue=F("revenue_contribution")/total_revenue
             ).annotate(
                 score=Case(
                     *status_list, default=Value(""), output_field=CharField()
@@ -2076,7 +2077,7 @@ class AnalyticsReport(APIView):
                 v_chain=Case(
                     *v_chain_list, default=Value(""), output_field=CharField()
                 ),
-            ).values(
+            ).order_by("-tot_revenue").values(
                 "department", 
                 "employee_count",
                 "v_chain",
@@ -2087,9 +2088,40 @@ class AnalyticsReport(APIView):
                 "rc_coe",
                 "score",
                 "status",
+                "tot_revenue"
             )
+            log_dict = []
+            my_flag = False
+            my_value = 0
+            for i in log:
+                v_chain = i.get("v_chain")
+                if my_flag and  i.get("v_chain") == "":
+                    tot = total_revenue - my_value
+                    if i.get("revenue_contribution") == tot:
+                        v_chain = "B"
+                    else:
+                        v_chain = "C"
+                log_dict.append(
+                    {
+                        "department":i.get("department"),
+                        "status":i.get("status"),
+                        "score":i.get("score"),
+                        "rc_coe":i.get("rc_coe"),
+                        "cost_contribution":i.get("cost_contribution"),
+                        "revenue_contribution":i.get("revenue_contribution"),
+                        "employee_count":i.get("employee_count"),
+                        "v_chain":v_chain,
+                        "cost_of_employee":i.get("cost_of_employee"),
+                        "weightage":i.get("weightage"),
+                        
 
-            response_dict["report"] = log.values("department", "status", "score", "rc_coe","cost_contribution", "revenue_contribution", "employee_count", "v_chain", "cost_of_employee", "weightage")
+                    }
+                )
+                if i.get("tot_revenue") and i.get("tot_revenue") * 100 >= 80:
+                    my_flag = True
+                    my_value = i.get("revenue_contribution")
+        
+            response_dict["report"] = log_dict
 
         elif csv_file.modules.module_identifier == 4:
             log  = CsvLogDetails.objects.filter(
