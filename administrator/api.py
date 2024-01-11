@@ -1165,11 +1165,14 @@ class GenerateReport(APIView):
                     i.holiday_hours = float(i.working_hour) - float(total_working_hours)
                     i.holiday_pay = i.holiday_hours * i.hourly_rate
                     ind_cal = (i.fixed_pay * float(individual_varriable_pay_wgt))/100
-                    i.individual_varriable_pay = (ind_cal * 0.5 * i.individual_ach_in)/100
-                    i.department_varriable_pay = (ind_cal *0.5)*float(department_varriable_pay_wgt)/100
-                    i.company_varriable_pay = (ind_cal * 0.5) * float(company_varriable_pay_wgt)/100
+                    dep_cal = (i.fixed_pay * float(department_varriable_pay_wgt))/100
+                    com_cal = (i.fixed_pay * float(company_varriable_pay_wgt))/100
+                    company_tar = float(company_target_achieved)/100
+                    i.individual_varriable_pay = (ind_cal * company_tar * i.individual_ach_in)/100
+                    i.department_varriable_pay = (dep_cal *company_tar)*float(department_target_achieved)/100
+                    i.company_varriable_pay = com_cal * (float(company_target_achieved)/100)
                     i.varriable_pay = (i.department_varriable_pay + i.individual_varriable_pay) + float(i.individual_ach_in)/100
-                    i.gross_pay = i.varriable_pay + i.overtime_pay + i.fixed_pay + i.holiday_pay
+                    i.gross_pay = i.varriable_pay + i.overtime_pay + i.fixed_pay 
                     i.save()
 
                 csv_file.is_report_generated = True
