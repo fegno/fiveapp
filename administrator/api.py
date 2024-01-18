@@ -2032,29 +2032,14 @@ class AnalyticsReport(APIView):
             if my_log_cost:
                 total_my_cost = my_log_cost.get("total_cost")
 
-            total_revenue =  CsvLogDetails.objects.filter(
-                    uploaded_file__id=pk
-                ).filter(
-                    Q(uploaded_file__uploaded_by=request.user)|
-                    Q(uploaded_file__uploaded_by__created_admin=request.user)
-                ).values("department").annotate(
-                    employee_count=Count("id"),
-                    weightage=Subquery(weightage_data),
-                ).annotate(
-                    revenue_contribution=monthly_revenue_cal*F("weightage"),
-                ).aggregate(tot=Sum("revenue_contribution"))
-            total_revenue = total_revenue.get("tot")
-
+            
             
             status_list = [
                 When(rc_coe__gte=0, rc_coe__lte=3, then=Value("Low")),
                 When(rc_coe__gt=3, rc_coe__lte=4, then=Value("Medium")),
                 When(rc_coe__gt=5,then=Value("High")),
             ]
-            v_chain_list = [
-                When(tot_revenue__gte=0.8, then=Value("A")),
-            ]
-
+            
             
             log  = CsvLogDetails.objects.filter(
                 uploaded_file__id=pk
@@ -2071,39 +2056,36 @@ class AnalyticsReport(APIView):
                 cost_contribution=(F("cost_of_employee")/total_my_cost)*100
             ).annotate(
                 rc_coe=F("revenue_contribution")/F("cost_of_employee"),
-                tot_revenue=F("revenue_contribution")/total_revenue
             ).annotate(
                 score=Case(
                     *status_list, default=Value(""), output_field=CharField()
                 ),
-            ).annotate(
-                v_chain=Case(
-                    *v_chain_list, default=Value(""), output_field=CharField()
-                ),
-            ).order_by("-tot_revenue").values(
+            ).order_by("-department").values(
                 "department", 
                 "employee_count",
-                "v_chain",
                 "cost_of_employee",
                 "weightage",
                 "revenue_contribution",
                 "cost_contribution",
                 "rc_coe",
                 "score",
-                "status",
-                "tot_revenue"
             )
+
+            total_revenue =  log.aggregate(tot=Sum("rc_coe"))
+            total_revenue = total_revenue.get("tot")
+
             log_dict = []
             my_flag = False
             my_value = 0
             for i in log:
-                v_chain = i.get("v_chain")
-                if my_flag and  i.get("v_chain") == "":
-                    tot = total_revenue - my_value
-                    if i.get("revenue_contribution") == tot:
-                        v_chain = "B"
-                    else:
-                        v_chain = "C"
+                per = float(i.get("rc_coe")) * 100/float(total_revenue) if total_revenue else 0
+                if per >= 20:
+                    v_chain = "A"
+                elif per >= 10 and per <20:
+                    v_chain = "B"
+                elif per < 10:
+                    v_chain = "C"
+
                 log_dict.append(
                     {
                         "department":i.get("department"),
