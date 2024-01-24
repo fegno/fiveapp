@@ -2762,7 +2762,7 @@ class AnalyticsReport(APIView):
         elif csv_file.modules.module_identifier == 9:
             report = []
 
-    
+            lead_time_v5 = 0
             avg_order_per_hour = float(csv_file.total_orders_pay_day)/float(csv_file.operating_hours_day) if csv_file.operating_hours_day != 0 else 0
             no_of_res = avg_order_per_hour/12
             productivity_varriation_cal = float(csv_file.actual_resource_per_hour)/no_of_res if no_of_res !=0  else 0
