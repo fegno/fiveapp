@@ -2784,6 +2784,8 @@ class AnalyticsReport(APIView):
 
                 lead_time_v4 = lead_time/csv_file.actual_resource_per_hour if csv_file.actual_resource_per_hour != 0 else 0
                 lead_time_v5 = lead_time_v3 * lead_time_v4
+            else:
+                lead_time_v5 = csv_file.lead_time
             report.append(
                 {
                     "per_day_value":"LEAD TIME (AT WAREHOUSE)",
