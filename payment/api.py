@@ -174,8 +174,8 @@ class InitiatePayment(APIView):
 		order.save()
 		with transaction.atomic():
 			stripe.api_key=settings.STRIPE_API_KEY
-			intent = stripe.PaymentIntent.create(amount=round(order.total_price*100),currency='gbp')
-			payment_attempt=PaymentAttempt.objects.create(parchase_user_type="Subscription",parchase=order,user=request.user,currency='gbp',amount=order.total_price,
+			intent = stripe.PaymentIntent.create(amount=round(order.total_price*100),currency='inr')
+			payment_attempt=PaymentAttempt.objects.create(parchase_user_type="Subscription",parchase=order,user=request.user,currency='inr',amount=order.total_price,
 				status='Initiated',client_secret=intent['client_secret'],payment_intent_id=intent['id'],last_attempt_date=timezone.now())
 		
 			response_dict['client_secret']=payment_attempt.client_secret
@@ -441,8 +441,8 @@ class InitiateUserPayment(APIView):
 		)
 		with transaction.atomic():
 			stripe.api_key=settings.STRIPE_API_KEY
-			intent = stripe.PaymentIntent.create(amount=round(order.total_price*100),currency='gbp')
-			payment_attempt=PaymentAttempt.objects.create(parchase_user_type="User",parchase=order,user=request.user,currency='gbp',amount=order.total_price,
+			intent = stripe.PaymentIntent.create(amount=round(order.total_price*100),currency='inr')
+			payment_attempt=PaymentAttempt.objects.create(parchase_user_type="User",parchase=order,user=request.user,currency='inr',amount=order.total_price,
 				status='Initiated',client_secret=intent['client_secret'],payment_intent_id=intent['id'],last_attempt_date=timezone.now())
 		
 			response_dict['client_secret']=payment_attempt.client_secret
@@ -586,7 +586,7 @@ class MockInitiatePayment(APIView):
 					subscription.bundle.add(*list(order.bundle.values_list("id", flat=True)))
 
 			with transaction.atomic():
-				payment_attempt=PaymentAttempt.objects.create(parchase_user_type="Subscription",parchase=order,user=request.user,currency='gbp',amount=order.total_price,
+				payment_attempt=PaymentAttempt.objects.create(parchase_user_type="Subscription",parchase=order,user=request.user,currency='inr',amount=order.total_price,
 					status='succeeded',last_attempt_date=timezone.now())
 				response_dict['purchase-id']=payment_attempt.id
 				response_dict['status']=True
@@ -753,8 +753,8 @@ class InitiateUserPaymentV2(APIView):
 
 		with transaction.atomic():
 			stripe.api_key=settings.STRIPE_API_KEY
-			intent = stripe.PaymentIntent.create(amount=round(order.total_price*100),currency='gbp')
-			payment_attempt=PaymentAttempt.objects.create(parchase_user_type="User",parchase=order,user=request.user,currency='gbp',amount=order.total_price,
+			intent = stripe.PaymentIntent.create(amount=round(order.total_price*100),currency='inr')
+			payment_attempt=PaymentAttempt.objects.create(parchase_user_type="User",parchase=order,user=request.user,currency='inr',amount=order.total_price,
 				status='Initiated',client_secret=intent['client_secret'],payment_intent_id=intent['id'],last_attempt_date=timezone.now())
 			response_dict['client_secret']=payment_attempt.client_secret
 			response_dict['status']=True
@@ -904,8 +904,8 @@ class InitiatePaymentV2(APIView):
 
 		with transaction.atomic():
 			stripe.api_key=settings.STRIPE_API_KEY
-			intent = stripe.PaymentIntent.create(amount=round(order.total_price*100),currency='gbp')
-			payment_attempt=PaymentAttempt.objects.create(parchase_user_type="Subscription",parchase=order,user=request.user,currency='gbp',amount=order.total_price,
+			intent = stripe.PaymentIntent.create(amount=round(order.total_price*100),currency='inr')
+			payment_attempt=PaymentAttempt.objects.create(parchase_user_type="Subscription",parchase=order,user=request.user,currency='inr',amount=order.total_price,
 				status='Initiated',client_secret=intent['client_secret'],payment_intent_id=intent['id'],last_attempt_date=timezone.now())
 		
 			response_dict['client_secret']=payment_attempt.client_secret
