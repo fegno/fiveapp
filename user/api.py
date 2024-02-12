@@ -69,7 +69,7 @@ class Applogin(APIView):
             response_dict["message"] = "Login Method DoesNotExist"
             return Response(response_dict, HTTP_200_OK)
         
-        if user.user_type == "USER":
+        if user.user_type == "USER" and not user.is_free_user:
             now_date = timezone.now().date()
             if user.subscription_end_date and user.subscription_end_date < now_date:
                 response_dict["error"] = "Subscription expired please contact admin"
