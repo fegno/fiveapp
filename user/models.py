@@ -52,6 +52,8 @@ class UserProfile(AbstractUser):
     created = models.DateTimeField(auto_now_add=True)
     updated = models.DateTimeField(auto_now=True)
 
+    is_deleted = models.BooleanField(null=True, blank=True, default=False)
+
 
     def __str__(self):
         return self.username
