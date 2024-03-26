@@ -34,6 +34,9 @@ from rest_framework import status
 from django.core.mail import send_mail, EmailMessage
 from django.template.loader import render_to_string
 
+from django.utils.encoding import force_text
+from django.utils.http import urlsafe_base64_decode
+
 
 def process_tasks():
     process_tasks_cmd = "python manage.py process_tasks"
@@ -56,14 +59,20 @@ class Applogin(APIView):
         if email == None or email == "null":
             response_dict["message"] = "Email cannot be empty"
             return Response(response_dict, HTTP_200_OK)
+        
         if email:
-            authenticated = authenticate(username=email, password=password)
-            if authenticated:
-                user = get_object_or_404(UserProfile, username=email)
-                user.save()
-                flag = 1
+            user = UserProfile.objects.get(email=email)
+            if user.is_active == True:
+                authenticated = authenticate(username=email, password=password)
+                if authenticated:
+                    user = get_object_or_404(UserProfile, username=email)
+                    user.save()
+                    flag = 1
+                else:
+                    response_dict["message"] = "Username or password incorrect"
+                    return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
             else:
-                response_dict["message"] = "Username or password incorrect"
+                response_dict["message"] = "User is deleted"
                 return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
         else:
             response_dict["message"] = "Login Method DoesNotExist"
@@ -779,3 +788,29 @@ class CardDetailsDelete(APIView):
         else:
             response_dict["error"] = "Access Denied, Only Admin can access the process"
             return Response(response_dict, status=status.HTTP_403_FORBIDDEN)
+        
+
+class DeleteUser(APIView):
+    permission_classes = (IsAuthenticated,)
+    authentication_classes = (CustomTokenAuthentication,)
+
+    def delete(self, request):
+        response_dict = {}
+    
+        try:
+            user = request.user
+            user_profile = UserProfile.objects.get(pk=user.id)
+
+            user_profile.is_active = False
+            user_profile.is_deleted = True
+            user_email = user_profile.email + "deleted"
+            user_profile.email = user_email
+            user_profile.username = user_email
+            user_profile.save()
+            response_dict["status"] = True
+            response_dict["message"] = "Successfully deleted the user"
+            return Response(response_dict, status=status.HTTP_200_OK)
+        except (TypeError, ValueError, OverflowError, UserProfile.DoesNotExist):
+            response_dict["status"] = False
+            response_dict["message"] = "Invalid token or user not found"
+            return Response(response_dict, status=status.HTTP_400_BAD_REQUEST)
